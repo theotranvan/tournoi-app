@@ -41,6 +41,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+prod = [
+    "django-storages[boto3]>=1.14,<2.0",
+]
 dev = [
     "pytest>=8.0",
     "pytest-django>=4.8",

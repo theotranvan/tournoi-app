@@ -89,25 +89,30 @@ cd frontend && npm run build
 python scripts/load_test_ws.py ws://localhost:8000/ws/tournaments/demo/ 200
 ```
 
-## ✅ Checklist avant un vrai tournoi
+## ✅ Checklist avant ouverture publique
 
-### 7 jours avant
-- [ ] Backup manuel vérifié (`./backup.sh` + restore test)
-- [ ] Sentry DSN prod configuré et testé (déclencher une erreur volontaire)
-- [ ] DNS propagé
-- [ ] HTTPS valide (Let's Encrypt)
-- [ ] Tests de charge WS lancés : 200 connexions simultanées OK
-- [ ] Seed d'un tournoi fantôme identique au vrai pour répétition
+### J-7
+- [ ] DNS propagé pour footix.app et api.footix.app
+- [ ] HTTPS valide (Let's Encrypt) confirmé
+- [ ] .env.production rempli avec vraies clés
+- [ ] Stripe configuré (TEST puis LIVE)
+- [ ] Sentry DSN actif et erreurs test capturées
+- [ ] Email transactionnel testé (envoyer un mail de reset password)
+- [ ] Premier backup automatique réussi
+- [ ] Restoration de backup testée sur staging
+- [ ] Test de charge WS : 200 connexions OK
+- [ ] Pages légales /legal/mentions et /legal/confidentialite à jour
 
-### 24h avant
-- [ ] `docker compose -f docker-compose.prod.yml up -d` sur la vraie prod
-- [ ] Vérifier que tous les healthchecks sont verts
-- [ ] Vérifier que la génération du planning du vrai tournoi fonctionne
-- [ ] Imprimer le kit tournoi (PDF via /admin/tournois/{id}/print/)
-- [ ] Tester un accès coach via QR code avec un vrai téléphone
+### J-1
+- [ ] `./deploy.sh` lancé sur la prod
+- [ ] Tous les healthchecks verts
+- [ ] Premier compte admin créé via createsuperuser
+- [ ] Test complet du flow free plan : créer tournoi, ajouter équipes, générer planning
+- [ ] Test complet du flow Stripe : checkout, webhook reçu, plan activé
+- [ ] Test PWA installable sur iOS et Android (Add to home screen)
 
-### Jour J matin
-- [ ] Vérifier les logs Sentry (0 erreur dans les 12h précédentes)
-- [ ] Tester une saisie de score depuis le téléphone d'un bénévole
-- [ ] Afficher l'écran terrain sur une tablette pour valider le rendu
-- [ ] Briefing des bénévoles avec "mode briefing" planning
+### Jour J
+- [ ] Sentry vide depuis 12h
+- [ ] Logs Nginx propres
+- [ ] Annonce préparée (post LinkedIn, Insta, email pilotes)
+- [ ] Page contact / support prête (email)

@@ -38,7 +38,7 @@ if [ "$SSL" = true ]; then
         --agree-tos \
         --no-eff-email \
         -d "${ALLOWED_HOSTS%%,*}" \
-        --email "${SSL_EMAIL:-admin@kickoff.app}"
+        --email "${SSL_EMAIL:-admin@footix.app}"
     cp nginx/ssl/live/*/fullchain.pem nginx/ssl/fullchain.pem
     cp nginx/ssl/live/*/privkey.pem nginx/ssl/privkey.pem
     echo "✓ SSL certificates obtained"

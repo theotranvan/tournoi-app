@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "com.kickoff.app",
-  appName: "Kickoff",
+  appId: "com.footix.app",
+  appName: "Footix",
   webDir: "out",
   server: {
     // In development, point to the dev server

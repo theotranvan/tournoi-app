@@ -22,7 +22,7 @@ export function getPlatform(): "ios" | "android" | "web" {
  */
 export function getApiUrl(): string {
   if (isNative()) {
-    return "https://api.kickoff.app/api/v1";
+    return "https://api.footix.app/api/v1";
   }
   return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 }

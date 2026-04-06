@@ -268,4 +268,4 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ─── Web Push (VAPID) ───────────────────────────────────────────────────────
 VAPID_PUBLIC_KEY = config("VAPID_PUBLIC_KEY", default="")
 VAPID_PRIVATE_KEY = config("VAPID_PRIVATE_KEY", default="")
-VAPID_ADMIN_EMAIL = config("VAPID_ADMIN_EMAIL", default="admin@kickoff.app")
+VAPID_ADMIN_EMAIL = config("VAPID_ADMIN_EMAIL", default="admin@footix.app")

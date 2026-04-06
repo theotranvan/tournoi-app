@@ -18,7 +18,7 @@ class Command(BaseCommand):
         owner, _ = User.objects.get_or_create(
             username="demo_admin",
             defaults={
-                "email": "admin@demo.kickoff.fr",
+                "email": "admin@demo.footix.fr",
                 "role": User.Role.ORGANIZER,
             },
         )

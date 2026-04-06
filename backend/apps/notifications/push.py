@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def _get_vapid_claims() -> dict:
     return {
-        "sub": f"mailto:{getattr(settings, 'VAPID_ADMIN_EMAIL', 'admin@kickoff.app')}",
+        "sub": f"mailto:{getattr(settings, 'VAPID_ADMIN_EMAIL', 'admin@footix.app')}",
     }
 
 
