@@ -1,18 +1,29 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { TeamAvatar } from "@/components/kickoff/team-avatar";
 import { LiveIndicator } from "@/components/kickoff/live-indicator";
 import { ScoreDisplay } from "@/components/kickoff/score-display";
-import { Minus, Plus, Check, ArrowLeft, Loader2, Play, Flag, Target } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from "@/components/ui/sheet";
+import { Minus, Plus, Check, ArrowLeft, Loader2, Play, Flag, Target, Users, X } from "lucide-react";
 import Link from "next/link";
 import { useMatch } from "@/hooks/use-matches";
 import { useSubmitScore, useStartMatch } from "@/hooks/use-match-mutations";
+import { triggerHaptic } from "@/lib/haptics";
+import type { GoalInput } from "@/types/api";
 
 const STATUS_LABEL: Record<string, string> = {
   scheduled: "Programmé",
@@ -49,6 +60,34 @@ export default function ScoreEntry({
   const [penaltyHome, setPenaltyHome] = useState<number | null>(null);
   const [penaltyAway, setPenaltyAway] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [showGoalSheet, setShowGoalSheet] = useState(false);
+  const [goals, setGoals] = useState<GoalInput[]>([]);
+
+  const addGoal = useCallback((team: "home" | "away") => {
+    triggerHaptic("light");
+    setGoals((prev) => [...prev, { team, player_name: "", minute: null }]);
+  }, []);
+
+  const removeGoal = useCallback((index: number) => {
+    triggerHaptic("light");
+    setGoals((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const updateGoal = useCallback(
+    (index: number, field: "player_name" | "minute", value: string) => {
+      setGoals((prev) =>
+        prev.map((g, i) =>
+          i === index
+            ? {
+                ...g,
+                [field]: field === "minute" ? (value ? Number(value) : null) : value,
+              }
+            : g
+        )
+      );
+    },
+    []
+  );
 
   // Prefill from existing scores
   if (match && !submitted && homeScore === 0 && awayScore === 0) {
@@ -59,6 +98,7 @@ export default function ScoreEntry({
   }
 
   function handleSubmit() {
+    triggerHaptic("medium");
     submitScore.mutate(
       {
         score_home: homeScore,
@@ -70,15 +110,45 @@ export default function ScoreEntry({
       {
         onSuccess: () => {
           setSubmitted(true);
-          setTimeout(() => {
-            router.back();
-          }, 1200);
+          setShowGoalSheet(true);
         },
       }
     );
   }
 
+  function handleSaveGoals() {
+    const validGoals = goals.filter((g) => g.player_name?.trim());
+    if (validGoals.length > 0) {
+      triggerHaptic("medium");
+      submitScore.mutate(
+        {
+          score_home: homeScore,
+          score_away: awayScore,
+          ...(penaltyHome !== null && penaltyAway !== null
+            ? { penalty_score_home: penaltyHome, penalty_score_away: penaltyAway }
+            : {}),
+          goals: validGoals,
+        },
+        {
+          onSuccess: () => {
+            setShowGoalSheet(false);
+            router.back();
+          },
+        }
+      );
+    } else {
+      setShowGoalSheet(false);
+      router.back();
+    }
+  }
+
+  function handleSkipGoals() {
+    setShowGoalSheet(false);
+    router.back();
+  }
+
   function handleStart() {
+    triggerHaptic("medium");
     startMatch.mutate();
   }
 
@@ -173,6 +243,7 @@ export default function ScoreEntry({
                     variant="outline"
                     className="size-16 rounded-2xl text-2xl active:scale-95 transition-transform"
                     onClick={() => {
+                      triggerHaptic("light");
                       setHomeScore(Math.max(0, homeScore - 1));
                       if (Math.max(0, homeScore - 1) !== awayScore) { setPenaltyHome(null); setPenaltyAway(null); }
                     }}
@@ -184,6 +255,7 @@ export default function ScoreEntry({
                     variant="outline"
                     className="size-16 rounded-2xl text-2xl active:scale-95 transition-transform"
                     onClick={() => {
+                      triggerHaptic("light");
                       setHomeScore(homeScore + 1);
                       if (homeScore + 1 !== awayScore) { setPenaltyHome(null); setPenaltyAway(null); }
                     }}
@@ -213,6 +285,7 @@ export default function ScoreEntry({
                     variant="outline"
                     className="size-16 rounded-2xl text-2xl active:scale-95 transition-transform"
                     onClick={() => {
+                      triggerHaptic("light");
                       setAwayScore(Math.max(0, awayScore - 1));
                       if (homeScore !== Math.max(0, awayScore - 1)) { setPenaltyHome(null); setPenaltyAway(null); }
                     }}
@@ -224,6 +297,7 @@ export default function ScoreEntry({
                     variant="outline"
                     className="size-16 rounded-2xl text-2xl active:scale-95 transition-transform"
                     onClick={() => {
+                      triggerHaptic("light");
                       setAwayScore(awayScore + 1);
                       if (homeScore !== awayScore + 1) { setPenaltyHome(null); setPenaltyAway(null); }
                     }}
@@ -249,7 +323,7 @@ export default function ScoreEntry({
                         variant="outline"
                         size="icon"
                         className="size-10 rounded-xl"
-                        onClick={() => setPenaltyHome(Math.max(0, (penaltyHome ?? 0) - 1))}
+                        onClick={() => { triggerHaptic("light"); setPenaltyHome(Math.max(0, (penaltyHome ?? 0) - 1)); }}
                       >
                         <Minus className="size-4" />
                       </Button>
@@ -260,7 +334,7 @@ export default function ScoreEntry({
                         variant="outline"
                         size="icon"
                         className="size-10 rounded-xl"
-                        onClick={() => setPenaltyHome((penaltyHome ?? 0) + 1)}
+                        onClick={() => { triggerHaptic("light"); setPenaltyHome((penaltyHome ?? 0) + 1); }}
                       >
                         <Plus className="size-4" />
                       </Button>
@@ -275,7 +349,7 @@ export default function ScoreEntry({
                         variant="outline"
                         size="icon"
                         className="size-10 rounded-xl"
-                        onClick={() => setPenaltyAway(Math.max(0, (penaltyAway ?? 0) - 1))}
+                        onClick={() => { triggerHaptic("light"); setPenaltyAway(Math.max(0, (penaltyAway ?? 0) - 1)); }}
                       >
                         <Minus className="size-4" />
                       </Button>
@@ -286,7 +360,7 @@ export default function ScoreEntry({
                         variant="outline"
                         size="icon"
                         className="size-10 rounded-xl"
-                        onClick={() => setPenaltyAway((penaltyAway ?? 0) + 1)}
+                        onClick={() => { triggerHaptic("light"); setPenaltyAway((penaltyAway ?? 0) + 1); }}
                       >
                         <Plus className="size-4" />
                       </Button>
@@ -347,6 +421,131 @@ export default function ScoreEntry({
           )}
         </CardContent>
       </Card>
+
+      {/* Goal scorers bottom-sheet */}
+      <Sheet open={showGoalSheet} onOpenChange={setShowGoalSheet}>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Users className="size-5" />
+              Buteurs (optionnel)
+            </SheetTitle>
+            <SheetDescription>
+              Ajoutez les buteurs si vous le souhaitez, ou passez cette étape.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="px-4 space-y-4">
+            {/* Home team goals */}
+            {homeScore > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold">{homeName}</p>
+                {goals
+                  .map((g, i) => ({ ...g, _i: i }))
+                  .filter((g) => g.team === "home")
+                  .map((g) => (
+                    <div key={g._i} className="flex items-center gap-2">
+                      <Input
+                        placeholder="Nom du joueur"
+                        className="flex-1"
+                        value={g.player_name ?? ""}
+                        onChange={(e) => updateGoal(g._i, "player_name", e.target.value)}
+                      />
+                      <Input
+                        placeholder="Min"
+                        type="number"
+                        className="w-16"
+                        value={g.minute ?? ""}
+                        onChange={(e) => updateGoal(g._i, "minute", e.target.value)}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 shrink-0"
+                        onClick={() => removeGoal(g._i)}
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    </div>
+                  ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => addGoal("home")}
+                >
+                  <Plus className="size-4 mr-1" />
+                  Ajouter un buteur
+                </Button>
+              </div>
+            )}
+
+            {/* Away team goals */}
+            {awayScore > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold">{awayName}</p>
+                {goals
+                  .map((g, i) => ({ ...g, _i: i }))
+                  .filter((g) => g.team === "away")
+                  .map((g) => (
+                    <div key={g._i} className="flex items-center gap-2">
+                      <Input
+                        placeholder="Nom du joueur"
+                        className="flex-1"
+                        value={g.player_name ?? ""}
+                        onChange={(e) => updateGoal(g._i, "player_name", e.target.value)}
+                      />
+                      <Input
+                        placeholder="Min"
+                        type="number"
+                        className="w-16"
+                        value={g.minute ?? ""}
+                        onChange={(e) => updateGoal(g._i, "minute", e.target.value)}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 shrink-0"
+                        onClick={() => removeGoal(g._i)}
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    </div>
+                  ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => addGoal("away")}
+                >
+                  <Plus className="size-4 mr-1" />
+                  Ajouter un buteur
+                </Button>
+              </div>
+            )}
+
+            {homeScore === 0 && awayScore === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Match nul 0-0 — aucun buteur à ajouter.
+              </p>
+            )}
+          </div>
+
+          <SheetFooter>
+            <Button onClick={handleSaveGoals} disabled={submitScore.isPending}>
+              {submitScore.isPending ? (
+                <Loader2 className="size-4 mr-2 animate-spin" />
+              ) : (
+                <Check className="size-4 mr-2" />
+              )}
+              Enregistrer les buteurs
+            </Button>
+            <Button variant="ghost" onClick={handleSkipGoals}>
+              Passer cette étape
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

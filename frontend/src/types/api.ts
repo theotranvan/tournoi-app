@@ -324,6 +324,7 @@ export interface MatchUpdatePayload {
   start_time?: string;
   duration_minutes?: number;
   notes?: string;
+  status?: MatchStatus;
 }
 
 export interface GoalInput {

@@ -99,7 +99,7 @@ class MatchDetailSerializer(serializers.ModelSerializer):
 class MatchUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Match
-        fields = ("field", "start_time", "duration_minutes", "notes")
+        fields = ("field", "start_time", "duration_minutes", "notes", "status")
 
 
 class ScoreInputSerializer(serializers.Serializer):
