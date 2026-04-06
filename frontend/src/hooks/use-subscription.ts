@@ -11,12 +11,13 @@ import type {
  * Fetch current user subscription + active licenses.
  * Response shape: { subscription: SubscriptionData, licenses: TournamentLicenseData[] }
  */
-export function useSubscription() {
+export function useSubscription(options?: { enabled?: boolean }) {
   return useQuery<SubscriptionStatusResponse>({
     queryKey: ["subscription"],
     queryFn: () => api.get("/subscriptions/status/"),
     staleTime: 60_000,
     retry: 1,
+    enabled: options?.enabled ?? true,
   });
 }
 

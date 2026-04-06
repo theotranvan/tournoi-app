@@ -6,11 +6,11 @@ import { TimelineContent } from "@/components/ui/timeline-animation";
 import { VerticalCutReveal } from "@/components/ui/vertical-cut-reveal";
 import { cn } from "@/lib/utils";
 import NumberFlow from "@number-flow/react";
-import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
-import { useRef, useState } from "react";
+import { motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 import { Check, Shield, Zap, Crown, Loader2, Trophy } from "lucide-react";
 import { useCheckout, useSubscription } from "@/hooks/use-subscription";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 const plans = [
   {
@@ -85,59 +85,61 @@ const PricingSwitch = ({
 }: {
   onSwitch: (value: string) => void;
 }) => {
-  const [selected, setSelected] = useState("0");
+  const [selected, setSelected] = useState(0);
+  const btnRefs = [useRef<HTMLButtonElement>(null), useRef<HTMLButtonElement>(null)];
+  const [indicator, setIndicator] = useState({ left: 0, width: 0 });
 
-  const handleSwitch = (value: string) => {
-    setSelected(value);
-    onSwitch(value);
+  useEffect(() => {
+    const el = btnRefs[selected].current;
+    if (el) {
+      setIndicator({ left: el.offsetLeft, width: el.offsetWidth });
+    }
+  }, [selected]);
+
+  const handleSwitch = (idx: number) => {
+    setSelected(idx);
+    onSwitch(String(idx));
   };
 
   return (
     <div className="flex justify-center">
-      <LayoutGroup>
-        <div className="relative z-10 mx-auto flex w-fit rounded-full bg-neutral-900 border border-neutral-700 p-1">
-          <button
-            type="button"
-            onClick={() => handleSwitch("0")}
-            className={cn(
-              "relative z-10 w-fit h-10 rounded-full sm:px-6 px-3 sm:py-2 py-1 font-medium transition-colors",
-              selected === "0" ? "text-white" : "text-gray-200"
-            )}
-          >
-            {selected === "0" && (
-              <motion.span
-                layoutId="pricing-switch"
-                className="absolute inset-0 rounded-full border-2 shadow-sm shadow-green-600 border-green-500 bg-gradient-to-t from-green-600 to-green-500"
-                transition={{ type: "spring", stiffness: 500, damping: 30 }}
-              />
-            )}
-            <span className="relative">Mensuel</span>
-          </button>
+      <div className="relative z-10 mx-auto flex w-fit rounded-full bg-neutral-900 border border-neutral-700 p-1">
+        <motion.div
+          className="absolute top-1 bottom-1 rounded-full border-2 shadow-sm shadow-green-600 border-green-500 bg-gradient-to-t from-green-600 to-green-500"
+          initial={false}
+          animate={{ left: indicator.left, width: indicator.width }}
+          transition={{ type: "spring", stiffness: 500, damping: 30 }}
+        />
 
-          <button
-            type="button"
-            onClick={() => handleSwitch("1")}
-            className={cn(
-              "relative z-10 w-fit h-10 flex-shrink-0 rounded-full sm:px-6 px-3 sm:py-2 py-1 font-medium transition-colors",
-              selected === "1" ? "text-white" : "text-gray-200"
-            )}
-          >
-            {selected === "1" && (
-              <motion.span
-                layoutId="pricing-switch"
-                className="absolute inset-0 rounded-full border-2 shadow-sm shadow-green-600 border-green-500 bg-gradient-to-t from-green-600 to-green-500"
-                transition={{ type: "spring", stiffness: 500, damping: 30 }}
-              />
-            )}
-            <span className="relative flex items-center gap-2">
-              Annuel
-              <span className="text-xs bg-green-500/20 text-green-300 rounded-full px-2 py-0.5">
-                -13%
-              </span>
+        <button
+          ref={btnRefs[0]}
+          type="button"
+          onClick={() => handleSwitch(0)}
+          className={cn(
+            "relative z-10 w-fit h-10 rounded-full sm:px-6 px-3 sm:py-2 py-1 font-medium transition-colors",
+            selected === 0 ? "text-white" : "text-gray-200"
+          )}
+        >
+          Mensuel
+        </button>
+
+        <button
+          ref={btnRefs[1]}
+          type="button"
+          onClick={() => handleSwitch(1)}
+          className={cn(
+            "relative z-10 w-fit h-10 flex-shrink-0 rounded-full sm:px-6 px-3 sm:py-2 py-1 font-medium transition-colors",
+            selected === 1 ? "text-white" : "text-gray-200"
+          )}
+        >
+          <span className="flex items-center gap-2">
+            Annuel
+            <span className="text-xs bg-green-500/20 text-green-300 rounded-full px-2 py-0.5">
+              -13%
             </span>
-          </button>
-        </div>
-      </LayoutGroup>
+          </span>
+        </button>
+      </div>
     </div>
   );
 };
@@ -145,11 +147,14 @@ const PricingSwitch = ({
 export default function PricingSection() {
   const [isYearly, setIsYearly] = useState(false);
   const pricingRef = useRef<HTMLDivElement>(null);
-  const { data } = useSubscription();
-  const checkout = useCheckout();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const canceled = searchParams.get("canceled") === "true";
+
+  // Only fetch subscription if user is logged in (avoids 401 → redirect)
+  const hasToken = typeof window !== "undefined" && !!localStorage.getItem("access_token");
+  const { data } = useSubscription({ enabled: hasToken });
+  const checkout = useCheckout();
+
+  const canceled = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("canceled") === "true";
 
   const isClub = data?.subscription?.is_club ?? false;
 
