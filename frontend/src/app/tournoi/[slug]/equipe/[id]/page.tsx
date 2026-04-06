@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useMemo } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,9 +8,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TeamAvatar } from "@/components/kickoff/team-avatar";
 import { MatchCard } from "@/components/kickoff/match-card";
 import { ShareButton } from "@/components/kickoff/share-button";
+import { CountdownTimer } from "@/components/kickoff/countdown-timer";
+import { FollowButton } from "@/components/public/follow-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { usePublicTeam } from "@/hooks/use-public";
-import { ArrowLeft, Users, AlertCircle } from "lucide-react";
+import { useTournamentSocket } from "@/hooks/use-tournament-socket";
+import { ArrowLeft, Users, AlertCircle, Clock, Target, Shield } from "lucide-react";
 import type { MatchList } from "@/types/api";
 
 const PHASE_LABEL: Record<string, string> = {
@@ -58,7 +61,90 @@ function computeStats(matches: MatchList[], teamName: string) {
     else lost++;
   }
 
-  return { played, won, drawn, lost, goalsFor, goalsAgainst };
+  return { played, won, drawn, lost, goalsFor, goalsAgainst, diff: goalsFor - goalsAgainst, points: won * 3 + drawn };
+}
+
+/* ── Timeline node ───────────────────────────────── */
+
+function TimelineNode({
+  m,
+  teamName,
+  slug,
+  isLast,
+}: {
+  m: MatchList;
+  teamName: string;
+  slug: string;
+  isLast: boolean;
+}) {
+  const isHome = m.display_home === teamName;
+  const opponent = isHome ? m.display_away : m.display_home;
+  const gf = isHome ? (m.score_home ?? 0) : (m.score_away ?? 0);
+  const ga = isHome ? (m.score_away ?? 0) : (m.score_home ?? 0);
+
+  let result: "V" | "N" | "D" | null = null;
+  let dotColor = "bg-muted-foreground";
+  if (m.status === "finished") {
+    if (gf > ga) { result = "V"; dotColor = "bg-green-500"; }
+    else if (gf === ga) { result = "N"; dotColor = "bg-amber-500"; }
+    else { result = "D"; dotColor = "bg-red-500"; }
+  } else if (m.status === "live") {
+    dotColor = "bg-red-500";
+  }
+
+  const time = new Date(m.start_time).toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return (
+    <Link href={`/tournoi/${slug}/match/${m.id}`} className="group">
+      <div className="flex gap-3">
+        {/* Line + dot */}
+        <div className="flex flex-col items-center">
+          <div className={`size-3 rounded-full ${dotColor} shrink-0 mt-1.5`} />
+          {!isLast && <div className="w-0.5 flex-1 bg-border mt-1" />}
+        </div>
+        {/* Content */}
+        <div className="pb-4 min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+            <span>{time}</span>
+            {m.field_name && <span>• {m.field_name}</span>}
+            <Badge variant="outline" className="text-[9px] px-1 py-0">
+              {PHASE_LABEL[m.phase] ?? m.phase}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-sm font-medium truncate group-hover:underline">
+              vs {opponent}
+            </span>
+            {m.status === "finished" && (
+              <Badge
+                variant={result === "V" ? "default" : "secondary"}
+                className={`text-[10px] px-1.5 ${
+                  result === "V"
+                    ? "bg-green-500/15 text-green-600"
+                    : result === "D"
+                    ? "bg-red-500/15 text-red-600"
+                    : "bg-amber-500/15 text-amber-600"
+                }`}
+              >
+                {result} {gf}-{ga}
+              </Badge>
+            )}
+            {m.status === "live" && (
+              <Badge className="bg-red-500/90 text-white text-[10px] px-1.5">
+                🔴 {gf}-{ga}
+              </Badge>
+            )}
+            {m.status === "scheduled" && (
+              <CountdownTimer kickoffTime={m.start_time} />
+            )}
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
 }
 
 export default function TeamPublicPage({
@@ -69,6 +155,17 @@ export default function TeamPublicPage({
   const { slug, id } = use(params);
   const teamId = Number(id);
   const { data, isLoading } = usePublicTeam(slug, teamId);
+
+  // Real-time
+  useTournamentSocket(slug);
+
+  const sortedMatches = useMemo(() => {
+    if (!data) return [];
+    return [...data.matches].sort(
+      (a, b) =>
+        new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+    );
+  }, [data]);
 
   if (isLoading) {
     return (
@@ -102,8 +199,7 @@ export default function TeamPublicPage({
 
   const { team, matches } = data;
   const stats = computeStats(matches, team.name);
-  const upcoming = matches.filter((m) => m.status === "scheduled");
-  const finished = matches.filter((m) => m.status === "finished");
+  const nextMatch = sortedMatches.find((m) => m.status === "scheduled");
   const live = matches.filter((m) => m.status === "live");
 
   return (
@@ -117,116 +213,119 @@ export default function TeamPublicPage({
           <ArrowLeft className="size-4" />
           Retour
         </Link>
-        <ShareButton title={team.name} text={`Suivez ${team.name} !`} />
-      </div>
-
-      {/* Team header */}
-      <div className="flex items-center gap-4">
-        <TeamAvatar name={team.name} logo={team.logo} size="xl" />
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold truncate">{team.name}</h1>
-          {team.category && (
-            <Badge variant="outline" className="mt-1">
-              {team.category.name}
-            </Badge>
-          )}
+        <div className="flex items-center gap-1">
+          <FollowButton teamId={teamId} />
+          <ShareButton title={team.name} text={`Suivez ${team.name} !`} />
         </div>
       </div>
 
-      {/* Stats grid */}
-      {stats.played > 0 && (
-        <div className="grid grid-cols-3 gap-2">
-          <Card>
-            <CardContent className="py-3 text-center">
-              <p className="text-2xl font-bold text-green-500">{stats.won}</p>
-              <p className="text-[10px] text-muted-foreground uppercase">Victoires</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="py-3 text-center">
-              <p className="text-2xl font-bold text-amber-500">{stats.drawn}</p>
-              <p className="text-[10px] text-muted-foreground uppercase">Nuls</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="py-3 text-center">
-              <p className="text-2xl font-bold text-red-500">{stats.lost}</p>
-              <p className="text-[10px] text-muted-foreground uppercase">Défaites</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {stats.played > 0 && (
-        <div className="grid grid-cols-3 gap-2">
-          <Card>
-            <CardContent className="py-3 text-center">
-              <p className="text-lg font-bold">{stats.played}</p>
-              <p className="text-[10px] text-muted-foreground uppercase">Joués</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="py-3 text-center">
-              <p className="text-lg font-bold">{stats.goalsFor}</p>
-              <p className="text-[10px] text-muted-foreground uppercase">Buts marqués</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="py-3 text-center">
-              <p className="text-lg font-bold">{stats.goalsAgainst}</p>
-              <p className="text-[10px] text-muted-foreground uppercase">Buts encaissés</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Live matches */}
-      {live.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold mb-2">En cours</h2>
-          <div className="space-y-2">
-            {live.map((m) => {
-              const d = matchToCard(m);
-              return (
-                <Link key={d.id} href={`/tournoi/${slug}/match/${d.id}`}>
-                  <MatchCard {...d} />
-                </Link>
-              );
-            })}
+      {/* Hero banner */}
+      <div className="relative -mx-4 px-4 py-6 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
+        <div className="flex items-center gap-4">
+          <TeamAvatar name={team.name} logo={team.logo} size="xl" />
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-bold truncate">{team.name}</h1>
+            {team.category && (
+              <Badge variant="outline" className="mt-1">
+                {team.category.name}
+              </Badge>
+            )}
           </div>
-        </section>
+        </div>
+      </div>
+
+      {/* Full stats table */}
+      {stats.played > 0 && (
+        <Card>
+          <CardContent className="py-3 px-2">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[10px] text-muted-foreground uppercase tracking-wider border-b border-border">
+                    <th className="py-1 px-1.5 text-center">MJ</th>
+                    <th className="py-1 px-1.5 text-center text-green-600">V</th>
+                    <th className="py-1 px-1.5 text-center text-amber-600">N</th>
+                    <th className="py-1 px-1.5 text-center text-red-600">D</th>
+                    <th className="py-1 px-1.5 text-center">BP</th>
+                    <th className="py-1 px-1.5 text-center">BC</th>
+                    <th className="py-1 px-1.5 text-center">Diff</th>
+                    <th className="py-1 px-1.5 text-center font-bold">Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="tabular-nums">
+                    <td className="py-2 px-1.5 text-center font-medium">{stats.played}</td>
+                    <td className="py-2 px-1.5 text-center text-green-600 font-bold">{stats.won}</td>
+                    <td className="py-2 px-1.5 text-center text-amber-600 font-bold">{stats.drawn}</td>
+                    <td className="py-2 px-1.5 text-center text-red-600 font-bold">{stats.lost}</td>
+                    <td className="py-2 px-1.5 text-center">{stats.goalsFor}</td>
+                    <td className="py-2 px-1.5 text-center">{stats.goalsAgainst}</td>
+                    <td className="py-2 px-1.5 text-center font-medium">
+                      <span className={stats.diff > 0 ? "text-green-600" : stats.diff < 0 ? "text-red-600" : ""}>
+                        {stats.diff > 0 ? "+" : ""}{stats.diff}
+                      </span>
+                    </td>
+                    <td className="py-2 px-1.5 text-center font-bold text-lg">{stats.points}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Upcoming */}
-      {upcoming.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold mb-2">À venir</h2>
-          <div className="space-y-2">
-            {upcoming.map((m) => {
-              const d = matchToCard(m);
-              return (
-                <Link key={d.id} href={`/tournoi/${slug}/match/${d.id}`}>
-                  <MatchCard {...d} />
-                </Link>
-              );
-            })}
-          </div>
-        </section>
+      {/* Next match — big countdown */}
+      {nextMatch && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader className="pb-1">
+            <CardTitle className="text-sm flex items-center gap-1.5">
+              <Clock className="size-4 text-primary" />
+              Prochain match
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-base font-semibold truncate">
+                  {nextMatch.display_home === team.name
+                    ? nextMatch.display_away
+                    : nextMatch.display_home}
+                </span>
+              </div>
+              <CountdownTimer kickoffTime={nextMatch.start_time} className="text-sm font-semibold text-primary" />
+            </div>
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+              {nextMatch.field_name && (
+                <span className="flex items-center gap-0.5">
+                  <Target className="size-3" />
+                  {nextMatch.field_name}
+                </span>
+              )}
+              <Badge variant="outline" className="text-[9px] px-1">
+                {PHASE_LABEL[nextMatch.phase] ?? nextMatch.phase}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Past results */}
-      {finished.length > 0 && (
+      {/* Match timeline */}
+      {sortedMatches.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold mb-2">Résultats</h2>
-          <div className="space-y-2">
-            {finished.map((m) => {
-              const d = matchToCard(m);
-              return (
-                <Link key={d.id} href={`/tournoi/${slug}/match/${d.id}`}>
-                  <MatchCard {...d} />
-                </Link>
-              );
-            })}
+          <h2 className="text-sm font-bold mb-3 flex items-center gap-1.5">
+            <Shield className="size-4 text-primary" />
+            Parcours
+          </h2>
+          <div className="ml-1">
+            {sortedMatches.map((m, i) => (
+              <TimelineNode
+                key={m.id}
+                m={m}
+                teamName={team.name}
+                slug={slug}
+                isLast={i === sortedMatches.length - 1}
+              />
+            ))}
           </div>
         </section>
       )}

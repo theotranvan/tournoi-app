@@ -1,18 +1,21 @@
 "use client";
 
-import { use, useMemo, useRef, useState } from "react";
+import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MatchCard } from "@/components/kickoff/match-card";
-import { StandingsTable, type Standing } from "@/components/kickoff/standings-table";
-import { TeamAvatar } from "@/components/kickoff/team-avatar";
 import { LiveIndicator } from "@/components/kickoff/live-indicator";
 import { ShareButton } from "@/components/kickoff/share-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
+import { LiveCarousel } from "@/components/public/live-carousel";
+import { AnimatedStandings } from "@/components/public/animated-standings";
+import { FollowedTeamsSection } from "@/components/public/followed-teams-section";
+import { EventTimeline } from "@/components/public/event-timeline";
+import { FinalsBracket } from "@/components/public/finals-bracket";
 import {
   usePublicTournament,
   usePublicLive,
@@ -29,9 +32,8 @@ import {
   Calendar,
   Info,
   Users,
-  ChevronRight,
 } from "lucide-react";
-import type { MatchList, CategoryStandings, TeamStanding } from "@/types/api";
+import type { MatchList, CategoryStandings } from "@/types/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { publicKeys } from "@/hooks/use-public";
 
@@ -80,22 +82,6 @@ function matchToCard(m: MatchList) {
     field: m.field_name ?? undefined,
     kickoffTime: m.start_time,
     phase: PHASE_LABEL[m.phase] ?? m.phase,
-  };
-}
-
-function standingToRow(s: TeamStanding): Standing {
-  return {
-    rank: s.rank,
-    teamName: s.team_name,
-    played: s.played,
-    won: s.won,
-    drawn: s.drawn,
-    lost: s.lost,
-    goalsFor: s.goals_for,
-    goalsAgainst: s.goals_against,
-    goalDifference: s.goal_difference,
-    points: s.points,
-    form: s.form,
   };
 }
 
@@ -203,60 +189,11 @@ function HeroSection({
   );
 }
 
-/* ── Live carrousel card ─────────────────────────────────── */
-
-function LiveMatchCarousel({ matches, slug }: { matches: MatchList[]; slug: string }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  if (matches.length === 0) return null;
-
-  return (
-    <div className="-mx-4 px-4">
-      <div
-        ref={scrollRef}
-        className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-1"
-      >
-        {matches.map((m, i) => (
-          <Link
-            key={m.id}
-            href={`/tournoi/${slug}/match/${m.id}`}
-            className={`snap-start shrink-0 w-[280px] animate-fade-in-up stagger-${i + 1}`}
-          >
-            <Card className="ring-red-500/30 bg-red-500/5 hover:bg-red-500/10 transition-all card-hover">
-              <CardContent className="p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <LiveIndicator size="sm" />
-                  <span className="text-[10px] text-muted-foreground">
-                    {m.category_name} • {m.field_name}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 flex items-center gap-2 min-w-0">
-                    <TeamAvatar name={m.display_home || "?"} size="sm" />
-                    <span className="text-sm font-medium truncate">{m.display_home}</span>
-                  </div>
-                  <span className="text-xl font-bold tabular-nums">{m.score_home ?? 0}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 flex items-center gap-2 min-w-0">
-                    <TeamAvatar name={m.display_away || "?"} size="sm" />
-                    <span className="text-sm font-medium truncate">{m.display_away}</span>
-                  </div>
-                  <span className="text-xl font-bold tabular-nums">{m.score_away ?? 0}</span>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /* ── Live Tab ────────────────────────────────────────────── */
 
 function LiveTab({ slug }: { slug: string }) {
   const { data, isLoading } = usePublicLive(slug);
+  const { data: allMatches } = usePublicMatches(slug);
   const wsConnected = useLiveStore((s) => s.wsConnected);
 
   if (isLoading) return <MatchSkeleton />;
@@ -264,18 +201,9 @@ function LiveTab({ slug }: { slug: string }) {
   const live = data?.live_matches ?? [];
   const upcoming = data?.upcoming_matches ?? [];
   const recent = data?.recent_results ?? [];
+  const all = allMatches ?? [];
 
   const hasContent = live.length > 0 || upcoming.length > 0 || recent.length > 0;
-
-  if (!hasContent) {
-    return (
-      <EmptyState
-        icon={Radio}
-        title="Aucun match en direct"
-        description="Le tournoi n'a pas encore démarré ou aucun match n'est en cours."
-      />
-    );
-  }
 
   return (
     <div className="space-y-5">
@@ -287,17 +215,23 @@ function LiveTab({ slug }: { slug: string }) {
         <span>{wsConnected ? "Temps réel" : "Actualisation auto 30s"}</span>
       </div>
 
-      {/* Live carrousel */}
+      {/* Followed teams */}
+      <FollowedTeamsSection allMatches={all} slug={slug} />
+
+      {/* Live carrousel — animated */}
       {live.length > 0 && (
-        <section>
-          <div className="flex items-center gap-2 mb-3">
-            <LiveIndicator />
-            <span className="text-sm font-medium">
-              {live.length} match{live.length > 1 ? "s" : ""}
-            </span>
-          </div>
-          <LiveMatchCarousel matches={live} slug={slug} />
-        </section>
+        <LiveCarousel matches={live} slug={slug} />
+      )}
+
+      {/* Event timeline */}
+      <EventTimeline />
+
+      {!hasContent && (
+        <EmptyState
+          icon={Radio}
+          title="Aucun match en direct"
+          description="Le tournoi n'a pas encore démarré ou aucun match n'est en cours."
+        />
       )}
 
       {/* Upcoming */}
@@ -446,35 +380,15 @@ function ProgrammeTab({ slug }: { slug: string }) {
 
 /* ── Classements Tab ─────────────────────────────────────── */
 
-function PodiumBadge({ rank }: { rank: number }) {
-  const medals: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
-  if (!medals[rank]) return <span className="tabular-nums">{rank}</span>;
-  return <span className="text-base">{medals[rank]}</span>;
-}
-
-function FormBadges({ form }: { form: ("W" | "D" | "L")[] }) {
-  if (!form || form.length === 0) return null;
-  const colorMap = {
-    W: "bg-green-500",
-    D: "bg-amber-500",
-    L: "bg-red-500",
-  };
-  return (
-    <div className="flex gap-0.5">
-      {form.slice(-5).map((r, i) => (
-        <span
-          key={i}
-          className={`size-2 rounded-full ${colorMap[r]}`}
-          title={r === "W" ? "Victoire" : r === "D" ? "Nul" : "Défaite"}
-        />
-      ))}
-    </div>
-  );
-}
-
 function ClassementsTab({ slug }: { slug: string }) {
   const { data, isLoading } = usePublicStandings(slug);
+  const { data: allMatches } = usePublicMatches(slug);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+
+  const hasKnockout = useMemo(
+    () => (allMatches ?? []).some((m) => m.phase !== "group"),
+    [allMatches]
+  );
 
   if (isLoading) {
     return (
@@ -494,11 +408,6 @@ function ClassementsTab({ slug }: { slug: string }) {
       />
     );
   }
-
-  const filteredData =
-    selectedCategory === "all"
-      ? data
-      : data.filter((cat) => String(cat.category.id) === selectedCategory);
 
   return (
     <div className="space-y-4">
@@ -525,39 +434,17 @@ function ClassementsTab({ slug }: { slug: string }) {
         </div>
       )}
 
-      {filteredData.map((cat: CategoryStandings) => (
-        <section key={cat.category.id}>
-          <h2 className="text-base font-bold mb-3">{cat.category.name}</h2>
-          {(cat.groups ?? []).length === 0 ? (
-            <Card className="mb-3">
-              <CardContent className="py-6 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Aucun groupe créé pour cette catégorie.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            (cat.groups ?? []).map((g) => (
-              <Card key={g.group.id} className="mb-3">
-                <CardHeader className="pb-1">
-                  <CardTitle className="text-sm">{g.group.name}</CardTitle>
-                </CardHeader>
-                <CardContent className="pb-2">
-                  {g.standings.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-3 text-center">
-                      Aucun classement disponible.
-                    </p>
-                  ) : (
-                    <StandingsTable
-                      standings={g.standings.map(standingToRow)}
-                    />
-                  )}
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </section>
-      ))}
+      {/* Animated standings with rank changes */}
+      <AnimatedStandings
+        data={data}
+        slug={slug}
+        selectedCategory={selectedCategory}
+      />
+
+      {/* Finals bracket */}
+      {hasKnockout && (
+        <FinalsBracket matches={allMatches ?? []} slug={slug} />
+      )}
     </div>
   );
 }
