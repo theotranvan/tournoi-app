@@ -170,7 +170,7 @@ export default function PricingSection() {
   // Only fetch subscription if user is logged in (avoids 401 → redirect)
   const hasToken = typeof window !== "undefined" && !!localStorage.getItem("access_token");
   const { data } = useSubscription({ enabled: hasToken });
-  const { data: tournamentsData, isLoading: tournamentsLoading } = useTournaments();
+  const { data: tournamentsData, isLoading: tournamentsLoading } = useTournaments({}, { enabled: hasToken });
   const checkout = useCheckout();
 
   const canceled = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("canceled") === "true";

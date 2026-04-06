@@ -15,11 +15,15 @@ export const tournamentKeys = {
   detail: (id: string) => [...tournamentKeys.details(), id] as const,
 };
 
-export function useTournaments(filters: Record<string, string> = {}) {
+export function useTournaments(
+  filters: Record<string, string> = {},
+  options?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: tournamentKeys.list(filters),
     queryFn: () =>
       api.get<PaginatedResponse<TournamentList>>("/tournaments/", filters),
+    enabled: options?.enabled ?? true,
   });
 }
 
