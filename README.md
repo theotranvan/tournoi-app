@@ -84,4 +84,30 @@ cd backend && pytest
 
 # Build frontend
 cd frontend && npm run build
+
+# Load test WebSocket (avant un gros tournoi)
+python scripts/load_test_ws.py ws://localhost:8000/ws/tournaments/demo/ 200
 ```
+
+## ✅ Checklist avant un vrai tournoi
+
+### 7 jours avant
+- [ ] Backup manuel vérifié (`./backup.sh` + restore test)
+- [ ] Sentry DSN prod configuré et testé (déclencher une erreur volontaire)
+- [ ] DNS propagé
+- [ ] HTTPS valide (Let's Encrypt)
+- [ ] Tests de charge WS lancés : 200 connexions simultanées OK
+- [ ] Seed d'un tournoi fantôme identique au vrai pour répétition
+
+### 24h avant
+- [ ] `docker compose -f docker-compose.prod.yml up -d` sur la vraie prod
+- [ ] Vérifier que tous les healthchecks sont verts
+- [ ] Vérifier que la génération du planning du vrai tournoi fonctionne
+- [ ] Imprimer le kit tournoi (PDF via /admin/tournois/{id}/print/)
+- [ ] Tester un accès coach via QR code avec un vrai téléphone
+
+### Jour J matin
+- [ ] Vérifier les logs Sentry (0 erreur dans les 12h précédentes)
+- [ ] Tester une saisie de score depuis le téléphone d'un bénévole
+- [ ] Afficher l'écran terrain sur une tablette pour valider le rendu
+- [ ] Briefing des bénévoles avec "mode briefing" planning

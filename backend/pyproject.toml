@@ -45,6 +45,7 @@ dev = [
     "pytest>=8.0",
     "pytest-django>=4.8",
     "pytest-cov>=5.0",
+    "pytest-asyncio>=0.24,<1.0",
     "factory-boy>=3.3",
     "ruff>=0.8",
     "mypy>=1.13",
@@ -78,6 +79,7 @@ django_settings_module = "kickoff.settings.dev"
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "kickoff.settings.dev"
 python_files = ["test_*.py", "tests.py"]
+asyncio_mode = "auto"
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"

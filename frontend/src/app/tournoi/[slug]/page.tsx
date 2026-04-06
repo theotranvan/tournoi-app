@@ -2,6 +2,7 @@
 
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -242,14 +243,24 @@ function LiveTab({ slug }: { slug: string }) {
             À venir
           </p>
           <div className="space-y-2">
-            {upcoming.map((m) => {
-              const d = matchToCard(m);
-              return (
-                <Link key={d.id} href={`/tournoi/${slug}/match/${d.id}`}>
-                  <MatchCard {...d} />
-                </Link>
-              );
-            })}
+            <AnimatePresence mode="popLayout">
+              {upcoming.map((m, i) => {
+                const d = matchToCard(m);
+                return (
+                  <motion.div
+                    key={d.id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ delay: i * 0.04, type: "spring", stiffness: 500, damping: 30 }}
+                  >
+                    <Link href={`/tournoi/${slug}/match/${d.id}`}>
+                      <MatchCard {...d} />
+                    </Link>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
           </div>
         </section>
       )}
@@ -262,14 +273,24 @@ function LiveTab({ slug }: { slug: string }) {
             Derniers résultats
           </p>
           <div className="space-y-2">
-            {recent.map((m) => {
-              const d = matchToCard(m);
-              return (
-                <Link key={d.id} href={`/tournoi/${slug}/match/${d.id}`}>
-                  <MatchCard {...d} />
-                </Link>
-              );
-            })}
+            <AnimatePresence mode="popLayout">
+              {recent.map((m, i) => {
+                const d = matchToCard(m);
+                return (
+                  <motion.div
+                    key={d.id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ delay: i * 0.04, type: "spring", stiffness: 500, damping: 30 }}
+                  >
+                    <Link href={`/tournoi/${slug}/match/${d.id}`}>
+                      <MatchCard {...d} />
+                    </Link>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
           </div>
         </section>
       )}
