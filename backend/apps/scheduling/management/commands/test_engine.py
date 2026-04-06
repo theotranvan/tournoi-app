@@ -57,16 +57,16 @@ class Command(BaseCommand):
             )
 
         self.stdout.write(self.style.HTTP_INFO(f"\n{'='*60}"))
-        self.stdout.write(self.style.HTTP_INFO("  KICKOFF — Moteur de planning"))
+        self.stdout.write(self.style.HTTP_INFO("  KICKOFF - Moteur de planning"))
         self.stdout.write(self.style.HTTP_INFO(f"  Tournoi: {tournament.name}"))
-        self.stdout.write(self.style.HTTP_INFO(f"  Stratégie: {strategy}"))
+        self.stdout.write(self.style.HTTP_INFO(f"  Strategie: {strategy}"))
         self.stdout.write(self.style.HTTP_INFO(f"{'='*60}\n"))
 
         start = time.time()
         engine = SchedulingEngine(tournament, strategy=strategy)
 
         def _progress(pct, msg):
-            bar = "█" * (pct // 5) + "░" * (20 - pct // 5)
+            bar = "#" * (pct // 5) + "." * (20 - pct // 5)
             self.stdout.write(f"\r  [{bar}] {pct:3d}% {msg}", ending="")
             self.stdout.flush()
 
@@ -78,7 +78,7 @@ class Command(BaseCommand):
         self._print_report(report, elapsed, engine)
 
         if options["benchmark"]:
-            self.stdout.write(f"\n  ⏱  Temps total: {elapsed*1000:.0f}ms")
+            self.stdout.write(f"\n  Temps total: {elapsed*1000:.0f}ms")
 
     def _run_benchmark(self, size, strategy):
         """Create a temporary tournament and benchmark the engine."""
@@ -105,9 +105,9 @@ class Command(BaseCommand):
 
     def _print_report(self, report, elapsed, engine):
         """Pretty-print the scheduling report."""
-        self.stdout.write(self.style.HTTP_INFO(f"\n{'─'*60}"))
-        self.stdout.write(self.style.HTTP_INFO("  📊 RAPPORT DE PLANIFICATION"))
-        self.stdout.write(self.style.HTTP_INFO(f"{'─'*60}"))
+        self.stdout.write(self.style.HTTP_INFO(f"\n{'-'*60}"))
+        self.stdout.write(self.style.HTTP_INFO("  RAPPORT DE PLANIFICATION"))
+        self.stdout.write(self.style.HTTP_INFO(f"{'-'*60}"))
 
         # Score
         score = report.score
@@ -122,33 +122,33 @@ class Command(BaseCommand):
         # Stats
         self.stdout.write(f"  Matchs placés: {report.placed_count}/{report.total_count}")
         self.stdout.write(f"  Temps: {elapsed*1000:.0f}ms")
-        self.stdout.write(f"  Stratégie: {report.strategy_used.value}")
+        self.stdout.write(f"  Strategie: {report.strategy_used.value}")
 
         # Conflicts
         if report.hard_conflicts:
             self.stdout.write(self.style.ERROR(
-                f"\n  ⚠ {len(report.hard_conflicts)} CONFLIT(S) HARD:"
+                f"\n  ! {len(report.hard_conflicts)} CONFLIT(S) HARD:"
             ))
             for c in report.hard_conflicts[:5]:
-                self.stdout.write(self.style.ERROR(f"    • {c.reason}"))
+                self.stdout.write(self.style.ERROR(f"    - {c.reason}"))
         else:
-            self.stdout.write(self.style.SUCCESS("  ✅ Aucun conflit hard"))
+            self.stdout.write(self.style.SUCCESS("  OK Aucun conflit hard"))
 
         # Warnings
         if report.soft_warnings:
             self.stdout.write(self.style.WARNING(
-                f"\n  ⚡ {len(report.soft_warnings)} avertissement(s):"
+                f"\n  ~ {len(report.soft_warnings)} avertissement(s):"
             ))
             for w in report.soft_warnings[:10]:
-                self.stdout.write(self.style.WARNING(f"    • {w.message}"))
+                self.stdout.write(self.style.WARNING(f"    - {w.message}"))
         else:
-            self.stdout.write(self.style.SUCCESS("  ✅ Aucun avertissement"))
+            self.stdout.write(self.style.SUCCESS("  OK Aucun avertissement"))
 
         # Schedule grid (ASCII art)
         if engine._context and engine._context.placements:
             self._print_grid(engine)
 
-        self.stdout.write(f"\n{'─'*60}\n")
+        self.stdout.write(f"\n{'-'*60}\n")
 
     def _print_grid(self, engine):
         """Print an ASCII grid of the schedule: day × field × time slots."""
@@ -163,14 +163,14 @@ class Command(BaseCommand):
             day = p.start_time.date().isoformat()
             grid[day][p.field_id].append(p)
 
-        self.stdout.write(self.style.HTTP_INFO("\n  📅 PLANNING DÉTAILLÉ"))
+        self.stdout.write(self.style.HTTP_INFO("\n  PLANNING DETAILLE"))
 
         for day in sorted(grid.keys()):
-            self.stdout.write(self.style.HTTP_INFO(f"\n  ┌── {day} {'─'*45}"))
+            self.stdout.write(self.style.HTTP_INFO(f"\n  +-- {day} {'-'*45}"))
             for fid in sorted(grid[day].keys()):
                 fname = fields[fid].name if fid in fields else f"Terrain {fid}"
                 pls = sorted(grid[day][fid], key=lambda p: p.start_time)
-                self.stdout.write(f"  │ {fname}:")
+                self.stdout.write(f"  | {fname}:")
                 for p in pls:
                     cat = engine._context.categories.get(p.match.category_id)
                     cat_name = cat.name if cat else "?"
@@ -187,7 +187,7 @@ class Command(BaseCommand):
                         away = t.name if t else away
                     phase = p.match.phase.upper()[:3]
                     self.stdout.write(
-                        f"  │   {start}-{end}  [{cat_name}] "
+                        f"  |   {start}-{end}  [{cat_name}] "
                         f"{phase}: {home} vs {away}"
                     )
-            self.stdout.write(f"  └{'─'*58}")
+            self.stdout.write(f"  +{'-'*58}")
