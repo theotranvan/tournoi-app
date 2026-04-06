@@ -19,15 +19,17 @@ export default function AdminLayout({
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
 
   const isLoginPage = pathname === "/admin/login";
+  const isRegisterPage = pathname === "/admin/register";
+  const isAuthPage = isLoginPage || isRegisterPage;
 
   useEffect(() => {
-    if (mounted && !isAuthenticated && !isLoginPage) {
+    if (mounted && !isAuthenticated && !isAuthPage) {
       router.replace("/admin/login");
     }
-  }, [mounted, isAuthenticated, isLoginPage, router]);
+  }, [mounted, isAuthenticated, isAuthPage, router]);
 
-  // Login page renders without the sidebar/nav chrome
-  if (isLoginPage) {
+  // Auth pages render without the sidebar/nav chrome
+  if (isAuthPage) {
     return <>{children}</>;
   }
 

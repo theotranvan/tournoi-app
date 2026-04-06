@@ -14,8 +14,17 @@ class NotificationViewSet(ListModelMixin, GenericViewSet):
 
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None  # notifications are displayed in a dropdown
 
     def get_queryset(self):
+        qs = self._base_queryset()
+        # Only slice for list action; detail actions need filterable queryset
+        if self.action == "list":
+            return qs[:50]
+        return qs
+
+    def _base_queryset(self):
+        """Unsliced queryset for actions that need .update() or .count()."""
         user = self.request.user
         qs = Notification.objects.all()
         # Filter by target: admin sees admin+all, coach sees coach+all
@@ -40,12 +49,12 @@ class NotificationViewSet(ListModelMixin, GenericViewSet):
     @action(detail=False, methods=["post"])
     def read_all(self, request):
         """Mark all notifications as read."""
-        qs = self.get_queryset().filter(is_read=False)
+        qs = self._base_queryset().filter(is_read=False)
         count = qs.update(is_read=True)
         return Response({"marked_read": count})
 
     @action(detail=False, methods=["get"])
     def unread_count(self, request):
         """Get count of unread notifications."""
-        count = self.get_queryset().filter(is_read=False).count()
+        count = self._base_queryset().filter(is_read=False).count()
         return Response({"count": count})

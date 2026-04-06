@@ -29,27 +29,31 @@ function StatCard({
   value,
   icon: Icon,
   color,
+  bgColor,
   loading,
+  delay,
 }: {
   label: string;
   value: number;
   icon: React.ElementType;
   color: string;
+  bgColor: string;
   loading: boolean;
+  delay: number;
 }) {
   return (
-    <Card size="sm">
+    <Card size="sm" className={`card-hover animate-fade-in-up stagger-${delay}`}>
       <CardContent className="pt-4 pb-3">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs text-muted-foreground">{label}</span>
-          <div className={`size-8 rounded-lg bg-accent flex items-center justify-center`}>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs text-muted-foreground font-medium">{label}</span>
+          <div className={`size-9 rounded-xl ${bgColor} flex items-center justify-center`}>
             <Icon className={`size-4 ${color}`} />
           </div>
         </div>
         {loading ? (
           <Skeleton className="h-8 w-12" />
         ) : (
-          <p className="text-2xl font-bold tabular-nums">{value}</p>
+          <p className="text-2xl font-bold tabular-nums animate-count-up">{value}</p>
         )}
       </CardContent>
     </Card>
@@ -61,7 +65,7 @@ function StatCard({
 function LiveTournamentCard({ t }: { t: TournamentList }) {
   return (
     <Link href={`/admin/tournois/${t.id}`}>
-      <Card className="border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer">
+      <Card className="border-primary/30 bg-primary/5 hover:bg-primary/10 transition-all cursor-pointer card-hover animate-fade-in-up">
         <CardContent className="py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 space-y-1">
@@ -78,9 +82,9 @@ function LiveTournamentCard({ t }: { t: TournamentList }) {
                 <span>{t.nb_matches} matchs</span>
               </div>
             </div>
-            <span className="text-xs font-medium text-primary flex items-center gap-1 shrink-0">
+            <span className="text-xs font-medium text-primary flex items-center gap-1 shrink-0 group">
               Gérer
-              <ArrowRight className="size-3.5" />
+              <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
             </span>
           </div>
         </CardContent>
@@ -109,7 +113,7 @@ const statusDot: Record<string, string> = {
 function TournamentQuickCard({ t }: { t: TournamentList }) {
   return (
     <Link href={`/admin/tournois/${t.id}`}>
-      <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
+      <Card className="hover:bg-accent/50 transition-all cursor-pointer card-hover">
         <CardContent className="py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">
@@ -158,7 +162,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 pb-safe">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between animate-fade-in">
         <div>
           <h1 className="text-2xl font-bold">Tableau de bord</h1>
           <p className="text-sm text-muted-foreground">
@@ -175,34 +179,42 @@ export default function AdminDashboard() {
           value={active.length}
           icon={Trophy}
           color="text-primary"
+          bgColor="bg-primary/10"
           loading={isLoading}
+          delay={1}
         />
         <StatCard
           label="Matchs total"
           value={totalMatches}
           icon={Calendar}
           color="text-blue-400"
+          bgColor="bg-blue-500/10"
           loading={isLoading}
+          delay={2}
         />
         <StatCard
           label="Équipes inscrites"
           value={totalTeams}
           icon={Users}
           color="text-violet-400"
+          bgColor="bg-violet-500/10"
           loading={isLoading}
+          delay={3}
         />
         <StatCard
           label="En direct"
           value={liveTournaments.length}
           icon={Zap}
           color="text-live"
+          bgColor="bg-red-500/10"
           loading={isLoading}
+          delay={4}
         />
       </div>
 
       {/* Live tournaments highlight */}
       {liveTournaments.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-2 animate-fade-in-up stagger-5">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
             Tournois en direct
           </h2>
@@ -213,15 +225,15 @@ export default function AdminDashboard() {
       )}
 
       {/* Quick actions */}
-      <div className="space-y-2">
+      <div className="space-y-2 animate-fade-in-up stagger-6">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
           Actions rapides
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           <Link href="/admin/tournois/new">
-            <Card className="hover:bg-accent/50 transition-colors cursor-pointer h-full">
+            <Card className="hover:bg-accent/50 transition-all cursor-pointer h-full card-hover">
               <CardContent className="py-4 flex flex-col items-center gap-2 text-center">
-                <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center">
                   <Plus className="size-5 text-primary" />
                 </div>
                 <span className="text-sm font-medium">Nouveau tournoi</span>
@@ -229,9 +241,9 @@ export default function AdminDashboard() {
             </Card>
           </Link>
           <Link href="/admin/planning">
-            <Card className="hover:bg-accent/50 transition-colors cursor-pointer h-full">
+            <Card className="hover:bg-accent/50 transition-all cursor-pointer h-full card-hover">
               <CardContent className="py-4 flex flex-col items-center gap-2 text-center">
-                <div className="size-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <div className="size-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
                   <CalendarDays className="size-5 text-blue-400" />
                 </div>
                 <span className="text-sm font-medium">Planning</span>
@@ -239,9 +251,9 @@ export default function AdminDashboard() {
             </Card>
           </Link>
           <Link href="/admin/equipes">
-            <Card className="hover:bg-accent/50 transition-colors cursor-pointer h-full">
+            <Card className="hover:bg-accent/50 transition-all cursor-pointer h-full card-hover">
               <CardContent className="py-4 flex flex-col items-center gap-2 text-center">
-                <div className="size-10 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                <div className="size-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
                   <ClipboardList className="size-5 text-violet-400" />
                 </div>
                 <span className="text-sm font-medium">Équipes</span>
@@ -252,7 +264,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Recent tournaments */}
-      <Card>
+      <Card className="animate-fade-in-up stagger-7">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Tournois récents</CardTitle>

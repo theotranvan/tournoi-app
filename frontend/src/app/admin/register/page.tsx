@@ -2,30 +2,47 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Eye, EyeOff } from "lucide-react";
-import { useLogin } from "@/hooks/use-auth";
-import Link from "next/link";
+import { useRegister } from "@/hooks/use-auth";
 
-export default function AdminLogin() {
+export default function AdminRegister() {
   const router = useRouter();
-  const login = useLogin();
+  const register = useRegister();
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [password2, setPassword2] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [localError, setLocalError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    login.mutate(
-      { username, password },
+    setLocalError("");
+
+    if (password !== password2) {
+      setLocalError("Les mots de passe ne correspondent pas.");
+      return;
+    }
+
+    register.mutate(
+      { username, email, password, password2 },
       {
         onSuccess: () => router.replace("/admin"),
       }
     );
   }
+
+  const errorMessage =
+    localError ||
+    (register.isError
+      ? (register.error as { detail?: string })?.detail ||
+        "Erreur lors de l\u2019inscription. Veuillez réessayer."
+      : "");
 
   return (
     <div className="relative flex items-center justify-center min-h-full px-4 pb-safe overflow-hidden">
@@ -41,7 +58,7 @@ export default function AdminLogin() {
           </div>
           <h1 className="text-2xl font-bold gradient-text">Kickoff</h1>
           <p className="text-sm text-muted-foreground">
-            Espace organisateur
+            Créer un compte organisateur
           </p>
         </div>
 
@@ -54,13 +71,28 @@ export default function AdminLogin() {
                   id="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="admin"
+                  placeholder="mon_nom"
                   autoComplete="username"
                   className="h-11"
                   required
                 />
               </div>
+
               <div className="space-y-2 animate-fade-in-up stagger-4">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="nom@exemple.com"
+                  autoComplete="email"
+                  className="h-11"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2 animate-fade-in-up stagger-5">
                 <Label htmlFor="password">Mot de passe</Label>
                 <div className="relative">
                   <Input
@@ -69,8 +101,9 @@ export default function AdminLogin() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     className="h-11 pr-10"
+                    minLength={8}
                     required
                   />
                   <button
@@ -88,34 +121,49 @@ export default function AdminLogin() {
                 </div>
               </div>
 
-              {login.isError && (
+              <div className="space-y-2 animate-fade-in-up stagger-6">
+                <Label htmlFor="password2">Confirmer le mot de passe</Label>
+                <Input
+                  id="password2"
+                  type={showPassword ? "text" : "password"}
+                  value={password2}
+                  onChange={(e) => setPassword2(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                  className="h-11"
+                  minLength={8}
+                  required
+                />
+              </div>
+
+              {errorMessage && (
                 <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 animate-fade-in-down">
                   <p className="text-sm text-destructive text-center">
-                    Identifiants incorrects. Veuillez réessayer.
+                    {errorMessage}
                   </p>
                 </div>
               )}
 
               <Button
                 type="submit"
-                className="w-full h-11 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-shadow animate-fade-in-up stagger-5"
-                disabled={login.isPending}
+                className="w-full h-11 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-shadow animate-fade-in-up stagger-7"
+                disabled={register.isPending}
               >
-                {login.isPending ? (
+                {register.isPending ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
-                  "Se connecter"
+                  "Créer mon compte"
                 )}
               </Button>
             </form>
 
-            <p className="text-center text-sm text-muted-foreground animate-fade-in stagger-6">
-              Pas encore de compte ?{" "}
+            <p className="text-center text-sm text-muted-foreground animate-fade-in stagger-8">
+              Déjà inscrit ?{" "}
               <Link
-                href="/admin/register"
+                href="/admin/login"
                 className="text-primary hover:underline font-medium"
               >
-                Créer un compte
+                Se connecter
               </Link>
             </p>
           </CardContent>

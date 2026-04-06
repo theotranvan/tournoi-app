@@ -58,6 +58,7 @@ import {
   useGenerateGroups,
   useCreateGroup,
 } from "@/hooks/use-team-mutations";
+import { TeamNameAutocomplete } from "@/components/kickoff/team-name-autocomplete";
 import type {
   TournamentStatus,
   Category,
@@ -430,12 +431,20 @@ function QuickTeamDialog({
             </div>
             <div className="space-y-1.5">
               <Label>Nom *</Label>
-              <Input
+              <TeamNameAutocomplete
+                tournamentId={tournamentId}
+                excludeCategory={String(form.category)}
                 value={form.name}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, name: e.target.value }))
+                onChange={(v) =>
+                  setForm((f) => ({ ...f, name: v }))
                 }
-                placeholder="FC Exemple"
+                onSelect={(name) =>
+                  setForm((f) => ({
+                    ...f,
+                    name,
+                    short_name: f.short_name || name.substring(0, 5),
+                  }))
+                }
                 required
               />
             </div>

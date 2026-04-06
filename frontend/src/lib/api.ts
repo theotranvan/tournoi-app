@@ -75,8 +75,10 @@ async function apiFetch<T = unknown>(
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
 
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(customHeaders as Record<string, string>),
   };
 
@@ -85,10 +87,16 @@ async function apiFetch<T = unknown>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
+  const serializedBody = isFormData
+    ? (body as FormData)
+    : body != null
+      ? JSON.stringify(body)
+      : undefined;
+
   let res = await fetch(url.toString(), {
     ...rest,
     headers,
-    body: body != null ? JSON.stringify(body) : undefined,
+    body: serializedBody,
   });
 
   // Auto-refresh on 401 or 403 (token expired or missing)
@@ -99,7 +107,7 @@ async function apiFetch<T = unknown>(
       res = await fetch(url.toString(), {
         ...rest,
         headers,
-        body: body != null ? JSON.stringify(body) : undefined,
+        body: serializedBody,
       });
     } else if (res.status === 401 || res.status === 403) {
       // Redirect to login if refresh failed

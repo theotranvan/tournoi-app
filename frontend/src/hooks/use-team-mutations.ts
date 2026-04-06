@@ -11,11 +11,30 @@ import { groupKeys } from "./use-groups";
 
 // ─── Teams ──────────────────────────────────────────────────────────────────
 
+function teamPayloadToBody(data: TeamPayload | Partial<TeamPayload>): FormData | Record<string, unknown> {
+  if (data.logo instanceof File) {
+    const fd = new FormData();
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined && value !== null) {
+        if (key === "logo" && value instanceof File) {
+          fd.append("logo", value);
+        } else {
+          fd.append(key, String(value));
+        }
+      }
+    }
+    return fd;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { logo, ...rest } = data as TeamPayload;
+  return rest as unknown as Record<string, unknown>;
+}
+
 export function useCreateTeam(tournamentId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: TeamPayload) =>
-      api.post<TeamAdmin>(`/tournaments/${tournamentId}/teams/`, data),
+      api.post<TeamAdmin>(`/tournaments/${tournamentId}/teams/`, teamPayloadToBody(data)),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: teamKeys.list(tournamentId) }),
   });
@@ -25,7 +44,7 @@ export function useUpdateTeam(tournamentId: string, id: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Partial<TeamPayload>) =>
-      api.patch<TeamAdmin>(`/tournaments/${tournamentId}/teams/${id}/`, data),
+      api.patch<TeamAdmin>(`/tournaments/${tournamentId}/teams/${id}/`, teamPayloadToBody(data)),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: teamKeys.list(tournamentId) });
       qc.invalidateQueries({ queryKey: teamKeys.detail(tournamentId, id) });

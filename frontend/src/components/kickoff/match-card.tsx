@@ -68,7 +68,7 @@ export function MatchCard({
   return (
     <Card
       className={cn(
-        "cursor-pointer transition-colors hover:ring-primary/30",
+        "cursor-pointer transition-all hover:ring-primary/30 card-hover",
         isLive && "ring-live/50 bg-live/5",
         className
       )}

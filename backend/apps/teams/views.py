@@ -6,7 +6,7 @@ from django.conf import settings
 from django.http import HttpResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.parsers import MultiPartParser
+from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -25,6 +25,7 @@ from apps.tournaments.views import _get_tournament_for_nested
 
 class TeamViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsOrganizer]
+    parser_classes = [JSONParser, MultiPartParser]
 
     def get_serializer_class(self):
         if self.action in ("list", "retrieve", "create", "update", "partial_update"):
@@ -119,6 +120,30 @@ class TeamViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_201_CREATED if created else status.HTTP_400_BAD_REQUEST,
         )
+
+    @action(detail=False, methods=["get"], url_path="suggestions")
+    def suggestions(self, request, tournament_id=None):
+        """Return distinct team names already used in this tournament.
+
+        Optionally filtered by ?search= and excluding teams in ?exclude_category=.
+        """
+        tournament = _get_tournament_for_nested(self.kwargs, request.user)
+        qs = Team.objects.filter(tournament=tournament)
+
+        exclude_cat = request.query_params.get("exclude_category")
+        if exclude_cat:
+            qs = qs.exclude(category_id=exclude_cat)
+
+        search = request.query_params.get("search", "").strip()
+        if search:
+            qs = qs.filter(name__icontains=search)
+
+        names = (
+            qs.values_list("name", flat=True)
+            .distinct()
+            .order_by("name")[:30]
+        )
+        return Response(list(names))
 
 
 class GroupViewSet(viewsets.ModelViewSet):

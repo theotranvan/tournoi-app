@@ -43,7 +43,7 @@ export function MobileNav({ variant = "coach", className }: MobileNavProps) {
   return (
     <nav
       className={cn(
-        "fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/95 backdrop-blur-md pb-safe md:hidden",
+        "fixed inset-x-0 bottom-0 z-50 border-t border-border/50 glass pb-safe md:hidden",
         className
       )}
       aria-label="Navigation principale"
@@ -57,15 +57,18 @@ export function MobileNav({ variant = "coach", className }: MobileNavProps) {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 min-w-[56px] h-14 rounded-lg transition-colors",
+                "flex flex-col items-center justify-center gap-0.5 min-w-[56px] h-14 rounded-lg transition-all",
                 isActive
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "text-primary scale-105"
+                  : "text-muted-foreground hover:text-foreground active:scale-95"
               )}
               aria-current={isActive ? "page" : undefined}
             >
               <item.icon className="size-5" aria-hidden="true" />
               <span className="text-[0.6rem] font-medium">{item.label}</span>
+              {isActive && (
+                <span className="absolute -bottom-0 size-1 rounded-full bg-primary" />
+              )}
             </Link>
           );
         })}

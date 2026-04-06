@@ -30,6 +30,8 @@ urlpatterns = [
     path("api/v1/public/", include("apps.public.urls")),
     # Notifications
     path("api/v1/", include("apps.notifications.urls")),
+    # Subscriptions
+    path("api/v1/subscriptions/", include("apps.subscriptions.urls")),
 ]
 
 if settings.DEBUG:

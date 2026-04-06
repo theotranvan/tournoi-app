@@ -223,7 +223,7 @@ export default function CoachHome() {
   return (
     <div className="p-4 space-y-5 pb-safe">
       {/* Header with TeamAvatar */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 animate-fade-in-up">
         <TeamAvatar name={team.name} logo={team.logo} size="lg" />
         <div className="min-w-0">
           <h1 className="text-xl font-bold truncate">{team.name}</h1>
@@ -234,13 +234,13 @@ export default function CoachHome() {
       </div>
 
       {/* Live match */}
-      {liveMatch && <LiveMatchCard match={liveMatch} />}
+      {liveMatch && <div className="animate-scale-in"><LiveMatchCard match={liveMatch} /></div>}
 
       {/* Next match */}
       {isLoading ? (
         <Skeleton className="h-28 w-full rounded-xl" />
       ) : nextMatch ? (
-        <NextMatchCard match={nextMatch} />
+        <div className="animate-fade-in-up stagger-2"><NextMatchCard match={nextMatch} /></div>
       ) : !liveMatch ? (
         <EmptyState
           icon={Clock}
@@ -252,22 +252,22 @@ export default function CoachHome() {
 
       {/* Stats grid: W / D / L */}
       {stats.played > 0 && (
-        <div className="grid grid-cols-3 gap-2">
-          <Card>
+        <div className="grid grid-cols-3 gap-2 animate-fade-in-up stagger-3">
+          <Card className="card-hover">
             <CardContent className="py-3 text-center">
-              <p className="text-2xl font-bold text-green-500">{stats.won}</p>
+              <p className="text-2xl font-bold text-green-500 animate-count-up">{stats.won}</p>
               <p className="text-[10px] text-muted-foreground uppercase">Victoires</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="card-hover">
             <CardContent className="py-3 text-center">
-              <p className="text-2xl font-bold text-amber-500">{stats.drawn}</p>
+              <p className="text-2xl font-bold text-amber-500 animate-count-up">{stats.drawn}</p>
               <p className="text-[10px] text-muted-foreground uppercase">Nuls</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="card-hover">
             <CardContent className="py-3 text-center">
-              <p className="text-2xl font-bold text-red-500">{stats.lost}</p>
+              <p className="text-2xl font-bold text-red-500 animate-count-up">{stats.lost}</p>
               <p className="text-[10px] text-muted-foreground uppercase">Défaites</p>
             </CardContent>
           </Card>
@@ -275,16 +275,16 @@ export default function CoachHome() {
       )}
 
       {stats.played > 0 && (
-        <div className="grid grid-cols-2 gap-2">
-          <Card>
+        <div className="grid grid-cols-2 gap-2 animate-fade-in-up stagger-4">
+          <Card className="card-hover">
             <CardContent className="py-3 text-center">
-              <p className="text-lg font-bold">{stats.goalsFor}</p>
+              <p className="text-lg font-bold animate-count-up">{stats.goalsFor}</p>
               <p className="text-[10px] text-muted-foreground uppercase">Buts marqués</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="card-hover">
             <CardContent className="py-3 text-center">
-              <p className="text-lg font-bold">{stats.goalsAgainst}</p>
+              <p className="text-lg font-bold animate-count-up">{stats.goalsAgainst}</p>
               <p className="text-[10px] text-muted-foreground uppercase">Buts encaissés</p>
             </CardContent>
           </Card>

@@ -35,6 +35,7 @@ import {
   useDeleteTeam,
   useBulkImportTeams,
 } from "@/hooks/use-team-mutations";
+import { TeamNameAutocomplete } from "@/components/kickoff/team-name-autocomplete";
 import type { TeamAdmin, TeamPayload, Category } from "@/types/api";
 
 // ─── Team Form Dialog ───────────────────────────────────────────────────────
@@ -68,6 +69,9 @@ function TeamFormDialog({
 
   const set = (field: keyof TeamPayload, value: string | number) =>
     setForm((prev) => ({ ...prev, [field]: value }));
+
+  const setLogo = (file: File | null) =>
+    setForm((prev) => ({ ...prev, logo: file }));
 
   const canSubmit = form.name.trim() && form.category > 0;
 
@@ -123,11 +127,16 @@ function TeamFormDialog({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="team-name">Nom *</Label>
-              <Input
-                id="team-name"
+              <TeamNameAutocomplete
+                tournamentId={tournamentId}
+                excludeCategory={String(form.category)}
                 value={form.name}
-                onChange={(e) => set("name", e.target.value)}
-                placeholder="FC Exemple"
+                onChange={(v) => set("name", v)}
+                onSelect={(name) => {
+                  set("name", name);
+                  if (!form.short_name) set("short_name", name.substring(0, 5));
+                }}
+                id="team-name"
                 required
               />
             </div>
@@ -169,6 +178,18 @@ function TeamFormDialog({
                 onChange={(e) => set("coach_email", e.target.value)}
                 placeholder="coach@example.com"
               />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="team-logo">Logo</Label>
+              <Input
+                id="team-logo"
+                type="file"
+                accept="image/*"
+                onChange={(e) => setLogo(e.target.files?.[0] ?? null)}
+              />
+              {team?.logo && !form.logo && (
+                <p className="text-xs text-muted-foreground">Logo actuel conservé</p>
+              )}
             </div>
           </div>
           <DialogFooter>

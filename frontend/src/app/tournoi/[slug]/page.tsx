@@ -128,9 +128,9 @@ function HeroSection({
   liveCount: number;
 }) {
   return (
-    <div className="relative -mx-4 -mt-4">
+    <div className="relative -mx-4 -mt-4 animate-fade-in">
       {/* Cover image or gradient */}
-      <div className="relative h-48 overflow-hidden bg-gradient-to-br from-primary/30 via-primary/10 to-background">
+      <div className="relative h-52 overflow-hidden bg-gradient-to-br from-primary/30 via-primary/10 to-background">
         {tournament.cover_image && (
           <img
             src={tournament.cover_image}
@@ -139,12 +139,12 @@ function HeroSection({
           />
         )}
         {/* Gradient overlay for readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
       </div>
 
       {/* Content overlay */}
-      <div className="relative -mt-20 px-4 pb-2">
-        <div className="flex items-start justify-between gap-2">
+      <div className="relative -mt-24 px-4 pb-2">
+        <div className="flex items-start justify-between gap-2 animate-fade-in-up stagger-1">
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-bold leading-tight">{tournament.name}</h1>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-sm text-muted-foreground">
@@ -170,8 +170,8 @@ function HeroSection({
 
         {/* Live badge */}
         {liveCount > 0 && (
-          <div className="mt-3">
-            <Badge variant="default" className="bg-red-500/90 hover:bg-red-500 text-white gap-1.5 px-2.5 py-1">
+          <div className="mt-3 animate-scale-in stagger-2">
+            <Badge variant="default" className="bg-red-500/90 hover:bg-red-500 text-white gap-1.5 px-2.5 py-1 shadow-lg shadow-red-500/20">
               <LiveIndicator size="sm" label="" />
               <span className="font-semibold">
                 {liveCount} match{liveCount > 1 ? "s" : ""} en direct
@@ -182,7 +182,7 @@ function HeroSection({
 
         {/* Category badges */}
         {tournament.categories.length > 0 && (
-          <div className="flex gap-1.5 mt-3 flex-wrap">
+          <div className="flex gap-1.5 mt-3 flex-wrap animate-fade-in-up stagger-3">
             {tournament.categories.map((c) => (
               <Badge
                 key={c.id}
@@ -216,13 +216,13 @@ function LiveMatchCarousel({ matches, slug }: { matches: MatchList[]; slug: stri
         ref={scrollRef}
         className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-1"
       >
-        {matches.map((m) => (
+        {matches.map((m, i) => (
           <Link
             key={m.id}
             href={`/tournoi/${slug}/match/${m.id}`}
-            className="snap-start shrink-0 w-[280px]"
+            className={`snap-start shrink-0 w-[280px] animate-fade-in-up stagger-${i + 1}`}
           >
-            <Card className="ring-red-500/30 bg-red-500/5 hover:bg-red-500/10 transition-colors">
+            <Card className="ring-red-500/30 bg-red-500/5 hover:bg-red-500/10 transition-all card-hover">
               <CardContent className="p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <LiveIndicator size="sm" />
@@ -689,13 +689,13 @@ export default function PublicTournament({
         {/* Sticky Tabs */}
         {tournament && (
           <Tabs defaultValue="live">
-            <div className="sticky top-14 z-30 -mx-4 px-4 bg-background/95 backdrop-blur-md border-b border-border pb-0">
+            <div className="sticky top-14 z-30 -mx-4 px-4 glass border-b border-border/50 pb-0">
               <TabsList className="w-full">
-                <TabsTrigger value="live" className="flex-1 gap-1">
+                <TabsTrigger value="live" className="flex-1 gap-1 transition-all">
                   <Radio className="size-3.5" />
                   Live
                 </TabsTrigger>
-                <TabsTrigger value="programme" className="flex-1 gap-1">
+                <TabsTrigger value="programme" className="flex-1 gap-1 transition-all">
                   <CalendarDays className="size-3.5" />
                   Matchs
                 </TabsTrigger>

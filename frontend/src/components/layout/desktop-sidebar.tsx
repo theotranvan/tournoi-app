@@ -12,6 +12,7 @@ import {
   Settings,
   Users,
   LayoutGrid,
+  CreditCard,
   ChevronLeft,
   ChevronRight,
   type LucideIcon,
@@ -43,6 +44,7 @@ const sidebarSections: { title: string; links: SidebarLink[] }[] = [
   {
     title: "Système",
     links: [
+      { href: "/admin/abonnement", label: "Abonnement", icon: CreditCard },
       { href: "/admin/parametres", label: "Paramètres", icon: Settings },
     ],
   },
@@ -59,7 +61,7 @@ export function DesktopSidebar({ className }: DesktopSidebarProps) {
   return (
     <aside
       className={cn(
-        "hidden md:flex flex-col h-full border-r border-border bg-sidebar transition-[width] duration-200",
+        "hidden md:flex flex-col h-full border-r border-border bg-sidebar transition-all duration-300 ease-in-out",
         collapsed ? "w-16" : "w-60",
         className
       )}

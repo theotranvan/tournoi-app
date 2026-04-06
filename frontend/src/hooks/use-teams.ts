@@ -8,6 +8,8 @@ export const teamKeys = {
     [...teamKeys.all, "list", tournamentId, filters] as const,
   detail: (tournamentId: string, id: number) =>
     [...teamKeys.all, "detail", tournamentId, id] as const,
+  suggestions: (tournamentId: string, search: string, excludeCategory?: string) =>
+    [...teamKeys.all, "suggestions", tournamentId, search, excludeCategory] as const,
 };
 
 export function useTeams(
@@ -31,5 +33,26 @@ export function useTeam(tournamentId: string, id: number) {
     queryFn: () =>
       api.get<TeamAdmin>(`/tournaments/${tournamentId}/teams/${id}/`),
     enabled: !!tournamentId && id > 0,
+  });
+}
+
+export function useTeamSuggestions(
+  tournamentId: string,
+  search: string,
+  excludeCategory?: string
+) {
+  const params: Record<string, string> = {};
+  if (search) params.search = search;
+  if (excludeCategory) params.exclude_category = excludeCategory;
+
+  return useQuery({
+    queryKey: teamKeys.suggestions(tournamentId, search, excludeCategory),
+    queryFn: () =>
+      api.get<string[]>(
+        `/tournaments/${tournamentId}/teams/suggestions/`,
+        params
+      ),
+    enabled: !!tournamentId && search.length >= 1,
+    staleTime: 10_000,
   });
 }

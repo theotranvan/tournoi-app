@@ -40,7 +40,15 @@ INSTALLED_APPS = [
     "apps.public",
     "apps.realtime",
     "apps.notifications",
+    "apps.subscriptions",
 ]
+
+# ─── Stripe ──────────────────────────────────────────────────────────────────
+STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY", default="")
+STRIPE_PUBLISHABLE_KEY = config("STRIPE_PUBLISHABLE_KEY", default="")
+STRIPE_WEBHOOK_SECRET = config("STRIPE_WEBHOOK_SECRET", default="")
+STRIPE_PRICE_MONTHLY = config("STRIPE_PRICE_MONTHLY", default="")
+STRIPE_PRICE_YEARLY = config("STRIPE_PRICE_YEARLY", default="")
 
 # ─── Middleware ───────────────────────────────────────────────────────────────
 MIDDLEWARE = [

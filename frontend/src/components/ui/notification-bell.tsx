@@ -83,7 +83,7 @@ export function NotificationBell({ className }: { className?: string }) {
 
           {/* Dropdown */}
           <div
-            className="absolute right-0 top-full mt-2 z-50 w-80 max-h-96 overflow-y-auto rounded-xl border border-border bg-card shadow-lg"
+            className="absolute right-0 top-full mt-2 z-50 w-80 max-h-96 overflow-y-auto rounded-xl border border-border bg-card shadow-xl animate-scale-in origin-top-right"
             role="region"
             aria-label="Notifications"
             onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
