@@ -1,0 +1,73 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths: ["backend/**"]
+  pull_request:
+    branches: [main, develop]
+    paths: ["backend/**"]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: pip install ".[dev]"
+      - name: Ruff check
+        run: ruff check .
+      - name: Ruff format check
+        run: ruff format --check .
+      - name: Mypy
+        run: mypy apps/ --ignore-missing-imports
+
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: kickoff_test
+          POSTGRES_USER: kickoff
+          POSTGRES_PASSWORD: kickoff
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    env:
+      SECRET_KEY: ci-test-secret-key
+      DEBUG: "True"
+      DATABASE_URL: postgres://kickoff:kickoff@localhost:5432/kickoff_test
+      REDIS_URL: redis://localhost:6379/0
+      DJANGO_SETTINGS_MODULE: kickoff.settings.dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: pip install ".[dev]"
+      - name: Run migrations
+        run: python manage.py migrate --noinput
+      - name: Run tests
+        run: pytest --cov=apps --cov-report=term-missing

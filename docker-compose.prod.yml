@@ -1,0 +1,84 @@
+# docker-compose.prod.yml — Production overrides
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+services:
+  postgres:
+    restart: always
+    ports: []   # No host exposure in prod
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-kickoff}
+      POSTGRES_USER: ${POSTGRES_USER:-kickoff}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    shm_size: 256mb
+
+  redis:
+    restart: always
+    ports: []   # No host exposure in prod
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+
+  backend:
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             daphne -b 0.0.0.0 -p 8000 --proxy-headers kickoff.asgi:application"
+    volumes:
+      - backend_static:/app/staticfiles
+      - backend_media:/app/media
+    ports: []   # Only exposed via nginx
+    restart: always
+    environment:
+      - DJANGO_SETTINGS_MODULE=kickoff.settings.prod
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/public/health/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  celery-worker:
+    command: celery -A kickoff worker -l warning --concurrency=4 --max-tasks-per-child=1000
+    volumes: []
+    restart: always
+    environment:
+      - DJANGO_SETTINGS_MODULE=kickoff.settings.prod
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  celery-beat:
+    command: celery -A kickoff beat -l warning
+    volumes: []
+    restart: always
+    environment:
+      - DJANGO_SETTINGS_MODULE=kickoff.settings.prod
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  frontend:
+    restart: always
+    ports: []   # Only exposed via nginx
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://api.kickoff.app/api/v1}
+      - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-wss://api.kickoff.app/ws}
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  nginx:
+    restart: always
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - backend_static:/app/backend/staticfiles:ro
+      - backend_media:/app/backend/media:ro

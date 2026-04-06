@@ -1,0 +1,150 @@
+name: Mobile Build
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Web build + Capacitor sync ─────────────────
+  build-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint & type check
+        run: |
+          npm run lint
+          npx tsc --noEmit
+
+      - name: Build for mobile (static export)
+        run: BUILD_TARGET=mobile npm run build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.API_URL || 'https://api.kickoff.app/api/v1' }}
+          NEXT_PUBLIC_WS_URL: ${{ vars.WS_URL || 'wss://api.kickoff.app/ws' }}
+
+      - name: Upload web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-export
+          path: frontend/out
+          retention-days: 7
+
+  # ── iOS Build ──────────────────────────────────
+  build-ios:
+    needs: build-web
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download web build
+        uses: actions/download-artifact@v4
+        with:
+          name: web-export
+          path: frontend/out
+
+      - name: Sync Capacitor
+        run: npx cap sync ios
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install CocoaPods
+        run: |
+          cd ios/App
+          pod install
+
+      - name: Build iOS (Debug)
+        run: |
+          cd ios/App
+          xcodebuild -workspace App.xcworkspace \
+            -scheme App \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            build \
+            | xcpretty
+
+      # TODO: For release builds, add Apple certificate + provisioning profile
+      # using apple-actions/import-codesign-certs and apple-actions/download-provisioning-profiles
+      # Then build with -configuration Release and export IPA via xcodebuild -exportArchive
+
+  # ── Android Build ──────────────────────────────
+  build-android:
+    needs: build-web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download web build
+        uses: actions/download-artifact@v4
+        with:
+          name: web-export
+          path: frontend/out
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build Android (Debug APK)
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: frontend/android/app/build/outputs/apk/debug/*.apk
+          retention-days: 7
+
+      # TODO: For release builds, decode ANDROID_KEYSTORE base64 secret,
+      # configure signing in android/app/build.gradle, then run assembleRelease

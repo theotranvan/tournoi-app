@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+venv/
+.venv/
+
+# Django
+db.sqlite3
+media/
+staticfiles/
+
+# Environment
+.env
+.env.local
+.env.docker
+.env.production
+
+# SSL certificates
+nginx/ssl/
+
+# Node
+node_modules/
+.next/
+.turbo/
+out/
+
+# Capacitor native projects
+ios/
+android/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test scripts
+test_e2e.py
