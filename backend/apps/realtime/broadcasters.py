@@ -56,6 +56,8 @@ def broadcast_match_score_updated(match) -> None:
         "match_id": str(match.id),
         "score_home": match.score_home,
         "score_away": match.score_away,
+        "penalty_score_home": match.penalty_score_home,
+        "penalty_score_away": match.penalty_score_away,
         "category_id": match.category_id,
         "group_id": match.group_id,
     }
@@ -69,6 +71,8 @@ def broadcast_match_finished(match) -> None:
         "match_id": str(match.id),
         "score_home": match.score_home,
         "score_away": match.score_away,
+        "penalty_score_home": match.penalty_score_home,
+        "penalty_score_away": match.penalty_score_away,
         "category_id": match.category_id,
         "group_id": match.group_id,
         "phase": match.phase,

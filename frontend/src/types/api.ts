@@ -290,6 +290,8 @@ export interface MatchList {
   status: MatchStatus;
   score_home: number | null;
   score_away: number | null;
+  penalty_score_home: number | null;
+  penalty_score_away: number | null;
   is_locked: boolean;
 }
 
@@ -329,6 +331,8 @@ export interface GoalInput {
 export interface ScoreInput {
   score_home: number;
   score_away: number;
+  penalty_score_home?: number | null;
+  penalty_score_away?: number | null;
   goals?: GoalInput[];
 }
 

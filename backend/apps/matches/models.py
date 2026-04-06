@@ -10,7 +10,7 @@ from apps.tournaments.models import Category, Field, Tournament
 
 
 class Match(TrackChangesMixin, models.Model):
-    _tracked_fields = ("status", "score_home", "score_away")
+    _tracked_fields = ("status", "score_home", "score_away", "penalty_score_home", "penalty_score_away")
     class Phase(models.TextChoices):
         GROUP = "group", "Phase de poules"
         ROUND_OF_16 = "r16", "8èmes de finale"
@@ -75,6 +75,15 @@ class Match(TrackChangesMixin, models.Model):
     score_home = models.PositiveIntegerField(null=True, blank=True)
     score_away = models.PositiveIntegerField(null=True, blank=True)
 
+    penalty_score_home = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Tirs au but domicile (phases finales uniquement)",
+    )
+    penalty_score_away = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Tirs au but extérieur (phases finales uniquement)",
+    )
+
     score_entered_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -127,6 +136,32 @@ class Match(TrackChangesMixin, models.Model):
                 errors["score_home"] = "Le score domicile est requis pour un match terminé."
             if self.score_away is None:
                 errors["score_away"] = "Le score extérieur est requis pour un match terminé."
+
+        # Penalties: interdit en phase de poules
+        has_pen = self.penalty_score_home is not None or self.penalty_score_away is not None
+        if has_pen and self.phase == self.Phase.GROUP:
+            errors["penalty_score_home"] = "Les tirs au but ne sont pas autorisés en phase de poules."
+
+        # Penalties must come in pairs
+        if (self.penalty_score_home is None) != (self.penalty_score_away is None):
+            errors["penalty_score_away"] = "Les deux scores de tirs au but doivent être renseignés."
+
+        # Penalties only valid when regular scores are tied
+        if (
+            has_pen
+            and self.score_home is not None
+            and self.score_away is not None
+            and self.score_home != self.score_away
+        ):
+            errors["penalty_score_home"] = "Les tirs au but ne sont possibles qu'en cas d'égalité."
+
+        # Penalties must not also be a draw
+        if (
+            self.penalty_score_home is not None
+            and self.penalty_score_away is not None
+            and self.penalty_score_home == self.penalty_score_away
+        ):
+            errors["penalty_score_away"] = "Les tirs au but ne peuvent pas être à égalité."
 
         if errors:
             raise ValidationError(errors)

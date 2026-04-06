@@ -45,6 +45,8 @@ class MatchListSerializer(serializers.ModelSerializer):
             "status",
             "score_home",
             "score_away",
+            "penalty_score_home",
+            "penalty_score_away",
             "is_locked",
         )
 
@@ -82,6 +84,8 @@ class MatchDetailSerializer(serializers.ModelSerializer):
             "status",
             "score_home",
             "score_away",
+            "penalty_score_home",
+            "penalty_score_away",
             "score_validated",
             "score_entered_by",
             "is_locked",
@@ -101,4 +105,6 @@ class MatchUpdateSerializer(serializers.ModelSerializer):
 class ScoreInputSerializer(serializers.Serializer):
     score_home = serializers.IntegerField(min_value=0)
     score_away = serializers.IntegerField(min_value=0)
+    penalty_score_home = serializers.IntegerField(min_value=0, required=False, allow_null=True, default=None)
+    penalty_score_away = serializers.IntegerField(min_value=0, required=False, allow_null=True, default=None)
     goals = GoalInputSerializer(many=True, required=False, default=[])

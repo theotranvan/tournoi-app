@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 
 from celery import shared_task
-from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +40,9 @@ def generate_schedule_task(self, tournament_id: str, strategy: str = "balanced")
     try:
         report = engine.generate()
 
-        with transaction.atomic():
-            engine.commit_to_db()
+        # commit_to_db is @transaction.atomic — if bulk_create fails,
+        # the DELETE is rolled back automatically.
+        engine.commit_to_db()
 
         result = report.to_dict()
         result["status"] = "success"
@@ -54,5 +54,6 @@ def generate_schedule_task(self, tournament_id: str, strategy: str = "balanced")
 
     except Exception as exc:
         logger.exception("Schedule generation failed for tournament %s", tournament_id)
+        # Transaction (if any) is already rolled back at this point.
         broadcast_task_failed(task_id, str(exc))
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc, countdown=30)

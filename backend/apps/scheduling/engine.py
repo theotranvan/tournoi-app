@@ -16,6 +16,8 @@ from collections import defaultdict
 from collections.abc import Callable
 from datetime import timedelta
 
+from django.db import transaction
+
 from apps.scheduling.context import SchedulingContext
 from apps.scheduling.enumerator import enumerate_tournament_matches
 from apps.scheduling.optimizer import two_opt_optimization
@@ -892,11 +894,16 @@ class SchedulingEngine:
             "bottlenecks": bottlenecks,
         }
 
+    @transaction.atomic
     def commit_to_db(self) -> list:
-        """Save all placements as Match objects. Only DB-write point."""
+        """Save all placements as Match objects. Only DB-write point.
+
+        Decorated with @transaction.atomic so DELETE + bulk_create
+        are rolled back together on any error.
+        """
         from apps.matches.models import Match
 
-        Match.objects.filter(
+        Match.objects.select_for_update().filter(
             tournament=self.tournament,
             is_locked=False,
             status=Match.Status.SCHEDULED,
@@ -931,11 +938,13 @@ class SchedulingEngine:
     # ─── Incremental recalculation ───────────────────────────────────────
 
     @classmethod
+    @transaction.atomic
     def reschedule(cls, tournament, changed_match_ids: list[str]) -> SchedulingReport:
         """Re-place only affected matches without full regeneration.
 
         Locked matches are left in-place. Non-locked affected matches
         (same category / same day) are deleted and re-placed.
+        Wrapped in @transaction.atomic so the delete + re-place is all-or-nothing.
         """
         from apps.matches.models import Match
 
@@ -1012,9 +1021,8 @@ class SchedulingEngine:
         total = placed + len(engine._matches)
         engine._report = engine._build_report(placed, total, start_ts)
 
-        from django.db import transaction
-
-        with transaction.atomic():
-            engine.commit_to_db()
+        # commit_to_db is itself @transaction.atomic; the outer
+        # reschedule @transaction.atomic wraps everything (delete + place + commit).
+        engine.commit_to_db()
 
         return engine._report

@@ -78,11 +78,14 @@ class MatchViewSet(viewsets.ModelViewSet):
 
         match.score_home = data["score_home"]
         match.score_away = data["score_away"]
+        match.penalty_score_home = data.get("penalty_score_home")
+        match.penalty_score_away = data.get("penalty_score_away")
         match.score_entered_by = request.user
         if match.status == Match.Status.SCHEDULED:
             match.status = Match.Status.LIVE
         match.save(update_fields=[
-            "score_home", "score_away", "score_entered_by", "status", "updated_at"
+            "score_home", "score_away", "penalty_score_home", "penalty_score_away",
+            "score_entered_by", "status", "updated_at"
         ])
 
         # Handle goals

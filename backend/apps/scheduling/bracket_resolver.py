@@ -133,8 +133,15 @@ def _get_match_result(match, role: str):
     elif match.score_away > match.score_home:
         winner, loser = match.team_away, match.team_home
     else:
-        # Draw in knockout — home team advances by default
-        winner, loser = match.team_home, match.team_away
+        # Draw in knockout — need penalty shootout to decide
+        if match.penalty_score_home is None or match.penalty_score_away is None:
+            return None  # Penalties not entered yet
+        if match.penalty_score_home > match.penalty_score_away:
+            winner, loser = match.team_home, match.team_away
+        elif match.penalty_score_away > match.penalty_score_home:
+            winner, loser = match.team_away, match.team_home
+        else:
+            return None  # Penalty scores tied — data error
 
     return winner if role == "Vainqueur" else loser
 

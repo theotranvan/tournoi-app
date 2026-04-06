@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { TeamAvatar } from "@/components/kickoff/team-avatar";
 import { LiveIndicator } from "@/components/kickoff/live-indicator";
 import { ScoreDisplay } from "@/components/kickoff/score-display";
-import { Minus, Plus, Check, ArrowLeft, Loader2, Play, Flag } from "lucide-react";
+import { Minus, Plus, Check, ArrowLeft, Loader2, Play, Flag, Target } from "lucide-react";
 import Link from "next/link";
 import { useMatch } from "@/hooks/use-matches";
 import { useSubmitScore, useStartMatch } from "@/hooks/use-match-mutations";
@@ -46,17 +46,27 @@ export default function ScoreEntry({
 
   const [homeScore, setHomeScore] = useState(0);
   const [awayScore, setAwayScore] = useState(0);
+  const [penaltyHome, setPenaltyHome] = useState<number | null>(null);
+  const [penaltyAway, setPenaltyAway] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
   // Prefill from existing scores
   if (match && !submitted && homeScore === 0 && awayScore === 0) {
     if (match.score_home !== null) setHomeScore(match.score_home);
     if (match.score_away !== null) setAwayScore(match.score_away);
+    if (match.penalty_score_home !== null) setPenaltyHome(match.penalty_score_home);
+    if (match.penalty_score_away !== null) setPenaltyAway(match.penalty_score_away);
   }
 
   function handleSubmit() {
     submitScore.mutate(
-      { score_home: homeScore, score_away: awayScore },
+      {
+        score_home: homeScore,
+        score_away: awayScore,
+        ...(penaltyHome !== null && penaltyAway !== null
+          ? { penalty_score_home: penaltyHome, penalty_score_away: penaltyAway }
+          : {}),
+      },
       {
         onSuccess: () => {
           setSubmitted(true);
@@ -105,6 +115,9 @@ export default function ScoreEntry({
   const awayLogo = match.team_away_detail?.logo ?? null;
   const isLive = match.status === "live";
   const isScheduled = match.status === "scheduled";
+  const isKnockout = match.phase !== "group";
+  const isDraw = homeScore === awayScore;
+  const showPenalties = isKnockout && isDraw;
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-lg mx-auto pb-safe">
@@ -159,9 +172,10 @@ export default function ScoreEntry({
                   <Button
                     variant="outline"
                     className="size-16 rounded-2xl text-2xl active:scale-95 transition-transform"
-                    onClick={() =>
-                      setHomeScore(Math.max(0, homeScore - 1))
-                    }
+                    onClick={() => {
+                      setHomeScore(Math.max(0, homeScore - 1));
+                      if (Math.max(0, homeScore - 1) !== awayScore) { setPenaltyHome(null); setPenaltyAway(null); }
+                    }}
                   >
                     <Minus className="size-7" />
                   </Button>
@@ -169,7 +183,10 @@ export default function ScoreEntry({
                   <Button
                     variant="outline"
                     className="size-16 rounded-2xl text-2xl active:scale-95 transition-transform"
-                    onClick={() => setHomeScore(homeScore + 1)}
+                    onClick={() => {
+                      setHomeScore(homeScore + 1);
+                      if (homeScore + 1 !== awayScore) { setPenaltyHome(null); setPenaltyAway(null); }
+                    }}
                   >
                     <Plus className="size-7" />
                   </Button>
@@ -195,9 +212,10 @@ export default function ScoreEntry({
                   <Button
                     variant="outline"
                     className="size-16 rounded-2xl text-2xl active:scale-95 transition-transform"
-                    onClick={() =>
-                      setAwayScore(Math.max(0, awayScore - 1))
-                    }
+                    onClick={() => {
+                      setAwayScore(Math.max(0, awayScore - 1));
+                      if (homeScore !== Math.max(0, awayScore - 1)) { setPenaltyHome(null); setPenaltyAway(null); }
+                    }}
                   >
                     <Minus className="size-7" />
                   </Button>
@@ -205,12 +223,83 @@ export default function ScoreEntry({
                   <Button
                     variant="outline"
                     className="size-16 rounded-2xl text-2xl active:scale-95 transition-transform"
-                    onClick={() => setAwayScore(awayScore + 1)}
+                    onClick={() => {
+                      setAwayScore(awayScore + 1);
+                      if (homeScore !== awayScore + 1) { setPenaltyHome(null); setPenaltyAway(null); }
+                    }}
                   >
                     <Plus className="size-7" />
                   </Button>
                 </div>
               </div>
+
+              {/* Penalty shootout (knockout draws only) */}
+              {showPenalties && (
+                <div className="rounded-xl border-2 border-orange-500/30 bg-orange-500/5 p-4 space-y-4">
+                  <div className="flex items-center justify-center gap-2 text-orange-600 dark:text-orange-400">
+                    <Target className="size-5" />
+                    <p className="font-semibold text-sm">Tirs au but (phase finale)</p>
+                  </div>
+
+                  {/* Penalty home */}
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium truncate max-w-[120px]">{homeName}</p>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="size-10 rounded-xl"
+                        onClick={() => setPenaltyHome(Math.max(0, (penaltyHome ?? 0) - 1))}
+                      >
+                        <Minus className="size-4" />
+                      </Button>
+                      <span className="text-xl font-bold tabular-nums w-8 text-center">
+                        {penaltyHome ?? 0}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="size-10 rounded-xl"
+                        onClick={() => setPenaltyHome((penaltyHome ?? 0) + 1)}
+                      >
+                        <Plus className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Penalty away */}
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium truncate max-w-[120px]">{awayName}</p>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="size-10 rounded-xl"
+                        onClick={() => setPenaltyAway(Math.max(0, (penaltyAway ?? 0) - 1))}
+                      >
+                        <Minus className="size-4" />
+                      </Button>
+                      <span className="text-xl font-bold tabular-nums w-8 text-center">
+                        {penaltyAway ?? 0}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="size-10 rounded-xl"
+                        onClick={() => setPenaltyAway((penaltyAway ?? 0) + 1)}
+                      >
+                        <Plus className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {penaltyHome !== null && penaltyAway !== null && penaltyHome === penaltyAway && (
+                    <p className="text-xs text-orange-600 dark:text-orange-400 text-center">
+                      Les tirs au but ne peuvent pas être à égalité.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Submit error */}
               {submitScore.isError && (
