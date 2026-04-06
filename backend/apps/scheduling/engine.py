@@ -94,6 +94,7 @@ class SchedulingEngine:
 
         self._progress(10, "Énumération des matchs…")
         self._enumerate_required_matches()
+        self._inject_phase_separation()
 
         if not self._matches:
             self._report = self._build_report(0, 0, start_ts)
@@ -215,6 +216,39 @@ class SchedulingEngine:
         matches, warnings = enumerate_tournament_matches(self.tournament)
         self._matches = matches
         self._warnings.extend(warnings)
+
+    def _inject_phase_separation(self) -> None:
+        """Apply phase separation constraints to knockout matches.
+
+        For 'next_day' mode: set forced_date on all non-group matches to
+        tournament.end_date so they are scheduled on the last day.
+        If the tournament is single-day, emit a warning instead.
+        """
+        mode = getattr(self.tournament, "phase_separation_mode", "none")
+        if mode != "next_day":
+            return
+
+        from dataclasses import replace as dc_replace
+
+        t = self.tournament
+        duration = (t.end_date - t.start_date).days
+        if duration < 1:
+            self._warnings.append(SoftWarning(
+                type="phase_separation_impossible",
+                message=(
+                    "Mode 'lendemain' activé mais le tournoi ne dure qu'un jour — "
+                    "les phases finales ne seront pas séparées."
+                ),
+            ))
+            return
+
+        forced = t.end_date
+        updated: list[ProvisionalMatch] = []
+        for m in self._matches:
+            if m.phase != "group":
+                m = dc_replace(m, forced_date=forced)
+            updated.append(m)
+        self._matches = updated
 
     # ─── Phase 3: Place locked matches ───────────────────────────────────
 
@@ -547,6 +581,9 @@ class SchedulingEngine:
                 # Category day must match
                 if not self._context.category_day_allowed(match.category_id, start):
                     continue
+                # Forced date (phase separation next_day mode)
+                if match.forced_date and start.date() != match.forced_date:
+                    continue
                 # Category time window
                 if not self._context.category_time_window_ok(match.category_id, start, end):
                     continue
@@ -878,6 +915,16 @@ class SchedulingEngine:
                 f"Le {day_bottleneck} est surchargé ({max_day_util}%). "
                 f"Répartissez les catégories sur plusieurs jours."
             )
+
+        # Phase separation warning
+        sep_mode = getattr(tournament, "phase_separation_mode", "none")
+        if sep_mode == "next_day":
+            duration_days = (tournament.end_date - tournament.start_date).days
+            if duration_days < 1:
+                bottlenecks.append(
+                    "Mode séparation 'lendemain' activé mais le tournoi ne dure qu'un jour. "
+                    "Ajoutez un jour ou changez le mode de séparation."
+                )
 
         return {
             "feasibility_score": feasibility_score,

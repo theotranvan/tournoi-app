@@ -55,6 +55,8 @@ class TournamentDetailSerializer(serializers.ModelSerializer):
             "default_match_duration",
             "default_transition_time",
             "default_rest_time",
+            "phase_separation_mode",
+            "knockout_rest_multiplier",
             "nb_categories",
             "nb_teams",
             "nb_matches",
@@ -86,6 +88,8 @@ class TournamentCreateSerializer(serializers.ModelSerializer):
             "default_match_duration",
             "default_transition_time",
             "default_rest_time",
+            "phase_separation_mode",
+            "knockout_rest_multiplier",
         )
         read_only_fields = ("id", "slug", "status")
 

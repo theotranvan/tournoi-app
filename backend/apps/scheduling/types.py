@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -29,6 +29,7 @@ class ProvisionalMatch:
     duration: int = 15
     transition: int = 5
     rest_needed: int = 20
+    forced_date: date | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -43,11 +44,15 @@ class ProvisionalMatch:
             "duration": self.duration,
             "transition": self.transition,
             "rest_needed": self.rest_needed,
+            "forced_date": self.forced_date.isoformat() if self.forced_date else None,
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ProvisionalMatch:
-        return cls(**data)
+        d = dict(data)
+        if isinstance(d.get("forced_date"), str):
+            d["forced_date"] = date.fromisoformat(d["forced_date"])
+        return cls(**d)
 
 
 @dataclass(frozen=True)

@@ -24,6 +24,8 @@ export default function NewTournament() {
     default_match_duration: 15,
     default_transition_time: 5,
     default_rest_time: 30,
+    phase_separation_mode: "same_day_rest" as "none" | "same_day_rest" | "next_day",
+    knockout_rest_multiplier: 3,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -213,6 +215,66 @@ export default function NewTournament() {
                 />
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Phase separation */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Séparation des phases</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="phase_separation_mode">Mode de séparation</Label>
+              <select
+                id="phase_separation_mode"
+                value={form.phase_separation_mode}
+                onChange={(e) =>
+                  set(
+                    "phase_separation_mode",
+                    e.target.value as "none" | "same_day_rest" | "next_day"
+                  )
+                }
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="none">Aucune séparation</option>
+                <option value="same_day_rest">
+                  Repos allongé avant phases finales
+                </option>
+                <option value="next_day">
+                  Phases finales le lendemain
+                </option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Permet de préserver le repos des jeunes joueurs entre les phases
+                de poules et les phases finales.
+              </p>
+            </div>
+
+            {form.phase_separation_mode === "same_day_rest" && (
+              <div className="space-y-2">
+                <Label htmlFor="knockout_rest_multiplier">
+                  Multiplicateur de repos (phases finales)
+                </Label>
+                <Input
+                  id="knockout_rest_multiplier"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={form.knockout_rest_multiplier}
+                  onChange={(e) =>
+                    set(
+                      "knockout_rest_multiplier",
+                      parseInt(e.target.value) || 1
+                    )
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Le repos minimum avant une phase finale sera multiplié par
+                  cette valeur (ex : ×3 = {form.default_rest_time * form.knockout_rest_multiplier} min).
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

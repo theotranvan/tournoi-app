@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from dataclasses import replace as dc_replace
 from itertools import combinations
 
 from apps.scheduling.types import ProvisionalMatch, SoftWarning
@@ -165,7 +166,17 @@ def enumerate_tournament_matches(tournament) -> tuple[list[ProvisionalMatch], li
     for cat_id, grps in categories_with_groups.items():
         cat = grps[0].category
         group_names = [g.name for g in sorted(grps, key=lambda g: g.display_order)]
-        matches.extend(enumerate_bracket_matches(cat, len(grps), group_names))
+        bracket_matches = enumerate_bracket_matches(cat, len(grps), group_names)
+
+        # Apply knockout rest multiplier if mode is 'same_day_rest'
+        if getattr(tournament, "phase_separation_mode", "none") == "same_day_rest":
+            multiplier = getattr(tournament, "knockout_rest_multiplier", 3)
+            bracket_matches = [
+                dc_replace(m, rest_needed=m.rest_needed * multiplier)
+                for m in bracket_matches
+            ]
+
+        matches.extend(bracket_matches)
 
     # Sort: group phase first, then by phase order
     phase_order = {"group": 0, "r16": 1, "quarter": 2, "semi": 3, "third": 4, "final": 5}

@@ -42,6 +42,11 @@ class Tournament(models.Model):
         FINISHED = "finished", "Terminé"
         ARCHIVED = "archived", "Archivé"
 
+    class PhaseSeparationMode(models.TextChoices):
+        NONE = "none", "Aucune séparation — tout dans l'ordre naturel"
+        SAME_DAY_REST = "same_day_rest", "Même jour avec repos minimum augmenté"
+        NEXT_DAY = "next_day", "Phases finales au jour suivant"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="tournaments")
     name = models.CharField(max_length=200)
@@ -65,6 +70,17 @@ class Tournament(models.Model):
     default_rest_time = models.PositiveIntegerField(
         default=20,
         help_text="Repos minimum entre deux matchs d'une même équipe en minutes",
+    )
+
+    phase_separation_mode = models.CharField(
+        max_length=20,
+        choices=PhaseSeparationMode.choices,
+        default=PhaseSeparationMode.SAME_DAY_REST,
+        help_text="Comment séparer les phases de poules des phases finales",
+    )
+    knockout_rest_multiplier = models.PositiveIntegerField(
+        default=3,
+        help_text="Multiplicateur de repos entre dernière poule et première phase finale",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)

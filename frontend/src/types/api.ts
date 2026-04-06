@@ -86,6 +86,8 @@ export interface TournamentDetail extends TournamentList {
   default_match_duration: number;
   default_transition_time: number;
   default_rest_time: number;
+  phase_separation_mode: "none" | "same_day_rest" | "next_day";
+  knockout_rest_multiplier: number;
   updated_at: string;
 }
 
@@ -102,6 +104,8 @@ export interface TournamentPayload {
   default_match_duration?: number;
   default_transition_time?: number;
   default_rest_time?: number;
+  phase_separation_mode?: "none" | "same_day_rest" | "next_day";
+  knockout_rest_multiplier?: number;
 }
 
 // ─── Categories ─────────────────────────────────────────────────────────────

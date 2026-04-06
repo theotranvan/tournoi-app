@@ -207,3 +207,126 @@ class TestEmptyTournament:
         assert report.total_count == 0
         assert report.placed_count == 0
         assert len(report.hard_conflicts) == 0
+
+
+@pytest.mark.django_db
+class TestPhaseSeparation:
+    """Phase separation modes — same_day_rest and next_day."""
+
+    def test_same_day_rest_triples_rest_before_knockout(self, organizer):
+        """With same_day_rest mode, knockout rest_needed should be multiplied."""
+        tournament = make_tournament(
+            organizer,
+            n_categories=1,
+            teams_per_cat=4,
+            n_fields=2,
+            n_days=1,
+            n_groups=2,
+            rest_time=20,
+        )
+        tournament.phase_separation_mode = "same_day_rest"
+        tournament.knockout_rest_multiplier = 3
+        tournament.save()
+
+        engine = SchedulingEngine(tournament, strategy="balanced")
+        report = engine.generate()
+        engine.commit_to_db()
+
+        # All matches should be placed
+        assert report.placed_count == report.total_count
+        assert report.total_count > 0
+
+        # Check that knockout matches have tripled rest in practice:
+        # verify no knockout starts sooner than 60min after groups end
+        from apps.matches.models import Match
+
+        group_matches = Match.objects.filter(
+            tournament=tournament, phase="group",
+        )
+        knockout_matches = Match.objects.filter(
+            tournament=tournament,
+        ).exclude(phase="group")
+
+        if group_matches.exists() and knockout_matches.exists():
+            last_group_end = max(
+                m.start_time + timedelta(minutes=m.duration_minutes)
+                for m in group_matches
+            )
+            first_knockout_start = min(m.start_time for m in knockout_matches)
+            gap_minutes = (first_knockout_start - last_group_end).total_seconds() / 60
+            # Gap should be at least 3x rest (60min) - allow 5min tolerance
+            assert gap_minutes >= 55, (
+                f"Knockout starts only {gap_minutes:.0f}min after groups "
+                f"(expected >= 60min with multiplier 3)"
+            )
+
+    def test_next_day_mode_forces_knockout_on_day_2(self, organizer):
+        """With next_day mode, all knockout matches should be on the last day."""
+        tournament = make_tournament(
+            organizer,
+            n_categories=1,
+            teams_per_cat=4,
+            n_fields=2,
+            n_days=2,
+            n_groups=2,
+        )
+        tournament.phase_separation_mode = "next_day"
+        tournament.save()
+
+        engine = SchedulingEngine(tournament, strategy="balanced")
+        report = engine.generate()
+        engine.commit_to_db()
+
+        assert report.placed_count == report.total_count
+        assert report.total_count > 0
+
+        from apps.matches.models import Match
+
+        knockout_matches = Match.objects.filter(
+            tournament=tournament,
+        ).exclude(phase="group")
+
+        last_day = tournament.end_date
+        for m in knockout_matches:
+            assert m.start_time.date() == last_day, (
+                f"Knockout match {m.phase} on {m.start_time.date()}, "
+                f"expected on {last_day}"
+            )
+
+    def test_next_day_single_day_warning(self, organizer):
+        """next_day mode on single-day tournament → warning, not crash."""
+        tournament = make_tournament(
+            organizer,
+            n_categories=1,
+            teams_per_cat=4,
+            n_fields=2,
+            n_days=1,
+            n_groups=2,
+        )
+        tournament.phase_separation_mode = "next_day"
+        tournament.save()
+
+        engine = SchedulingEngine(tournament, strategy="balanced")
+        report = engine.generate()
+
+        # Should still work (no crash), with a warning
+        assert report.placed_count == report.total_count
+        warning_types = [w.type for w in report.soft_warnings]
+        assert "phase_separation_impossible" in warning_types
+
+    def test_feasibility_next_day_single_day_bottleneck(self, organizer):
+        """Feasibility check should flag next_day mode on single-day tournament."""
+        tournament = make_tournament(
+            organizer,
+            n_categories=1,
+            teams_per_cat=4,
+            n_fields=2,
+            n_days=1,
+            n_groups=2,
+        )
+        tournament.phase_separation_mode = "next_day"
+        tournament.save()
+
+        result = SchedulingEngine.check_feasibility(tournament)
+        bottleneck_text = " ".join(result["bottlenecks"])
+        assert "lendemain" in bottleneck_text.lower() or "séparation" in bottleneck_text.lower()

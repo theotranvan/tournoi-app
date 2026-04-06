@@ -72,6 +72,10 @@ def score_placement(
     if not context.category_day_allowed(match.category_id, start_time):
         return None
 
+    # 5b. Forced date (phase separation next_day mode)
+    if match.forced_date and start_time.date() != match.forced_date:
+        return None
+
     # 6. Finals cannot start before group phase finishes + rest
     if match.phase != "group":
         last_end = context.last_group_match_end(match.category_id)
