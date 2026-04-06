@@ -7,12 +7,18 @@ from apps.public.views import (
     PublicMatchesView,
     PublicStandingsView,
     PublicTeamView,
+    PublicTournamentByCodeView,
     PublicTournamentView,
     HealthCheckView,
 )
 
 urlpatterns = [
     path("health/", HealthCheckView.as_view(), name="public-health"),
+    path(
+        "tournaments/by-code/<str:code>/",
+        PublicTournamentByCodeView.as_view(),
+        name="public-tournament-by-code",
+    ),
     path(
         "tournaments/<slug:slug>/",
         PublicTournamentView.as_view(),

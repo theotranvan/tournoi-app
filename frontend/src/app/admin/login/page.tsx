@@ -6,9 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { useLogin } from "@/hooks/use-auth";
 import Link from "next/link";
+import { triggerHaptic } from "@/lib/haptics";
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -29,6 +30,16 @@ export default function AdminLogin() {
 
   return (
     <div className="relative flex items-center justify-center min-h-full px-4 pb-safe overflow-hidden">
+      {/* Back button */}
+      <Link
+        href="/start"
+        onClick={() => triggerHaptic("light")}
+        className="absolute top-4 left-4 z-10 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors animate-fade-in"
+      >
+        <ArrowLeft className="size-4" />
+        Retour
+      </Link>
+
       {/* Decorative gradient orbs */}
       <div className="orb orb-green size-64 -top-16 -right-16 fixed" />
       <div className="orb orb-blue size-48 bottom-20 -left-12 fixed" />
@@ -36,10 +47,8 @@ export default function AdminLogin() {
       <div className="relative w-full max-w-sm space-y-6">
         {/* Branding */}
         <div className="text-center space-y-2 animate-fade-in-up">
-          <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto animate-glow-pulse">
-            <span className="text-3xl">⚽</span>
-          </div>
-          <h1 className="text-2xl font-bold gradient-text">Kickoff</h1>
+          <img src="/logo-footix.png" alt="Footix" className="h-16 w-auto mx-auto animate-glow-pulse" />
+          <h1 className="text-2xl font-bold gradient-text">Footix</h1>
           <p className="text-sm text-muted-foreground">
             Espace organisateur
           </p>

@@ -27,7 +27,7 @@ export default async function Image({
     start_time: string;
   } | null = null;
 
-  let tournamentName = "Kickoff";
+  let tournamentName = "Footix";
 
   try {
     const [matchRes, tournamentRes] = await Promise.all([

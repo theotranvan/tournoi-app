@@ -71,8 +71,8 @@ export function DesktopSidebar({ className }: DesktopSidebarProps) {
       <div className="flex h-14 items-center justify-between px-4 border-b border-sidebar-border">
         {!collapsed && (
           <Link href="/admin" className="flex items-center gap-2">
-            <span className="text-lg font-bold text-primary">⚽</span>
-            <span className="text-base font-semibold">Kickoff</span>
+            <img src="/logo-footix.png" alt="Footix" className="h-7 w-auto" />
+            <span className="text-base font-semibold">Footix</span>
           </Link>
         )}
         <div className="flex items-center gap-1">

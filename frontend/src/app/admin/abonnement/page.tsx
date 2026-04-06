@@ -81,7 +81,7 @@ export default function AbonnementPage() {
       <div>
         <h1 className="text-2xl font-bold">Abonnement</h1>
         <p className="text-muted-foreground mt-1">
-          Gérez votre abonnement Kickoff
+          Gérez votre abonnement Footix
         </p>
       </div>
 

@@ -1,6 +1,6 @@
 {
-  "name": "Kickoff — Gestion de tournois",
-  "short_name": "Kickoff",
+  "name": "Footix — Gestion de tournois",
+  "short_name": "Footix",
   "description": "Organisez, planifiez et suivez vos tournois de football en temps réel.",
   "start_url": "/",
   "id": "/",
@@ -37,7 +37,7 @@
       "sizes": "1080x1920",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Accueil Kickoff"
+      "label": "Accueil Footix"
     }
   ]
 }

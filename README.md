@@ -1,4 +1,4 @@
-# Kickoff — Tournament Management Platform
+# Footix — Tournament Management Platform
 
 Application web de gestion de tournois de football.
 Django REST API + Next.js frontend, temps réel via WebSocket.

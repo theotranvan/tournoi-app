@@ -19,25 +19,25 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Kickoff — Gestion de tournois",
+  title: "Footix — Gestion de tournois",
   description:
     "Organisez, planifiez et suivez vos tournois de football en temps réel.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Kickoff",
+    title: "Footix",
   },
   openGraph: {
-    title: "Kickoff — Gestion de tournois",
+    title: "Footix — Gestion de tournois",
     description:
       "Organisez, planifiez et suivez vos tournois de football en temps réel.",
-    siteName: "Kickoff",
+    siteName: "Footix",
     type: "website",
   },
   twitter: {
     card: "summary",
-    title: "Kickoff — Gestion de tournois",
+    title: "Footix — Gestion de tournois",
     description:
       "Organisez, planifiez et suivez vos tournois de football en temps réel.",
   },

@@ -123,7 +123,7 @@ async function apiFetch<T = unknown>(
     try {
       const err = await res.json();
       detail = err.detail ?? err.message ?? detail;
-      errors = err.errors;
+      errors = err.errors ?? err.details;
     } catch {
       // non-JSON error
     }

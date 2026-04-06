@@ -9,7 +9,7 @@ interface ThemeState {
 
 function getStoredTheme(): Theme {
   if (typeof window === "undefined") return "system";
-  return (localStorage.getItem("kickoff_theme") as Theme) ?? "system";
+  return (localStorage.getItem("footix_theme") as Theme) ?? "system";
 }
 
 function applyTheme(theme: Theme) {
@@ -29,7 +29,7 @@ function applyTheme(theme: Theme) {
 export const useThemeStore = create<ThemeState>((set) => ({
   theme: getStoredTheme(),
   setTheme: (theme) => {
-    localStorage.setItem("kickoff_theme", theme);
+    localStorage.setItem("footix_theme", theme);
     applyTheme(theme);
     set({ theme });
   },

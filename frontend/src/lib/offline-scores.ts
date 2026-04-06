@@ -1,10 +1,10 @@
 /**
  * IndexedDB helpers for storing pending score submissions offline.
- * DB: "kickoff-offline", Store: "kickoff-pending-scores"
+ * DB: "footix-offline", Store: "footix-pending-scores"
  */
 
-const DB_NAME = "kickoff-offline";
-const STORE_NAME = "kickoff-pending-scores";
+const DB_NAME = "footix-offline";
+const STORE_NAME = "footix-pending-scores";
 const DB_VERSION = 1;
 
 export interface PendingScore {

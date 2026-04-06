@@ -130,7 +130,7 @@ export function PlanningExport({ schedule, tournamentName }: PlanningExportProps
     const lines = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//Kickoff//Planning//FR",
+      "PRODID:-//Footix//Planning//FR",
       `X-WR-CALNAME:${tournamentName}`,
     ];
 
@@ -147,7 +147,7 @@ export function PlanningExport({ schedule, tournamentName }: PlanningExportProps
         `SUMMARY:${m.display_home} vs ${m.display_away}`,
         `DESCRIPTION:${m.category_name} — ${m.phase}`,
         `LOCATION:${m.fieldName}`,
-        `UID:${m.id}@kickoff`,
+        `UID:${m.id}@footix`,
         "END:VEVENT"
       );
     }

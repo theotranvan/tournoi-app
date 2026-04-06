@@ -1,4 +1,6 @@
+import random
 import re
+import string
 import uuid
 
 from django.core.exceptions import ValidationError
@@ -34,6 +36,12 @@ def validate_availability(value: list) -> None:
             raise ValidationError(f"Slot {i}: 'start' doit être avant 'end'.")
 
 
+def _generate_public_code() -> str:
+    """Generate a 6-character uppercase alphanumeric code."""
+    chars = string.ascii_uppercase + string.digits
+    return "".join(random.choices(chars, k=6))
+
+
 class Tournament(models.Model):
     class Status(models.TextChoices):
         DRAFT = "draft", "Brouillon"
@@ -51,6 +59,13 @@ class Tournament(models.Model):
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="tournaments")
     name = models.CharField(max_length=200)
     slug = models.SlugField(unique=True, max_length=220)
+    public_code = models.CharField(
+        max_length=6,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="Code unique à 6 caractères pour l'accès spectateur",
+    )
     location = models.CharField(max_length=300)
     start_date = models.DateField()
     end_date = models.DateField()
@@ -90,6 +105,7 @@ class Tournament(models.Model):
         indexes = [
             models.Index(fields=["club", "status"]),
             models.Index(fields=["slug"]),
+            models.Index(fields=["public_code"]),
         ]
         ordering = ["-start_date"]
 
@@ -103,6 +119,8 @@ class Tournament(models.Model):
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(f"{self.name}-{self.start_date.year}")
+        if not self.public_code:
+            self.public_code = _generate_public_code()
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:

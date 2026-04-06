@@ -28,7 +28,7 @@ export default async function Image({
     score_away: number | null;
   }[] = [];
 
-  let tournamentName = "Kickoff";
+  let tournamentName = "Footix";
 
   try {
     const [teamRes, tournamentRes] = await Promise.all([

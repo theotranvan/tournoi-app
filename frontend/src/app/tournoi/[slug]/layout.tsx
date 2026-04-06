@@ -26,13 +26,13 @@ export async function generateMetadata({
   const tournament = await fetchTournament(slug);
 
   if (!tournament) {
-    return { title: "Tournoi — Kickoff" };
+    return { title: "Tournoi — Footix" };
   }
 
-  const title = `${tournament.name} — Kickoff`;
+  const title = `${tournament.name} — Footix`;
   const description =
     tournament.description ||
-    `Suivez le tournoi ${tournament.name} en direct sur Kickoff.`;
+    `Suivez le tournoi ${tournament.name} en direct sur Footix.`;
   const url = `/tournoi/${slug}`;
 
   return {
@@ -42,7 +42,7 @@ export async function generateMetadata({
       title,
       description,
       url,
-      siteName: "Kickoff",
+      siteName: "Footix",
       type: "website",
       ...(tournament.cover_image && {
         images: [{ url: tournament.cover_image, width: 1200, height: 630 }],
@@ -72,7 +72,8 @@ export default function PublicTournamentLayout({
         >
           <ArrowLeft className="size-5" />
         </Link>
-        <span className="text-lg font-bold text-primary">⚽ Kickoff</span>
+        <img src="/logo-footix.png" alt="Footix" className="h-7 w-auto" />
+        <span className="text-lg font-bold text-primary">Footix</span>
       </header>
       <main className="flex-1">{children}</main>
     </div>

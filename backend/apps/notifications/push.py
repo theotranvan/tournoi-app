@@ -16,7 +16,7 @@ def _get_vapid_claims() -> dict:
     }
 
 
-def send_push(user, title: str, body: str, url: str = "/", tag: str = "kickoff") -> int:
+def send_push(user, title: str, body: str, url: str = "/", tag: str = "footix") -> int:
     """Send a push notification to all subscriptions for a user.
 
     Returns the number of successfully sent notifications.
@@ -27,13 +27,13 @@ def send_push(user, title: str, body: str, url: str = "/", tag: str = "kickoff")
     return _send_to_subscriptions(subscriptions, title, body, url, tag)
 
 
-def send_push_to_team(team_id: int, title: str, body: str, url: str = "/", tag: str = "kickoff") -> int:
+def send_push_to_team(team_id: int, title: str, body: str, url: str = "/", tag: str = "footix") -> int:
     """Send a push notification to all subscriptions for a team."""
     subscriptions = PushSubscription.objects.filter(team_id=team_id)
     return _send_to_subscriptions(subscriptions, title, body, url, tag)
 
 
-def send_push_to_users(users, title: str, body: str, url: str = "/", tag: str = "kickoff") -> int:
+def send_push_to_users(users, title: str, body: str, url: str = "/", tag: str = "footix") -> int:
     """Send a push notification to multiple users. Returns total sent count."""
     total = 0
     for user in users:

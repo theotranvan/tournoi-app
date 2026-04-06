@@ -107,7 +107,7 @@ export default function CoachParametres() {
             </Button>
             <ShareButton
               title={team.name}
-              text={`Suivez ${team.name} sur Kickoff !`}
+              text={`Suivez ${team.name} sur Footix !`}
               variant="outline"
               size="sm"
             />

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Eye, Users, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RoleCard } from "@/components/onboarding/role-card";
@@ -9,16 +9,65 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { triggerHaptic } from "@/lib/haptics";
 
 export default function StartPage() {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center px-5 pt-safe pb-safe bg-background">
-      <div className="w-full max-w-md flex-1 flex flex-col py-8">
+    <div className="min-h-[100dvh] flex flex-col items-center px-5 pt-safe pb-safe bg-background relative overflow-hidden">
+      {/* Decorative background */}
+      <div className="pointer-events-none fixed inset-0" aria-hidden="true">
+        {/* Gradient orbs */}
+        <div className="orb orb-green size-72 -top-20 -left-20" />
+        <div className="orb orb-blue size-56 top-1/3 -right-16" />
+        <div className="orb orb-green size-40 bottom-16 right-8 opacity-10" />
+
+        {/* Floating shapes */}
+        <motion.div
+          className="absolute top-[12%] right-[10%] size-3 rounded-full bg-purple-500/20"
+          animate={prefersReducedMotion ? {} : { y: [0, -10, 0], opacity: [0.2, 0.4, 0.2] }}
+          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div
+          className="absolute top-[30%] left-[6%] size-2 rounded-full bg-blue-500/20"
+          animate={prefersReducedMotion ? {} : { y: [0, 12, 0], opacity: [0.15, 0.35, 0.15] }}
+          transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+        />
+        <motion.div
+          className="absolute top-[55%] right-[15%] size-2.5 rotate-45 rounded-sm bg-primary/15"
+          animate={prefersReducedMotion ? {} : { y: [0, -8, 0], rotate: [45, 90, 45] }}
+          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+        />
+        <motion.div
+          className="absolute top-[70%] left-[12%] size-2 rounded-full bg-blue-400/15"
+          animate={prefersReducedMotion ? {} : { y: [0, 14, 0], opacity: [0.1, 0.3, 0.1] }}
+          transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+        />
+        <motion.div
+          className="absolute bottom-[20%] right-[40%] size-1.5 rounded-full bg-purple-400/20"
+          animate={prefersReducedMotion ? {} : { y: [0, -10, 0], x: [0, 5, 0] }}
+          transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
+        />
+        <motion.div
+          className="absolute top-[85%] left-[30%] size-2 rotate-12 rounded-sm bg-primary/10"
+          animate={prefersReducedMotion ? {} : { y: [0, -6, 0], rotate: [12, -12, 12] }}
+          transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 3 }}
+        />
+
+        {/* Subtle dot grid overlay */}
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)",
+            backgroundSize: "24px 24px",
+          }}
+        />
+      </div>
+
+      <div className="w-full max-w-md flex-1 flex flex-col py-8 relative z-10">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-2">
-            <div className="size-9 rounded-xl bg-primary/10 flex items-center justify-center">
-              <span className="text-lg">⚽</span>
-            </div>
-            <span className="font-bold text-lg gradient-text">Kickoff</span>
+            <img src="/logo-footix.png" alt="Footix" className="h-9 w-auto" />
+            <span className="font-bold text-lg gradient-text">Footix</span>
           </div>
           <ThemeToggle />
         </div>

@@ -16,6 +16,7 @@ class TournamentListSerializer(serializers.ModelSerializer):
             "club",
             "name",
             "slug",
+            "public_code",
             "location",
             "start_date",
             "end_date",
@@ -28,7 +29,7 @@ class TournamentListSerializer(serializers.ModelSerializer):
             "nb_fields",
             "created_at",
         )
-        read_only_fields = ("id", "slug", "status", "created_at")
+        read_only_fields = ("id", "slug", "public_code", "status", "created_at")
 
 
 class TournamentDetailSerializer(serializers.ModelSerializer):
@@ -44,6 +45,7 @@ class TournamentDetailSerializer(serializers.ModelSerializer):
             "club",
             "name",
             "slug",
+            "public_code",
             "location",
             "start_date",
             "end_date",
@@ -64,7 +66,7 @@ class TournamentDetailSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("id", "slug", "status", "created_at", "updated_at")
+        read_only_fields = ("id", "slug", "public_code", "status", "created_at", "updated_at")
 
 
 class TournamentCreateSerializer(serializers.ModelSerializer):

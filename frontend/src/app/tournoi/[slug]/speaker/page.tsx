@@ -248,7 +248,7 @@ export default function SpeakerPage(props: { params: Promise<{ slug: string }> }
 
       {/* Footer */}
       <footer className="mt-10 text-center text-xs text-blue-300/40">
-        Propulsé par Kickoff · Se rafraîchit automatiquement
+        Propulsé par Footix · Se rafraîchit automatiquement
       </footer>
     </div>
   );

@@ -80,11 +80,11 @@ export function InstallPrompt() {
     <div className="fixed bottom-20 left-4 right-4 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
       <div className="bg-card border border-border rounded-xl shadow-lg p-4">
         <div className="flex items-start gap-3">
-          <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <span className="text-xl">⚽</span>
+          <div className="size-10 rounded-lg overflow-hidden shrink-0">
+            <img src="/logo-footix.png" alt="Footix" className="h-10 w-auto" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold">Installer Kickoff</p>
+            <p className="text-sm font-semibold">Installer Footix</p>
             <p className="text-xs text-muted-foreground mt-0.5">
               {isIOS
                 ? "Appuyez sur Partager puis « Sur l'écran d'accueil »"

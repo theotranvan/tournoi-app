@@ -136,7 +136,7 @@ export default function PrintPage(props: { params: Promise<{ id: string }> }) {
         // Footer
         doc.setFontSize(9);
         doc.setTextColor(150);
-        doc.text("Généré par Kickoff", pageW / 2, pageH - 15, { align: "center" });
+        doc.text("Généré par Footix", pageW / 2, pageH - 15, { align: "center" });
         doc.setTextColor(0);
       }
 

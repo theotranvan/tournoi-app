@@ -57,7 +57,7 @@ class Command(BaseCommand):
             )
 
         self.stdout.write(self.style.HTTP_INFO(f"\n{'='*60}"))
-        self.stdout.write(self.style.HTTP_INFO("  KICKOFF - Moteur de planning"))
+        self.stdout.write(self.style.HTTP_INFO("  FOOTIX - Moteur de planning"))
         self.stdout.write(self.style.HTTP_INFO(f"  Tournoi: {tournament.name}"))
         self.stdout.write(self.style.HTTP_INFO(f"  Strategie: {strategy}"))
         self.stdout.write(self.style.HTTP_INFO(f"{'='*60}\n"))

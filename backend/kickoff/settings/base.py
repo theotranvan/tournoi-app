@@ -163,7 +163,7 @@ REST_FRAMEWORK = {
 
 # ─── DRF Spectacular ─────────────────────────────────────────────────────────
 SPECTACULAR_SETTINGS = {
-    "TITLE": "Kickoff API",
+    "TITLE": "Footix API",
     "DESCRIPTION": "Tournament management platform API",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,

@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { TeamAvatar } from "@/components/kickoff/team-avatar";
-import { Loader2, KeyRound, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Loader2, KeyRound, CheckCircle2, ShieldCheck, ArrowLeft } from "lucide-react";
 import { useTeamAccess } from "@/hooks/use-auth";
 import { useCoachStore } from "@/stores/coach-store";
+import Link from "next/link";
+import { triggerHaptic } from "@/lib/haptics";
 
 export default function CoachAccess() {
   const [code, setCode] = useState("");
@@ -49,7 +51,17 @@ export default function CoachAccess() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background">
+    <div className="relative min-h-screen flex flex-col items-center justify-center p-4 bg-background">
+      {/* Back button */}
+      <Link
+        href="/start"
+        onClick={() => triggerHaptic("light")}
+        className="absolute top-4 left-4 z-10 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors animate-fade-in"
+      >
+        <ArrowLeft className="size-4" />
+        Retour
+      </Link>
+
       {/* Branding */}
       <div className="text-center mb-8">
         <div className="mx-auto mb-4 flex size-20 items-center justify-center rounded-2xl bg-primary/10">

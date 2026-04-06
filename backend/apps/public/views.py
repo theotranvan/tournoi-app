@@ -25,6 +25,7 @@ class PublicTournamentView(APIView):
                 "id": str(tournament.id),
                 "name": tournament.name,
                 "slug": tournament.slug,
+                "public_code": tournament.public_code,
                 "location": tournament.location,
                 "start_date": tournament.start_date.isoformat(),
                 "end_date": tournament.end_date.isoformat(),
@@ -35,6 +36,24 @@ class PublicTournamentView(APIView):
                     {"id": c.id, "name": c.name, "color": c.color}
                     for c in categories
                 ],
+            }
+        )
+
+
+class PublicTournamentByCodeView(APIView):
+    """Lookup a tournament by its public_code and return its slug."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, code):
+        code = code.upper().strip()
+        tournament = get_object_or_404(
+            Tournament.objects.filter(is_public=True), public_code=code
+        )
+        return Response(
+            {
+                "slug": tournament.slug,
+                "name": tournament.name,
             }
         )
 
