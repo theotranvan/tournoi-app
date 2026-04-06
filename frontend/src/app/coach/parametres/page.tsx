@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { TeamAvatar } from "@/components/kickoff/team-avatar";
 import { ShareButton } from "@/components/kickoff/share-button";
-import { Settings, LogOut, Trophy, Users, Copy, Check, RefreshCw, Bell, BellOff } from "lucide-react";
+import { Settings, LogOut, Trophy, Users, Copy, Check, RefreshCw, Bell, BellOff, Sparkles } from "lucide-react";
 import { useCoachStore } from "@/stores/coach-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { useOnboardingStore } from "@/stores/onboarding-store";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 
@@ -179,6 +180,26 @@ export default function CoachParametres() {
           <p className="text-[11px] text-muted-foreground text-center mt-2">
             Rejoindre une autre équipe avec un nouveau code.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* À propos */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">À propos</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="ghost"
+            className="w-full justify-start"
+            onClick={() => {
+              useOnboardingStore.getState().reset();
+              router.push("/bienvenue");
+            }}
+          >
+            <Sparkles className="size-4 mr-2" />
+            Revoir l&apos;intro
+          </Button>
         </CardContent>
       </Card>
 

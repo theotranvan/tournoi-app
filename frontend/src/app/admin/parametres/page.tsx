@@ -4,9 +4,10 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Settings, LogOut, User, Palette } from "lucide-react";
+import { Settings, LogOut, User, Palette, Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useAuthStore } from "@/stores/auth-store";
+import { useOnboardingStore } from "@/stores/onboarding-store";
 
 export default function AdminParametres() {
   const router = useRouter();
@@ -77,6 +78,29 @@ export default function AdminParametres() {
             Choisissez le thème de l&apos;interface.
           </p>
           <ThemeToggle />
+        </CardContent>
+      </Card>
+
+      {/* À propos */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-4 text-muted-foreground" />
+            <CardTitle>À propos</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="ghost"
+            className="w-full justify-start"
+            onClick={() => {
+              useOnboardingStore.getState().reset();
+              router.push("/bienvenue");
+            }}
+          >
+            <Sparkles className="size-4 mr-2" />
+            Revoir l&apos;intro
+          </Button>
         </CardContent>
       </Card>
 
