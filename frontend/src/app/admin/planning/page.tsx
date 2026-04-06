@@ -22,6 +22,7 @@ import { useTournaments } from "@/hooks/use-tournaments";
 import { useSchedule, useScheduleConflicts } from "@/hooks/use-schedule";
 import { useGenerateSchedule } from "@/hooks/use-mutations";
 import { FeasibilityPanel } from "@/components/planning/feasibility-panel";
+import { DiagnosticsPanel } from "@/components/planning/diagnostics-panel";
 import type { MatchList, MatchStatus, MatchPhase, ScheduleDay } from "@/types/api";
 
 const STATUS_COLOR: Record<MatchStatus, string> = {
@@ -207,17 +208,20 @@ export default function AdminPlanning() {
           </p>
         </div>
         {!!selectedTournament && (
-          <Button
-            onClick={() => generateMut.mutate({ async: true })}
-            disabled={generateMut.isPending}
-          >
-            {generateMut.isPending ? (
-              <Loader2 className="size-4 mr-1 animate-spin" />
-            ) : (
-              <Zap className="size-4 mr-1" />
-            )}
-            Générer le planning
-          </Button>
+          <div className="flex gap-2">
+            <DiagnosticsPanel tournamentId={selectedTournament} />
+            <Button
+              onClick={() => generateMut.mutate({ async: true })}
+              disabled={generateMut.isPending}
+            >
+              {generateMut.isPending ? (
+                <Loader2 className="size-4 mr-1 animate-spin" />
+              ) : (
+                <Zap className="size-4 mr-1" />
+              )}
+              Générer le planning
+            </Button>
+          </div>
         )}
       </div>
 

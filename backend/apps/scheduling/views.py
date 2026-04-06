@@ -247,3 +247,57 @@ class ResolveBracketsView(APIView):
         )
         results = resolve_brackets(tournament)
         return Response(results, status=status.HTTP_200_OK)
+
+
+class ScheduleDiagnosticsView(APIView):
+    """GET /api/v1/tournaments/{id}/schedule/diagnostics/
+
+    Re-score the current schedule in explain mode and return per-match
+    diagnostics with penalty breakdowns.
+    """
+
+    permission_classes = [IsAuthenticated, IsOrganizer]
+
+    def get(self, request, tournament_id):
+        tournament = _get_tournament_for_nested(
+            {"tournament_id": tournament_id}, request.user,
+        )
+        result = SchedulingEngine.diagnose_current_schedule(tournament)
+        return Response(result)
+
+
+class SuggestSwapView(APIView):
+    """POST /api/v1/tournaments/{id}/schedule/suggest-swap/{match_id}/
+
+    Find and optionally apply the best 2-opt swap for a specific match.
+    Query param ?apply=true will execute the swap in DB.
+    """
+
+    permission_classes = [IsAuthenticated, IsOrganizer]
+
+    def post(self, request, tournament_id, match_id):
+        tournament = _get_tournament_for_nested(
+            {"tournament_id": tournament_id}, request.user,
+        )
+        suggestion = SchedulingEngine.suggest_swap(tournament, match_id)
+        if not suggestion:
+            return Response(
+                {"detail": "Aucun échange améliorant trouvé."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        apply = request.query_params.get("apply", "").lower() == "true"
+        if apply:
+            swap_id = suggestion["swap_with_match_id"]
+            with transaction.atomic():
+                m1 = Match.objects.select_for_update().get(pk=match_id)
+                m2 = Match.objects.select_for_update().get(pk=swap_id)
+                m1.field_id, m2.field_id = m2.field_id, m1.field_id
+                m1.start_time, m2.start_time = m2.start_time, m1.start_time
+                m1.save(update_fields=["field_id", "start_time"])
+                m2.save(update_fields=["field_id", "start_time"])
+            suggestion["applied"] = True
+        else:
+            suggestion["applied"] = False
+
+        return Response(suggestion)

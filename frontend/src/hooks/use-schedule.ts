@@ -5,6 +5,7 @@ import type {
   ScheduleConflict,
   ScheduleTaskStatus,
   FeasibilityResult,
+  DiagnosticsResult,
 } from "@/types/api";
 
 export const scheduleKeys = {
@@ -17,6 +18,8 @@ export const scheduleKeys = {
     [...scheduleKeys.all, "task", taskId] as const,
   feasibility: (tournamentId: string) =>
     [...scheduleKeys.all, "feasibility", tournamentId] as const,
+  diagnostics: (tournamentId: string) =>
+    [...scheduleKeys.all, "diagnostics", tournamentId] as const,
 };
 
 export function useSchedule(tournamentId: string) {
@@ -63,5 +66,16 @@ export function useFeasibility(tournamentId: string) {
         `/tournaments/${tournamentId}/schedule/feasibility/`
       ),
     enabled: !!tournamentId,
+  });
+}
+
+export function useDiagnostics(tournamentId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: scheduleKeys.diagnostics(tournamentId),
+    queryFn: () =>
+      api.get<DiagnosticsResult>(
+        `/tournaments/${tournamentId}/schedule/diagnostics/`
+      ),
+    enabled: !!tournamentId && enabled,
   });
 }

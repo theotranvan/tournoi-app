@@ -115,6 +115,36 @@ class SoftWarning:
         }
 
 
+@dataclass
+class MatchDiagnostic:
+    """Detailed diagnostic for a single match placement."""
+
+    match_id: str
+    display: str  # "FC A vs FC B (U10, Poule A)"
+    placed: bool
+    field_name: str | None
+    start_time: datetime | None
+    score: float
+    penalties: list[dict[str, Any]]  # [{"type": "short_rest", "amount": -15, "detail": "..."}]
+    rest_before_home: int | None  # minutes
+    rest_before_away: int | None  # minutes
+    alternatives_considered: int  # how many slots were evaluated
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "match_id": self.match_id,
+            "display": self.display,
+            "placed": self.placed,
+            "field_name": self.field_name,
+            "start_time": self.start_time.isoformat() if self.start_time else None,
+            "score": round(self.score, 1),
+            "penalties": self.penalties,
+            "rest_before_home_minutes": self.rest_before_home,
+            "rest_before_away_minutes": self.rest_before_away,
+            "alternatives_considered": self.alternatives_considered,
+        }
+
+
 @dataclass(frozen=True)
 class SchedulingReport:
     placed_count: int
@@ -124,6 +154,7 @@ class SchedulingReport:
     soft_warnings: list[SoftWarning]
     execution_time_ms: int
     strategy_used: Strategy
+    match_diagnostics: list[MatchDiagnostic] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {

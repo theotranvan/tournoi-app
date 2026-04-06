@@ -433,6 +433,40 @@ export interface FeasibilityResult {
   bottlenecks: string[];
 }
 
+// ─── Diagnostics ────────────────────────────────────────────────────────────
+
+export interface DiagnosticPenalty {
+  type: string;
+  amount: number;
+  detail: string;
+}
+
+export interface MatchDiagnostic {
+  match_id: string;
+  display: string;
+  score: number;
+  field_name: string | null;
+  start_time: string | null;
+  penalties: DiagnosticPenalty[];
+  rest_before_home_minutes: number | null;
+  rest_before_away_minutes: number | null;
+}
+
+export interface DiagnosticsResult {
+  global_score: number;
+  matches: MatchDiagnostic[];
+}
+
+export interface SwapSuggestion {
+  swap_with_match_id: string;
+  swap_with_display: string;
+  swap_with_time: string;
+  swap_with_field: string;
+  improvement: number;
+  description: string;
+  applied: boolean;
+}
+
 // ─── Public API ─────────────────────────────────────────────────────────────
 
 export interface PublicTournament {

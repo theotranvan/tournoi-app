@@ -7,9 +7,11 @@ from apps.scheduling.views import (
     RecalculateScheduleView,
     ResolveBracketsView,
     ScheduleConflictsView,
+    ScheduleDiagnosticsView,
     ScheduleFeasibilityView,
     ScheduleListView,
     ScheduleTaskStatusView,
+    SuggestSwapView,
 )
 
 urlpatterns = [
@@ -39,5 +41,15 @@ urlpatterns = [
         "resolve-brackets/",
         ResolveBracketsView.as_view(),
         name="schedule-resolve-brackets",
+    ),
+    path(
+        "diagnostics/",
+        ScheduleDiagnosticsView.as_view(),
+        name="schedule-diagnostics",
+    ),
+    path(
+        "suggest-swap/<str:match_id>/",
+        SuggestSwapView.as_view(),
+        name="schedule-suggest-swap",
     ),
 ]

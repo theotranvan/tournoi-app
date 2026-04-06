@@ -24,6 +24,7 @@ from apps.scheduling.optimizer import two_opt_optimization
 from apps.scheduling.scoring import score_placement
 from apps.scheduling.types import (
     Conflict,
+    MatchDiagnostic,
     Placement,
     ProvisionalMatch,
     SchedulingReport,
@@ -69,6 +70,7 @@ class SchedulingEngine:
         self._context: SchedulingContext | None = None
         self._conflicts: list[Conflict] = []
         self._warnings: list[SoftWarning] = []
+        self._match_diagnostics: list[MatchDiagnostic] = []
         self._report: SchedulingReport | None = None
 
     def set_progress_callback(self, cb: Callable[[int, str], None]) -> None:
@@ -120,6 +122,7 @@ class SchedulingEngine:
 
         self._progress(90, "Construction du rapport…")
         self._generate_warnings()
+        self._build_diagnostics()
 
         placed = len(self._context.placements)
         self._report = self._build_report(placed, total, start_ts)
@@ -712,6 +715,279 @@ class SchedulingEngine:
                 else:
                     consecutive = 1
 
+    # ─── Diagnostics generation ────────────────────────────────────────
+
+    def _build_diagnostics(self) -> None:
+        """Build detailed per-match diagnostics using explain mode scoring."""
+        for p in self._context.placements:
+            m = p.match
+            # Temporarily remove this placement to score it fairly
+            self._context.remove_placement(p)
+            result = score_placement(
+                m, p.field_id, p.start_time, self._context, explain=True,
+            )
+            self._context.commit_placement(p)
+
+            penalties = result["penalties"] if result else []
+            score_val = result["score"] if result else 0.0
+
+            # Build display name
+            cat = self._context.categories.get(m.category_id)
+            cat_name = cat.name if cat else f"Cat {m.category_id}"
+            grp = self._context.groups.get(m.group_id) if m.group_id else None
+            grp_name = grp.name if grp else None
+            home = (
+                self._context.teams[m.team_home_id].name
+                if m.team_home_id and m.team_home_id in self._context.teams
+                else m.placeholder_home or "TBD"
+            )
+            away = (
+                self._context.teams[m.team_away_id].name
+                if m.team_away_id and m.team_away_id in self._context.teams
+                else m.placeholder_away or "TBD"
+            )
+            suffix = f" ({cat_name}"
+            if grp_name:
+                suffix += f", {grp_name}"
+            suffix += ")"
+            display = f"{home} vs {away}{suffix}"
+
+            field_name = (
+                self._context.fields[p.field_id].name
+                if p.field_id in self._context.fields
+                else None
+            )
+
+            rest_home = None
+            rest_away = None
+            if m.team_home_id:
+                r = self._context.time_since_last_match(m.team_home_id, p.start_time)
+                rest_home = round(r) if r != float("inf") else None
+            if m.team_away_id:
+                r = self._context.time_since_last_match(m.team_away_id, p.start_time)
+                rest_away = round(r) if r != float("inf") else None
+
+            self._match_diagnostics.append(MatchDiagnostic(
+                match_id=m.provisional_id,
+                display=display,
+                placed=True,
+                field_name=field_name,
+                start_time=p.start_time,
+                score=score_val,
+                penalties=penalties,
+                rest_before_home=rest_home,
+                rest_before_away=rest_away,
+                alternatives_considered=0,
+            ))
+
+    @classmethod
+    def diagnose_current_schedule(cls, tournament) -> dict:
+        """Re-score the existing DB schedule in explain mode.
+
+        Returns a dict with global_score and per-match diagnostics.
+        """
+        from apps.matches.models import Match
+
+        engine = cls(tournament)
+        engine.load_context()
+
+        matches = (
+            Match.objects.filter(tournament=tournament, status=Match.Status.SCHEDULED)
+            .select_related("field", "category", "team_home", "team_away", "group")
+            .order_by("start_time")
+        )
+
+        # First pass: load all placements into context
+        provisional_map: dict[str, tuple[ProvisionalMatch, Match]] = {}
+        for m in matches:
+            cat = engine._context.categories.get(m.category_id)
+            pm = ProvisionalMatch(
+                provisional_id=str(m.id),
+                category_id=m.category_id,
+                group_id=m.group_id,
+                phase=m.phase,
+                team_home_id=m.team_home_id,
+                team_away_id=m.team_away_id,
+                placeholder_home=m.placeholder_home,
+                placeholder_away=m.placeholder_away,
+                duration=m.duration_minutes,
+                transition=cat.effective_transition_time if cat else 5,
+                rest_needed=cat.effective_rest_time if cat else 20,
+            )
+            p = Placement(match=pm, field_id=m.field_id, start_time=m.start_time)
+            engine._context.commit_placement(p)
+            provisional_map[str(m.id)] = (pm, m)
+
+        # Second pass: score each placement in explain mode
+        diagnostics: list[dict] = []
+        total_score = 0.0
+        for p in list(engine._context.placements):
+            m = p.match
+            db_match = provisional_map[m.provisional_id][1]
+
+            engine._context.remove_placement(p)
+            result = score_placement(
+                m, p.field_id, p.start_time, engine._context, explain=True,
+            )
+            engine._context.commit_placement(p)
+
+            penalties = result["penalties"] if result else []
+            score_val = result["score"] if result else 0.0
+            total_score += score_val
+
+            # Build display
+            home = db_match.team_home.name if db_match.team_home else (db_match.placeholder_home or "TBD")
+            away = db_match.team_away.name if db_match.team_away else (db_match.placeholder_away or "TBD")
+            cat_name = db_match.category.name if db_match.category else ""
+            grp_name = db_match.group.name if db_match.group else None
+            suffix = f" ({cat_name}"
+            if grp_name:
+                suffix += f", {grp_name}"
+            suffix += ")"
+
+            rest_home = None
+            rest_away = None
+            if m.team_home_id:
+                r = engine._context.time_since_last_match(m.team_home_id, p.start_time)
+                rest_home = round(r) if r != float("inf") else None
+            if m.team_away_id:
+                r = engine._context.time_since_last_match(m.team_away_id, p.start_time)
+                rest_away = round(r) if r != float("inf") else None
+
+            diagnostics.append({
+                "match_id": str(m.provisional_id),
+                "display": f"{home} vs {away}{suffix}",
+                "score": round(score_val, 1),
+                "field_name": db_match.field.name if db_match.field else None,
+                "start_time": p.start_time.isoformat() if p.start_time else None,
+                "penalties": penalties,
+                "rest_before_home_minutes": rest_home,
+                "rest_before_away_minutes": rest_away,
+            })
+
+        n = len(diagnostics)
+        avg_score = total_score / n if n > 0 else 0
+        # Normalize to 0-100 scale (base 1000)
+        global_score = round(min(100, max(0, avg_score / 10)), 1)
+
+        return {
+            "global_score": global_score,
+            "matches": sorted(diagnostics, key=lambda d: d["score"]),
+        }
+
+    @classmethod
+    def suggest_swap(cls, tournament, match_id: str) -> dict | None:
+        """Find the best 2-opt swap for a specific match.
+
+        Returns a suggestion dict or None if no improving swap exists.
+        """
+        from apps.matches.models import Match
+
+        engine = cls(tournament)
+        engine.load_context()
+
+        # Load all scheduled matches into context
+        db_matches = (
+            Match.objects.filter(tournament=tournament, status=Match.Status.SCHEDULED)
+            .select_related("field", "category", "team_home", "team_away", "group")
+            .order_by("start_time")
+        )
+
+        target_placement: Placement | None = None
+        for m in db_matches:
+            cat = engine._context.categories.get(m.category_id)
+            pm = ProvisionalMatch(
+                provisional_id=str(m.id),
+                category_id=m.category_id,
+                group_id=m.group_id,
+                phase=m.phase,
+                team_home_id=m.team_home_id,
+                team_away_id=m.team_away_id,
+                placeholder_home=m.placeholder_home,
+                placeholder_away=m.placeholder_away,
+                duration=m.duration_minutes,
+                transition=cat.effective_transition_time if cat else 5,
+                rest_needed=cat.effective_rest_time if cat else 20,
+            )
+            p = Placement(match=pm, field_id=m.field_id, start_time=m.start_time)
+            engine._context.commit_placement(p)
+            if str(m.id) == match_id:
+                target_placement = p
+
+        if not target_placement:
+            return None
+
+        from apps.scheduling.optimizer import can_swap
+
+        best_swap = None
+        best_improvement = 0.0
+
+        for other in engine._context.placements:
+            if other.match.provisional_id == match_id:
+                continue
+            if not can_swap(target_placement, other, engine._context):
+                continue
+
+            # Evaluate the swap
+            engine._context.remove_placement(target_placement)
+            engine._context.remove_placement(other)
+
+            new_s1 = score_placement(
+                target_placement.match,
+                other.field_id,
+                other.start_time,
+                engine._context,
+            )
+            new_s2 = score_placement(
+                other.match,
+                target_placement.field_id,
+                target_placement.start_time,
+                engine._context,
+            )
+
+            engine._context.commit_placement(target_placement)
+            engine._context.commit_placement(other)
+
+            if new_s1 is not None and new_s2 is not None:
+                old_score = target_placement.score + other.score
+                new_score = new_s1 + new_s2
+                improvement = new_score - old_score
+                if improvement > best_improvement:
+                    best_improvement = improvement
+
+                    # Build display for swap partner
+                    om = other.match
+                    o_home = (
+                        engine._context.teams[om.team_home_id].name
+                        if om.team_home_id and om.team_home_id in engine._context.teams
+                        else om.placeholder_home or "TBD"
+                    )
+                    o_away = (
+                        engine._context.teams[om.team_away_id].name
+                        if om.team_away_id and om.team_away_id in engine._context.teams
+                        else om.placeholder_away or "TBD"
+                    )
+                    swap_time = other.start_time.strftime("%H:%M") if other.start_time else "?"
+                    field_name = (
+                        engine._context.fields[other.field_id].name
+                        if other.field_id in engine._context.fields
+                        else str(other.field_id)
+                    )
+
+                    best_swap = {
+                        "swap_with_match_id": om.provisional_id,
+                        "swap_with_display": f"{o_home} vs {o_away}",
+                        "swap_with_time": swap_time,
+                        "swap_with_field": field_name,
+                        "improvement": round(best_improvement, 1),
+                        "description": (
+                            f"Échanger avec '{o_home} vs {o_away}' à {swap_time} "
+                            f"({field_name}) améliorerait le score de +{best_improvement:.0f} points."
+                        ),
+                    }
+
+        return best_swap
+
     # ─── Phase 8: Build report ───────────────────────────────────────────
 
     def _build_report(
@@ -730,6 +1006,7 @@ class SchedulingEngine:
             soft_warnings=list(self._warnings),
             execution_time_ms=int((time_mod.time() - start_ts) * 1000),
             strategy_used=self.strategy,
+            match_diagnostics=list(self._match_diagnostics),
         )
 
     # ─── Commit to DB ────────────────────────────────────────────────────

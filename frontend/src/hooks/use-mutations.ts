@@ -188,3 +188,25 @@ export function useRecalculateSchedule(tournamentId: string) {
       qc.invalidateQueries({ queryKey: scheduleKeys.list(tournamentId) }),
   });
 }
+
+export function useSuggestSwap(tournamentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      matchId,
+      apply,
+    }: {
+      matchId: string;
+      apply?: boolean;
+    }) =>
+      api.post(
+        `/tournaments/${tournamentId}/schedule/suggest-swap/${matchId}/${apply ? "?apply=true" : ""}`
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: scheduleKeys.list(tournamentId) });
+      qc.invalidateQueries({
+        queryKey: scheduleKeys.diagnostics(tournamentId),
+      });
+    },
+  });
+}
