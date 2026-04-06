@@ -275,8 +275,8 @@ export default function PricingSection() {
       </TimelineContent>
 
       {/* Header */}
-      <article className="text-center mb-6 pt-32 max-w-3xl mx-auto space-y-2 relative z-50 px-4">
-        <h2 className="text-4xl font-medium text-white">
+      <article className="text-center mb-4 sm:mb-6 pt-20 sm:pt-32 max-w-3xl mx-auto space-y-2 relative z-50 px-4">
+        <h2 className="text-2xl sm:text-4xl font-medium text-white">
           <VerticalCutReveal
             splitBy="words"
             staggerDuration={0.15}
@@ -299,7 +299,7 @@ export default function PricingSection() {
           animationNum={0}
           timelineRef={pricingRef}
           customVariants={revealVariants}
-          className="text-gray-300"
+          className="text-gray-300 text-sm sm:text-base"
         >
           Organise, planifie et suis tes tournois. Commence gratuitement,
           monte en puissance quand tu veux.
@@ -336,7 +336,7 @@ export default function PricingSection() {
       />
 
       {/* Cards grid */}
-      <div className="grid md:grid-cols-3 max-w-5xl gap-4 py-6 mx-auto px-4">
+      <div className="flex flex-col md:grid md:grid-cols-3 max-w-5xl gap-6 sm:gap-4 py-4 sm:py-6 mx-auto px-5 sm:px-4">
         {plans.map((plan, index) => {
           const Icon = plan.icon;
           const isOneShot = plan.name === "One-Shot";
@@ -368,11 +368,11 @@ export default function PricingSection() {
                 )}
               >
 
-                <CardHeader className="text-left">
-                  <div className="flex items-center gap-2 mb-2">
+                <CardHeader className="text-left pb-2 sm:pb-4">
+                  <div className="flex items-center gap-2 mb-1 sm:mb-2">
                     <Icon
                       className={cn(
-                        "size-5",
+                        "size-4 sm:size-5",
                         plan.popular
                           ? "text-green-400"
                           : isClubPlan
@@ -380,34 +380,34 @@ export default function PricingSection() {
                             : "text-gray-400"
                       )}
                     />
-                    <h3 className="text-3xl">{plan.name}</h3>
+                    <h3 className="text-2xl sm:text-3xl">{plan.name}</h3>
                   </div>
                   <div className="flex items-baseline">
                     {isFree ? (
                       <>
-                        <span className="text-4xl font-semibold">0 €</span>
-                        <span className="text-gray-300 ml-1">
+                        <span className="text-3xl sm:text-4xl font-semibold">0 €</span>
+                        <span className="text-gray-300 ml-1 text-sm sm:text-base">
                           pour toujours
                         </span>
                       </>
                     ) : isOneShot ? (
                       <>
-                        <span className="text-4xl font-semibold">
-                          <NumberFlow value={49} className="text-4xl font-semibold" />
-                          <span className="text-4xl font-semibold ml-1">€</span>
+                        <span className="text-3xl sm:text-4xl font-semibold">
+                          <NumberFlow value={49} className="text-3xl sm:text-4xl font-semibold" />
+                          <span className="text-3xl sm:text-4xl font-semibold ml-1">€</span>
                         </span>
-                        <span className="text-gray-300 ml-1">par tournoi</span>
+                        <span className="text-gray-300 ml-1 text-sm sm:text-base">par tournoi</span>
                       </>
                     ) : (
                       <>
-                        <span className="text-4xl font-semibold">
+                        <span className="text-3xl sm:text-4xl font-semibold">
                           <NumberFlow
                             value={isYearly ? 199 : 19}
-                            className="text-4xl font-semibold"
+                            className="text-3xl sm:text-4xl font-semibold"
                           />
-                          <span className="text-4xl font-semibold ml-1">€</span>
+                          <span className="text-3xl sm:text-4xl font-semibold ml-1">€</span>
                         </span>
-                        <span className="text-gray-300 ml-1">
+                        <span className="text-gray-300 ml-1 text-sm sm:text-base">
                           /{isYearly ? "an" : "mois"}
                         </span>
                       </>
@@ -428,7 +428,7 @@ export default function PricingSection() {
                     <button
                       type="button"
                       disabled
-                      className="w-full mb-6 p-4 text-xl rounded-xl bg-gradient-to-t from-neutral-950 to-neutral-700 shadow-lg shadow-neutral-900 border border-neutral-700 text-gray-400 cursor-not-allowed"
+                      className="w-full mb-4 sm:mb-6 p-3 sm:p-4 text-base sm:text-xl rounded-xl bg-gradient-to-t from-neutral-950 to-neutral-700 shadow-lg shadow-neutral-900 border border-neutral-700 text-gray-400 cursor-not-allowed"
                     >
                       Plan actuel
                     </button>
@@ -440,7 +440,7 @@ export default function PricingSection() {
                         checkout.isPending || (isClubPlan && isClub)
                       }
                       className={cn(
-                        "w-full mb-6 p-4 text-xl rounded-xl transition-all",
+                        "w-full mb-4 sm:mb-6 p-3 sm:p-4 text-base sm:text-xl rounded-xl transition-all",
                         isClubPlan && isClub
                           ? "bg-gradient-to-t from-neutral-950 to-neutral-700 shadow-lg shadow-neutral-900 border border-neutral-700 text-gray-400 cursor-not-allowed"
                           : plan.popular
@@ -461,8 +461,8 @@ export default function PricingSection() {
                     </button>
                   )}
 
-                  <div className="space-y-3 pt-4 border-t border-neutral-700">
-                    <h4 className="font-medium text-base mb-3">
+                  <div className="space-y-2 sm:space-y-3 pt-3 sm:pt-4 border-t border-neutral-700">
+                    <h4 className="font-medium text-sm sm:text-base mb-2 sm:mb-3">
                       {plan.includes[0]}
                     </h4>
                     <ul className="space-y-2">
@@ -473,13 +473,13 @@ export default function PricingSection() {
                         >
                           <Check
                             className={cn(
-                              "size-4 shrink-0",
+                              "size-3.5 sm:size-4 shrink-0",
                               plan.popular
                                 ? "text-green-400"
                                 : "text-neutral-400"
                             )}
                           />
-                          <span className="text-sm text-gray-300">
+                          <span className="text-xs sm:text-sm text-gray-300">
                             {feature}
                           </span>
                         </li>
@@ -495,7 +495,7 @@ export default function PricingSection() {
       </div>
 
       {/* Footer */}
-      <div className="text-center text-sm text-gray-500 pb-12 relative z-10 space-y-1 px-4">
+      <div className="text-center text-xs sm:text-sm text-gray-500 pb-8 sm:pb-12 relative z-10 space-y-1 px-4">
         <p>Paiement sécurisé par Stripe. Annulation possible à tout moment.</p>
         <p>
           Les prix incluent la TVA.{" "}
