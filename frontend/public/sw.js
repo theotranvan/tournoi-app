@@ -14,6 +14,8 @@ const CACHE_VERSION = "kickoff-v1";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const API_CACHE = `${CACHE_VERSION}-api`;
+const PUBLIC_API_CACHE = `${CACHE_VERSION}-public-api`;
+const MATCHES_CACHE = `${CACHE_VERSION}-matches`;
 
 // App shell files to precache on install
 const APP_SHELL = [
@@ -50,7 +52,9 @@ self.addEventListener("activate", (event) => {
               key.startsWith("kickoff-") &&
               key !== STATIC_CACHE &&
               key !== DYNAMIC_CACHE &&
-              key !== API_CACHE
+              key !== API_CACHE &&
+              key !== PUBLIC_API_CACHE &&
+              key !== MATCHES_CACHE
           )
           .map((key) => caches.delete(key))
       )
@@ -75,7 +79,19 @@ self.addEventListener("fetch", (event) => {
   // WebSocket — don't cache
   if (url.protocol === "ws:" || url.protocol === "wss:") return;
 
-  // API calls — network-first
+  // Public API — stale-while-revalidate (coach can always see cached data)
+  if (url.pathname.match(/\/api\/v1\/public\//)) {
+    event.respondWith(staleWhileRevalidate(request, PUBLIC_API_CACHE));
+    return;
+  }
+
+  // Match API — network-first with 5s timeout
+  if (url.pathname.match(/\/api\/v1\/tournaments\/.*\/matches/)) {
+    event.respondWith(networkFirstWithTimeout(request, MATCHES_CACHE, 5000));
+    return;
+  }
+
+  // Other API calls — network-first
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(networkFirst(request, API_CACHE));
     return;
@@ -154,6 +170,30 @@ async function staleWhileRevalidate(request, cacheName) {
   return cached || fetchPromise;
 }
 
+async function networkFirstWithTimeout(request, cacheName, timeoutMs) {
+  const cached = await caches.match(request);
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    const response = await fetch(request, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      const cache = await caches.open(cacheName);
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    if (cached) return cached;
+    return new Response(JSON.stringify({ detail: "Offline" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function isStaticAsset(pathname) {
@@ -162,7 +202,7 @@ function isStaticAsset(pathname) {
   );
 }
 
-// ── Push notifications (placeholder for future) ─────────────────────────────
+// ── Push notifications ──────────────────────────────────────────────────────
 
 self.addEventListener("push", (event) => {
   if (!event.data) return;
@@ -175,7 +215,8 @@ self.addEventListener("push", (event) => {
         icon: "/icons/icon-192.png",
         badge: "/icons/icon-192.png",
         tag: data.tag || "kickoff",
-        data: data.url ? { url: data.url } : undefined,
+        data: { url: data.url || "/" },
+        vibrate: [100, 50, 100],
       })
     );
   } catch {
@@ -187,8 +228,7 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url = event.notification.data?.url || "/";
   event.waitUntil(
-    self.clients.matchAll({ type: "window" }).then((clients) => {
-      // Focus existing tab if available
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
         if (client.url.includes(url) && "focus" in client) {
           return client.focus();
@@ -198,3 +238,89 @@ self.addEventListener("notificationclick", (event) => {
     })
   );
 });
+
+// ── Background Sync — Pending Scores ────────────────────────────────────────
+
+const PENDING_SCORES_STORE = "kickoff-pending-scores";
+
+self.addEventListener("sync", (event) => {
+  if (event.tag === "sync-pending-scores") {
+    event.waitUntil(syncPendingScores());
+  }
+});
+
+async function syncPendingScores() {
+  let db;
+  try {
+    db = await openScoresDB();
+  } catch {
+    return;
+  }
+
+  const tx = db.transaction(PENDING_SCORES_STORE, "readonly");
+  const store = tx.objectStore(PENDING_SCORES_STORE);
+  const entries = await idbGetAll(store);
+  tx.oncomplete = () => {};
+
+  let synced = 0;
+  const failed = [];
+
+  for (const entry of entries) {
+    try {
+      const res = await fetch(entry.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(entry.token ? { Authorization: `Bearer ${entry.token}` } : {}),
+        },
+        body: JSON.stringify(entry.data),
+      });
+      if (res.ok) {
+        synced++;
+        // Remove from DB
+        const delTx = db.transaction(PENDING_SCORES_STORE, "readwrite");
+        delTx.objectStore(PENDING_SCORES_STORE).delete(entry.id);
+      } else {
+        failed.push(entry);
+      }
+    } catch {
+      failed.push(entry);
+    }
+  }
+
+  db.close();
+
+  // Notify all open clients
+  if (synced > 0) {
+    const allClients = await self.clients.matchAll({ type: "window" });
+    for (const client of allClients) {
+      client.postMessage({
+        type: "SCORES_SYNCED",
+        count: synced,
+        remaining: failed.length,
+      });
+    }
+  }
+}
+
+function openScoresDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("kickoff-offline", 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(PENDING_SCORES_STORE)) {
+        db.createObjectStore(PENDING_SCORES_STORE, { keyPath: "id" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function idbGetAll(store) {
+  return new Promise((resolve, reject) => {
+    const req = store.getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}

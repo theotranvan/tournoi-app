@@ -1,12 +1,15 @@
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.mixins import ListModelMixin
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
-from .models import Notification
-from .serializers import NotificationSerializer
+from django.conf import settings
+
+from .models import Notification, PushSubscription
+from .serializers import NotificationSerializer, PushSubscriptionSerializer
 
 
 class NotificationViewSet(ListModelMixin, GenericViewSet):
@@ -58,3 +61,47 @@ class NotificationViewSet(ListModelMixin, GenericViewSet):
         """Get count of unread notifications."""
         count = self._base_queryset().filter(is_read=False).count()
         return Response({"count": count})
+
+
+class VapidPublicKeyView(APIView):
+    """Return the VAPID public key for push subscription."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        key = getattr(settings, "VAPID_PUBLIC_KEY", "")
+        return Response({"key": key})
+
+
+class PushSubscribeView(APIView):
+    """Register a push subscription for the authenticated user."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = PushSubscriptionSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"status": "subscribed"}, status=status.HTTP_201_CREATED)
+
+
+class PushUnsubscribeView(APIView):
+    """Remove push subscriptions for the authenticated user/team."""
+
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        from apps.accounts.authentication import TeamAnonymousUser
+
+        endpoint = request.data.get("endpoint")
+        user = request.user
+
+        if isinstance(user, TeamAnonymousUser):
+            qs = PushSubscription.objects.filter(team_id=user.team_id)
+        else:
+            qs = PushSubscription.objects.filter(user=user)
+
+        if endpoint:
+            qs = qs.filter(endpoint=endpoint)
+        count, _ = qs.delete()
+        return Response({"deleted": count})

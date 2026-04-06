@@ -131,13 +131,54 @@ async function apiFetch<T = unknown>(
   }
 
   if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
+
+  const data = await res.json() as T;
+
+  // Cache successful GET responses for public/match routes in localStorage
+  if (
+    typeof window !== "undefined" &&
+    (!options.method || options.method === "GET") &&
+    (path.startsWith("/public/") || path.includes("/matches"))
+  ) {
+    try {
+      const cacheKey = `offline:${path}${params ? "?" + new URLSearchParams(params).toString() : ""}`;
+      localStorage.setItem(cacheKey, JSON.stringify(data));
+    } catch {
+      // localStorage full — ignore
+    }
+  }
+
+  return data;
+}
+
+function getOfflineCache<T>(path: string, params?: Record<string, string>): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const cacheKey = `offline:${path}${params ? "?" + new URLSearchParams(params).toString() : ""}`;
+    const cached = localStorage.getItem(cacheKey);
+    return cached ? (JSON.parse(cached) as T) : null;
+  } catch {
+    return null;
+  }
 }
 
 // Convenience methods
 const api = {
-  get: <T = unknown>(path: string, params?: Record<string, string>) =>
-    apiFetch<T>(path, { method: "GET", params }),
+  get: async <T = unknown>(path: string, params?: Record<string, string>): Promise<T> => {
+    try {
+      return await apiFetch<T>(path, { method: "GET", params });
+    } catch (err) {
+      // On network failure for public/match routes, try localStorage cache
+      if (
+        (path.startsWith("/public/") || path.includes("/matches")) &&
+        !(err instanceof ApiError)
+      ) {
+        const cached = getOfflineCache<T>(path, params);
+        if (cached !== null) return cached;
+      }
+      throw err;
+    }
+  },
 
   post: <T = unknown>(path: string, body?: unknown) =>
     apiFetch<T>(path, { method: "POST", body }),

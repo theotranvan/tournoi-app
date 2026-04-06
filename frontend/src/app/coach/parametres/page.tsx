@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { TeamAvatar } from "@/components/kickoff/team-avatar";
 import { ShareButton } from "@/components/kickoff/share-button";
-import { Settings, LogOut, Trophy, Users, Copy, Check, RefreshCw } from "lucide-react";
+import { Settings, LogOut, Trophy, Users, Copy, Check, RefreshCw, Bell, BellOff } from "lucide-react";
 import { useCoachStore } from "@/stores/coach-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
 
 export default function CoachParametres() {
   const router = useRouter();
@@ -18,6 +19,7 @@ export default function CoachParametres() {
   const clearTeam = useCoachStore((s) => s.clear);
   const logout = useAuthStore((s) => s.logout);
   const [copied, setCopied] = useState(false);
+  const { permission, isSubscribed, isLoading, requestPermission, unsubscribe } = usePushNotifications();
 
   useEffect(() => {
     if (!team) router.replace("/coach/acces");
@@ -119,6 +121,47 @@ export default function CoachParametres() {
         </CardHeader>
         <CardContent>
           <ThemeToggle />
+        </CardContent>
+      </Card>
+
+      {/* Push notifications */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Notifications</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Recevez une alerte quand votre match commence ou se termine.
+          </p>
+          {permission === "denied" ? (
+            <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2">
+              <p className="text-sm text-destructive font-medium">
+                Notifications bloquées
+              </p>
+              <p className="text-xs text-destructive/80">
+                Autorisez les notifications dans les paramètres de votre navigateur.
+              </p>
+            </div>
+          ) : isSubscribed ? (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={unsubscribe}
+              disabled={isLoading}
+            >
+              <BellOff className="size-4 mr-2" />
+              Désactiver les notifications
+            </Button>
+          ) : (
+            <Button
+              className="w-full"
+              onClick={requestPermission}
+              disabled={isLoading}
+            >
+              <Bell className="size-4 mr-2" />
+              Activer les notifications
+            </Button>
+          )}
         </CardContent>
       </Card>
 

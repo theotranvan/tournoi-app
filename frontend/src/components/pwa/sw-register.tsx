@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
+import { requestBackgroundSync } from "@/lib/offline-scores";
 
 /**
  * Registers the service worker on mount.
+ * Triggers pending score sync when coming back online.
  * Renders nothing — just a side-effect component.
  */
 export function ServiceWorkerRegister() {
@@ -31,6 +33,16 @@ export function ServiceWorkerRegister() {
       .catch((err) => {
         console.warn("[SW] Registration failed:", err);
       });
+
+    // When coming back online, trigger background sync for pending scores
+    const handleOnline = () => {
+      requestBackgroundSync().catch(() => {});
+    };
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+    };
   }, []);
 
   return null;
