@@ -1,6 +1,13 @@
 "use client";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Sparkles as SparklesComp } from "@/components/ui/sparkles";
 import { TimelineContent } from "@/components/ui/timeline-animation";
 import { VerticalCutReveal } from "@/components/ui/vertical-cut-reveal";
@@ -8,8 +15,9 @@ import { cn } from "@/lib/utils";
 import NumberFlow from "@number-flow/react";
 import { motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { Check, Shield, Zap, Crown, Loader2, Trophy } from "lucide-react";
+import { Check, Shield, Zap, Crown, Loader2, Trophy, Calendar, MapPin } from "lucide-react";
 import { useCheckout, useSubscription } from "@/hooks/use-subscription";
+import { useTournaments } from "@/hooks/use-tournaments";
 import { useRouter } from "next/navigation";
 
 const plans = [
@@ -146,12 +154,14 @@ const PricingSwitch = ({
 
 export default function PricingSection() {
   const [isYearly, setIsYearly] = useState(false);
+  const [showTournamentPicker, setShowTournamentPicker] = useState(false);
   const pricingRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   // Only fetch subscription if user is logged in (avoids 401 → redirect)
   const hasToken = typeof window !== "undefined" && !!localStorage.getItem("access_token");
   const { data } = useSubscription({ enabled: hasToken });
+  const { data: tournamentsData, isLoading: tournamentsLoading } = useTournaments();
   const checkout = useCheckout();
 
   const canceled = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("canceled") === "true";
@@ -180,7 +190,12 @@ export default function PricingSection() {
 
   const handleAction = (planName: string) => {
     if (planName === "One-Shot") {
-      router.push("/admin?upgrade=one_shot");
+      const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+      if (!token) {
+        router.push("/admin/login?next=/pricing");
+        return;
+      }
+      setShowTournamentPicker(true);
     } else if (planName === "Club") {
       const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
       if (!token) {
@@ -191,6 +206,14 @@ export default function PricingSection() {
         plan: isYearly ? "club_yearly" : "club_monthly",
       });
     }
+  };
+
+  const handleOneShotCheckout = (tournamentId: string) => {
+    setShowTournamentPicker(false);
+    checkout.mutate({
+      plan: "one_shot",
+      tournament_id: tournamentId,
+    });
   };
 
   return (
@@ -470,6 +493,73 @@ export default function PricingSection() {
           </a>
         </p>
       </div>
+
+      {/* Tournament picker dialog for One-Shot */}
+      <Dialog open={showTournamentPicker} onOpenChange={setShowTournamentPicker}>
+        <DialogContent
+          className="bg-neutral-900 border-neutral-700 text-white max-h-[80vh] overflow-y-auto"
+          onClose={() => setShowTournamentPicker(false)}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-white">Choisis un tournoi</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Sélectionne le tournoi pour lequel tu veux acheter la licence One-Shot (49 €).
+            </DialogDescription>
+          </DialogHeader>
+
+          {tournamentsLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="size-6 animate-spin text-green-500" />
+            </div>
+          ) : !tournamentsData?.results?.length ? (
+            <div className="text-center py-8 space-y-3">
+              <p className="text-gray-400">Tu n&apos;as pas encore de tournoi.</p>
+              <button
+                type="button"
+                onClick={() => router.push("/admin/tournois/nouveau")}
+                className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-500 transition-colors"
+              >
+                Créer un tournoi
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2 mt-2">
+              {tournamentsData.results.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => handleOneShotCheckout(t.id)}
+                  disabled={checkout.isPending}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-neutral-700 hover:border-green-500 hover:bg-neutral-800 transition-all text-left group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-white truncate group-hover:text-green-400 transition-colors">
+                      {t.name}
+                    </p>
+                    <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                      {t.start_date && (
+                        <span className="flex items-center gap-1">
+                          <Calendar className="size-3" />
+                          {new Date(t.start_date).toLocaleDateString("fr-FR")}
+                        </span>
+                      )}
+                      {t.location && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="size-3" />
+                          {t.location}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-xs text-gray-500 uppercase tracking-wide shrink-0">
+                    {t.status}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
