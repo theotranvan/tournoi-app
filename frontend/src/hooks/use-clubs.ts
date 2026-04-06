@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { Club } from "@/types/api";
+import type { Club, FFFClub } from "@/types/api";
 
 export const clubKeys = {
   all: ["clubs"] as const,
@@ -20,5 +20,14 @@ export function useClub(id: number) {
     queryKey: clubKeys.detail(id),
     queryFn: () => api.get<Club>(`/clubs/${id}/`),
     enabled: id > 0,
+  });
+}
+
+export function useClubFFFSearch(query: string) {
+  return useQuery({
+    queryKey: ["clubs", "fff-search", query] as const,
+    queryFn: () => api.get<FFFClub[]>("/clubs/fff-search/", { q: query }),
+    enabled: query.length >= 2,
+    staleTime: 60 * 60 * 1000,
   });
 }

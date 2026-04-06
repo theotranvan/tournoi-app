@@ -566,3 +566,17 @@ export interface TournamentPlanResponse {
   plan: "FREE" | "ONE_SHOT" | "CLUB";
   tournament_id: string;
 }
+
+// ─── FFF Club Search ────────────────────────────────────────────────────────
+
+export interface FFFClub {
+  fff_id: number;
+  name: string;
+  short_name: string;
+  city: string;
+  postal_code: string;
+  logo: string | null;
+  colors: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
