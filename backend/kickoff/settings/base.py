@@ -193,11 +193,36 @@ SENTRY_DSN = config("SENTRY_DSN", default="")
 if SENTRY_DSN:
     import sentry_sdk
 
+    _SENSITIVE_KEYS = {"access_code", "password", "token", "secret", "authorization"}
+
+    def _scrub_data(data):
+        """Recursively redact sensitive keys from event data."""
+        if isinstance(data, dict):
+            return {
+                k: "[REDACTED]" if k.lower() in _SENSITIVE_KEYS else _scrub_data(v)
+                for k, v in data.items()
+            }
+        if isinstance(data, list):
+            return [_scrub_data(item) for item in data]
+        return data
+
+    def _sentry_before_send(event, hint):
+        """Strip sensitive fields from Sentry events."""
+        if "request" in event and "data" in event["request"]:
+            event["request"]["data"] = _scrub_data(event["request"]["data"])
+        if "exception" in event:
+            for val in event["exception"].get("values", []):
+                for frame in (val.get("stacktrace") or {}).get("frames", []):
+                    if "vars" in frame:
+                        frame["vars"] = _scrub_data(frame["vars"])
+        return event
+
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         traces_sample_rate=0.2,
         profiles_sample_rate=0.1,
         send_default_pii=False,
+        before_send=_sentry_before_send,
     )
 
 # ─── Logging ─────────────────────────────────────────────────────────────────

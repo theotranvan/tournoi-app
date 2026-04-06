@@ -4,7 +4,13 @@ from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
-from apps.core.health import HealthDBView, HealthView
+from apps.core.health import (
+    HealthCeleryView,
+    HealthDBView,
+    HealthFullView,
+    HealthRedisView,
+    HealthView,
+)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -18,6 +24,9 @@ urlpatterns = [
     # Health
     path("api/v1/health/", HealthView.as_view(), name="health"),
     path("api/v1/health/db/", HealthDBView.as_view(), name="health-db"),
+    path("api/v1/health/redis/", HealthRedisView.as_view(), name="health-redis"),
+    path("api/v1/health/celery/", HealthCeleryView.as_view(), name="health-celery"),
+    path("api/v1/health/full/", HealthFullView.as_view(), name="health-full"),
     # Auth
     path("api/v1/auth/", include("apps.accounts.urls")),
     # Clubs
@@ -33,6 +42,14 @@ urlpatterns = [
     # Subscriptions
     path("api/v1/subscriptions/", include("apps.subscriptions.urls")),
 ]
+
+if settings.DEBUG:
+    from apps.core.debug import DebugCeleryQueueView, DebugWSGroupsView
+
+    urlpatterns += [
+        path("api/v1/debug/ws-groups/", DebugWSGroupsView.as_view(), name="debug-ws-groups"),
+        path("api/v1/debug/celery-queue/", DebugCeleryQueueView.as_view(), name="debug-celery-queue"),
+    ]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

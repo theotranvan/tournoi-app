@@ -24,6 +24,10 @@ class AuthRateThrottle(AnonRateThrottle):
     rate = "5/minute"
 
 
+class TeamAccessRateThrottle(AnonRateThrottle):
+    rate = "10/minute"
+
+
 class RegisterView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [AuthRateThrottle]
@@ -81,6 +85,7 @@ class RefreshView(TokenRefreshView):
 
 class TeamAccessView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [TeamAccessRateThrottle]
 
     def post(self, request):
         serializer = TeamAccessSerializer(data=request.data)

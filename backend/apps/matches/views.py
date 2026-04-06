@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -6,6 +8,8 @@ from rest_framework.response import Response
 from apps.core import BusinessRuleViolation, InvalidStateTransition
 from apps.core.permissions import IsOrganizer
 from apps.matches.models import Goal, Match
+
+logger = logging.getLogger(__name__)
 from apps.matches.serializers import (
     GoalSerializer,
     MatchDetailSerializer,
@@ -118,6 +122,15 @@ class MatchViewSet(viewsets.ModelViewSet):
         match.status = Match.Status.FINISHED
         match.score_validated = True
         match.save(update_fields=["status", "score_validated", "updated_at"])
+        logger.info(
+            "match.finished",
+            extra={
+                "match_id": str(match.id),
+                "tournament_id": str(match.tournament_id),
+                "score": f"{match.score_home}-{match.score_away}",
+                "user_id": str(request.user.id),
+            },
+        )
         return Response(MatchDetailSerializer(match).data)
 
     @action(detail=True, methods=["post"])

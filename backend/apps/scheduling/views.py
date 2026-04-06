@@ -11,9 +11,14 @@ from django.db import transaction
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from apps.core.permissions import IsOrganizer
+
+
+class ScheduleGenerateThrottle(UserRateThrottle):
+    rate = "5/hour"
 from apps.matches.models import Match
 from apps.scheduling.engine import SchedulingEngine
 from apps.scheduling.serializers import GenerateScheduleSerializer, RecalculateSerializer
@@ -31,6 +36,7 @@ class GenerateScheduleView(APIView):
     """
 
     permission_classes = [IsAuthenticated, IsOrganizer]
+    throttle_classes = [ScheduleGenerateThrottle]
 
     def post(self, request, tournament_id):
         tournament = _get_tournament_for_nested(
@@ -57,6 +63,15 @@ class GenerateScheduleView(APIView):
         with transaction.atomic():
             engine.commit_to_db()
 
+        logger.info(
+            "schedule.generated",
+            extra={
+                "tournament_id": str(tournament.id),
+                "strategy": strategy,
+                "user_id": str(request.user.id),
+                "total_matches": report.to_dict().get("total_matches", 0),
+            },
+        )
         return Response(report.to_dict(), status=status.HTTP_200_OK)
 
 

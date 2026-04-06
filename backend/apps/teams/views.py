@@ -83,6 +83,10 @@ class TeamViewSet(viewsets.ModelViewSet):
         if not file:
             raise BusinessRuleViolation("Un fichier CSV est requis.")
 
+        # Limit CSV file size to 2 MB
+        if file.size > 2 * 1024 * 1024:
+            raise BusinessRuleViolation("Le fichier CSV ne doit pas dépasser 2 Mo.")
+
         decoded = file.read().decode("utf-8-sig")
         reader = csv.DictReader(io.StringIO(decoded))
         created = []
