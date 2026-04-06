@@ -11,6 +11,11 @@ from rest_framework.response import Response
 from apps.clubs.models import Club
 from apps.core import BusinessRuleViolation, InvalidStateTransition
 from apps.core.permissions import IsOrganizer
+from apps.subscriptions.plans import (
+    FREE_LIMITS,
+    check_can_create_tournament,
+    get_effective_plan,
+)
 from apps.tournaments.models import Category, Field, SchedulingConstraint, Tournament
 from apps.tournaments.serializers import (
     BulkCategorySerializer,
@@ -73,6 +78,11 @@ class TournamentViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
+        # Plan gate: limit active tournaments for FREE users
+        error = check_can_create_tournament(self.request.user)
+        if error:
+            raise PermissionDenied(error)
+
         club = serializer.validated_data.get("club")
         if not club:
             club, _ = Club.objects.get_or_create(
@@ -148,6 +158,9 @@ class TournamentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def duplicate(self, request, id=None):
+        error = check_can_create_tournament(request.user)
+        if error:
+            raise PermissionDenied(error)
         original = self.get_object()
         clone = Tournament.objects.create(
             club=original.club,
@@ -203,6 +216,12 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         tournament = _get_tournament_for_nested(self.kwargs, self.request.user)
+        # Plan gate: limit categories for FREE users
+        if get_effective_plan(self.request.user, tournament) == "FREE":
+            if tournament.categories.count() >= FREE_LIMITS.max_categories_per_tournament:
+                raise PermissionDenied(
+                    f"Le plan gratuit est limité à {FREE_LIMITS.max_categories_per_tournament} catégories par tournoi."
+                )
         try:
             serializer.save(tournament=tournament)
         except IntegrityError:
@@ -226,6 +245,14 @@ class CategoryViewSet(viewsets.ModelViewSet):
         serializer = BulkCategorySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         tournament = _get_tournament_for_nested(self.kwargs, request.user)
+        # Plan gate: limit categories for FREE users
+        if get_effective_plan(request.user, tournament) == "FREE":
+            incoming = len(serializer.validated_data["categories"])
+            existing = tournament.categories.count()
+            if existing + incoming > FREE_LIMITS.max_categories_per_tournament:
+                raise PermissionDenied(
+                    f"Le plan gratuit est limité à {FREE_LIMITS.max_categories_per_tournament} catégories par tournoi."
+                )
         created = []
         for i, cat_data in enumerate(serializer.validated_data["categories"]):
             cat = Category.objects.create(
@@ -254,6 +281,12 @@ class FieldViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         tournament = _get_tournament_for_nested(self.kwargs, self.request.user)
+        # Plan gate: limit fields for FREE users
+        if get_effective_plan(self.request.user, tournament) == "FREE":
+            if tournament.fields.count() >= FREE_LIMITS.max_fields_per_tournament:
+                raise PermissionDenied(
+                    f"Le plan gratuit est limité à {FREE_LIMITS.max_fields_per_tournament} terrains par tournoi."
+                )
         self._validate_availability(serializer.validated_data, tournament)
         serializer.save(tournament=tournament)
 

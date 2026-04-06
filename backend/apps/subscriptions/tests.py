@@ -74,14 +74,15 @@ class TestSubscriptionStatusView:
 
         resp = api.get("/api/v1/subscriptions/status/")
         assert resp.status_code == 200
-        assert resp.data["plan"] == "free"
+        assert resp.data["subscription"]["plan"] == "free"
+        assert "licenses" in resp.data
         assert Subscription.objects.filter(user=user).exists()
 
     def test_get_status_returns_existing(self, api, subscription):
         resp = api.get("/api/v1/subscriptions/status/")
         assert resp.status_code == 200
-        assert resp.data["plan"] == "free"
-        assert resp.data["status"] == "active"
+        assert resp.data["subscription"]["plan"] == "free"
+        assert resp.data["subscription"]["status"] == "active"
 
     def test_status_requires_auth(self):
         client = APIClient()

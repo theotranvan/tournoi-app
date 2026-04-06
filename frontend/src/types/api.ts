@@ -519,3 +519,50 @@ export interface Notification {
   is_read: boolean;
   created_at: string;
 }
+
+// ─── Subscriptions / Pricing ────────────────────────────────────────────────
+
+export type SubscriptionPlan =
+  | "free"
+  | "monthly"
+  | "yearly"
+  | "club_monthly"
+  | "club_yearly";
+
+export type SubscriptionStatus =
+  | "active"
+  | "past_due"
+  | "canceled"
+  | "incomplete"
+  | "trialing";
+
+export interface SubscriptionData {
+  plan: SubscriptionPlan;
+  status: SubscriptionStatus;
+  is_premium: boolean;
+  is_club: boolean;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+}
+
+export interface TournamentLicenseData {
+  id: string;
+  tournament_id: string;
+  tournament_name: string;
+  is_active: boolean;
+  is_valid: boolean;
+  valid_from: string | null;
+  valid_until: string | null;
+  created_at: string;
+}
+
+export interface SubscriptionStatusResponse {
+  subscription: SubscriptionData;
+  licenses: TournamentLicenseData[];
+}
+
+export interface TournamentPlanResponse {
+  plan: "FREE" | "ONE_SHOT" | "CLUB";
+  tournament_id: string;
+}

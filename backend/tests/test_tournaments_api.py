@@ -7,6 +7,8 @@ from rest_framework.test import APIClient
 
 from tests.factories import CategoryFactory, ClubFactory, FieldFactory, TeamFactory, TournamentFactory, UserFactory
 
+from apps.subscriptions.models import Subscription
+
 
 @pytest.fixture
 def api() -> APIClient:
@@ -192,6 +194,9 @@ class TestTournamentActions:
 
     def test_duplicate(self, api):
         user = _make_user()
+        Subscription.objects.update_or_create(
+            user=user, defaults={"plan": "club_monthly", "status": "active"},
+        )
         club = ClubFactory(owner=user)
         t = TournamentFactory(club=club)
         CategoryFactory(tournament=t, name="U10")
@@ -223,6 +228,9 @@ class TestCategoriesCRUD:
 
     def test_bulk_create(self, api):
         user = _make_user()
+        Subscription.objects.update_or_create(
+            user=user, defaults={"plan": "club_monthly", "status": "active"},
+        )
         club = ClubFactory(owner=user)
         t = TournamentFactory(club=club)
         api.force_authenticate(user=user)

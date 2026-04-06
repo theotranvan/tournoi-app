@@ -15,6 +15,7 @@ from rest_framework import status
 
 from apps.accounts.models import User
 from apps.clubs.models import Club
+from apps.subscriptions.models import Subscription
 from apps.tournaments.models import Tournament, Category, Field
 from apps.teams.models import Team
 from apps.matches.models import Match
@@ -647,6 +648,11 @@ class ComprehensiveE2ETest(TestCase):
 
     def test_090_duplicate_tournament(self):
         self._auth_admin()
+        # Give admin a CLUB subscription so free-plan limits don't block
+        Subscription.objects.update_or_create(
+            user=self.admin_user,
+            defaults={"plan": "club_monthly", "status": "active"},
+        )
         t = self.c.post(
             "/api/v1/tournaments/",
             {

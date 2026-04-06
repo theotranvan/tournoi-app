@@ -6,6 +6,8 @@ from rest_framework.test import APIClient
 
 from tests.factories import CategoryFactory, ClubFactory, GroupFactory, TeamFactory, TournamentFactory, UserFactory
 
+from apps.subscriptions.models import Subscription
+
 
 @pytest.fixture
 def api() -> APIClient:
@@ -129,6 +131,14 @@ class TestHappyPathE2E:
         assert resp.status_code == status.HTTP_201_CREATED
         token = resp.json()["access"]
         api.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+        # Give user a CLUB subscription so free-plan limits don't block
+        from apps.accounts.models import User
+        user = User.objects.get(username="theo")
+        Subscription.objects.update_or_create(
+            user=user,
+            defaults={"plan": "club_monthly", "status": "active"},
+        )
 
         # 2. Create club
         resp = api.post("/api/v1/clubs/", {"name": "FC Kickoff"})

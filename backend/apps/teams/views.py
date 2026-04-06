@@ -12,6 +12,7 @@ from rest_framework.response import Response
 
 from apps.core import BusinessRuleViolation
 from apps.core.permissions import IsOrganizer
+from apps.subscriptions.plans import FREE_LIMITS, get_effective_plan
 from apps.teams.models import Group, Team, generate_access_code
 from apps.teams.serializers import (
     GenerateGroupsSerializer,
@@ -48,6 +49,13 @@ class TeamViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         tournament = _get_tournament_for_nested(self.kwargs, self.request.user)
+        # Plan gate: limit teams for FREE users
+        if get_effective_plan(self.request.user, tournament) == "FREE":
+            if tournament.teams.count() >= FREE_LIMITS.max_teams_per_tournament:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied(
+                    f"Le plan gratuit est limité à {FREE_LIMITS.max_teams_per_tournament} équipes par tournoi."
+                )
         serializer.save(tournament=tournament)
 
     @action(detail=True, methods=["post"], url_path="regenerate-code")

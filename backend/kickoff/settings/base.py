@@ -49,6 +49,10 @@ STRIPE_PUBLISHABLE_KEY = config("STRIPE_PUBLISHABLE_KEY", default="")
 STRIPE_WEBHOOK_SECRET = config("STRIPE_WEBHOOK_SECRET", default="")
 STRIPE_PRICE_MONTHLY = config("STRIPE_PRICE_MONTHLY", default="")
 STRIPE_PRICE_YEARLY = config("STRIPE_PRICE_YEARLY", default="")
+# Pricing v2
+STRIPE_PRICE_ONE_SHOT = config("STRIPE_PRICE_ONE_SHOT", default="")
+STRIPE_PRICE_CLUB_MONTHLY = config("STRIPE_PRICE_CLUB_MONTHLY", default="")
+STRIPE_PRICE_CLUB_YEARLY = config("STRIPE_PRICE_CLUB_YEARLY", default="")
 
 # ─── Middleware ───────────────────────────────────────────────────────────────
 MIDDLEWARE = [

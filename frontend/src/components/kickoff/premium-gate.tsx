@@ -15,7 +15,7 @@ interface PremiumGateProps {
  * Shows a paywall prompt when the user is on the free plan.
  */
 export function PremiumGate({ children, fallback }: PremiumGateProps) {
-  const { data: sub, isLoading } = useSubscription();
+  const { data, isLoading } = useSubscription();
 
   if (isLoading) {
     return (
@@ -25,7 +25,7 @@ export function PremiumGate({ children, fallback }: PremiumGateProps) {
     );
   }
 
-  if (sub?.is_premium) {
+  if (data?.subscription?.is_premium) {
     return <>{children}</>;
   }
 
@@ -43,7 +43,7 @@ export function PremiumGate({ children, fallback }: PremiumGateProps) {
         Cette fonctionnalité nécessite un abonnement actif.
         Abonne-toi pour débloquer toutes les fonctionnalités de Footix.
       </p>
-      <Link href="/admin/abonnement">
+      <Link href="/pricing">
         <Button size="lg">
           <Crown className="size-4 mr-2" />
           Voir les offres

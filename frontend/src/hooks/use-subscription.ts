@@ -2,18 +2,17 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import type {
+  SubscriptionStatusResponse,
+  TournamentPlanResponse,
+} from "@/types/api";
 
-interface SubscriptionData {
-  plan: "free" | "monthly" | "yearly";
-  status: "active" | "past_due" | "canceled" | "incomplete" | "trialing";
-  is_premium: boolean;
-  current_period_start: string | null;
-  current_period_end: string | null;
-  cancel_at_period_end: boolean;
-}
-
+/**
+ * Fetch current user subscription + active licenses.
+ * Response shape: { subscription: SubscriptionData, licenses: TournamentLicenseData[] }
+ */
 export function useSubscription() {
-  return useQuery<SubscriptionData>({
+  return useQuery<SubscriptionStatusResponse>({
     queryKey: ["subscription"],
     queryFn: () => api.get("/subscriptions/status/"),
     staleTime: 60_000,
@@ -21,10 +20,32 @@ export function useSubscription() {
   });
 }
 
+/**
+ * Get effective plan for a specific tournament (FREE / ONE_SHOT / CLUB).
+ */
+export function useTournamentPlan(tournamentId: string | undefined) {
+  return useQuery<TournamentPlanResponse>({
+    queryKey: ["tournament-plan", tournamentId],
+    queryFn: () =>
+      api.get<TournamentPlanResponse>(
+        `/subscriptions/tournament/${tournamentId}/plan/`
+      ),
+    enabled: !!tournamentId,
+    staleTime: 60_000,
+  });
+}
+
+type CheckoutPlan = "monthly" | "yearly" | "club_monthly" | "club_yearly" | "one_shot";
+
+interface CheckoutParams {
+  plan: CheckoutPlan;
+  tournament_id?: string;
+}
+
 export function useCheckout() {
   return useMutation({
-    mutationFn: (plan: "monthly" | "yearly") =>
-      api.post<{ checkout_url: string }>("/subscriptions/checkout/", { plan }),
+    mutationFn: (params: CheckoutParams) =>
+      api.post<{ checkout_url: string }>("/subscriptions/checkout/", params),
     onSuccess: (data) => {
       window.location.href = data.checkout_url;
     },
