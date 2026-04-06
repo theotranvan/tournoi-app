@@ -6,7 +6,7 @@ import { TimelineContent } from "@/components/ui/timeline-animation";
 import { VerticalCutReveal } from "@/components/ui/vertical-cut-reveal";
 import { cn } from "@/lib/utils";
 import NumberFlow from "@number-flow/react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { useRef, useState } from "react";
 import { Check, Shield, Zap, Crown, Loader2, Trophy } from "lucide-react";
 import { useCheckout, useSubscription } from "@/hooks/use-subscription";
@@ -94,46 +94,50 @@ const PricingSwitch = ({
 
   return (
     <div className="flex justify-center">
-      <div className="relative z-10 mx-auto flex w-fit rounded-full bg-neutral-900 border border-neutral-700 p-1">
-        <button
-          onClick={() => handleSwitch("0")}
-          className={cn(
-            "relative z-10 w-fit h-10 rounded-full sm:px-6 px-3 sm:py-2 py-1 font-medium transition-colors",
-            selected === "0" ? "text-white" : "text-gray-200"
-          )}
-        >
-          {selected === "0" && (
-            <motion.span
-              layoutId="pricing-switch"
-              className="absolute top-0 left-0 h-10 w-full rounded-full border-4 shadow-sm shadow-green-600 border-green-600 bg-gradient-to-t from-green-600 to-green-500"
-              transition={{ type: "spring", stiffness: 500, damping: 30 }}
-            />
-          )}
-          <span className="relative">Mensuel</span>
-        </button>
+      <LayoutGroup>
+        <div className="relative z-10 mx-auto flex w-fit rounded-full bg-neutral-900 border border-neutral-700 p-1">
+          <button
+            type="button"
+            onClick={() => handleSwitch("0")}
+            className={cn(
+              "relative z-10 w-fit h-10 rounded-full sm:px-6 px-3 sm:py-2 py-1 font-medium transition-colors",
+              selected === "0" ? "text-white" : "text-gray-200"
+            )}
+          >
+            {selected === "0" && (
+              <motion.span
+                layoutId="pricing-switch"
+                className="absolute inset-0 rounded-full border-2 shadow-sm shadow-green-600 border-green-500 bg-gradient-to-t from-green-600 to-green-500"
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              />
+            )}
+            <span className="relative">Mensuel</span>
+          </button>
 
-        <button
-          onClick={() => handleSwitch("1")}
-          className={cn(
-            "relative z-10 w-fit h-10 flex-shrink-0 rounded-full sm:px-6 px-3 sm:py-2 py-1 font-medium transition-colors",
-            selected === "1" ? "text-white" : "text-gray-200"
-          )}
-        >
-          {selected === "1" && (
-            <motion.span
-              layoutId="pricing-switch"
-              className="absolute top-0 left-0 h-10 w-full rounded-full border-4 shadow-sm shadow-green-600 border-green-600 bg-gradient-to-t from-green-600 to-green-500"
-              transition={{ type: "spring", stiffness: 500, damping: 30 }}
-            />
-          )}
-          <span className="relative flex items-center gap-2">
-            Annuel
-            <span className="text-xs bg-green-500/20 text-green-300 rounded-full px-2 py-0.5">
-              -13%
+          <button
+            type="button"
+            onClick={() => handleSwitch("1")}
+            className={cn(
+              "relative z-10 w-fit h-10 flex-shrink-0 rounded-full sm:px-6 px-3 sm:py-2 py-1 font-medium transition-colors",
+              selected === "1" ? "text-white" : "text-gray-200"
+            )}
+          >
+            {selected === "1" && (
+              <motion.span
+                layoutId="pricing-switch"
+                className="absolute inset-0 rounded-full border-2 shadow-sm shadow-green-600 border-green-500 bg-gradient-to-t from-green-600 to-green-500"
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              />
+            )}
+            <span className="relative flex items-center gap-2">
+              Annuel
+              <span className="text-xs bg-green-500/20 text-green-300 rounded-full px-2 py-0.5">
+                -13%
+              </span>
             </span>
-          </span>
-        </button>
-      </div>
+          </button>
+        </div>
+      </LayoutGroup>
     </div>
   );
 };
@@ -173,6 +177,11 @@ export default function PricingSection() {
     if (planName === "One-Shot") {
       router.push("/admin?upgrade=one_shot");
     } else if (planName === "Club") {
+      const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+      if (!token) {
+        router.push("/admin/login?next=/pricing");
+        return;
+      }
       checkout.mutate({
         plan: isYearly ? "club_yearly" : "club_monthly",
       });
@@ -379,6 +388,7 @@ export default function PricingSection() {
                 <CardContent className="pt-0">
                   {isFree ? (
                     <button
+                      type="button"
                       disabled
                       className="w-full mb-6 p-4 text-xl rounded-xl bg-gradient-to-t from-neutral-950 to-neutral-700 shadow-lg shadow-neutral-900 border border-neutral-700 text-gray-400 cursor-not-allowed"
                     >
@@ -386,6 +396,7 @@ export default function PricingSection() {
                     </button>
                   ) : (
                     <button
+                      type="button"
                       onClick={() => handleAction(plan.name)}
                       disabled={
                         checkout.isPending || (isClubPlan && isClub)

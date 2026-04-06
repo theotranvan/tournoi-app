@@ -49,6 +49,14 @@ export function useCheckout() {
     onSuccess: (data) => {
       window.location.href = data.checkout_url;
     },
+    onError: (error) => {
+      console.error("Checkout failed:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Erreur lors de la création du paiement. Réessaie."
+      );
+    },
   });
 }
 
