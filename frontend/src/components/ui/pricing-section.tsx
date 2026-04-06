@@ -94,14 +94,21 @@ const PricingSwitch = ({
   onSwitch: (value: string) => void;
 }) => {
   const [selected, setSelected] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
   const btnRefs = [useRef<HTMLButtonElement>(null), useRef<HTMLButtonElement>(null)];
-  const [indicator, setIndicator] = useState({ left: 0, width: 0 });
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
 
   useEffect(() => {
-    const el = btnRefs[selected].current;
-    if (el) {
-      setIndicator({ left: el.offsetLeft, width: el.offsetWidth });
-    }
+    const measure = () => {
+      const el = btnRefs[selected].current;
+      if (el) {
+        setIndicator({ left: el.offsetLeft, width: el.offsetWidth });
+      }
+    };
+    measure();
+    // Re-measure after fonts load (can shift button widths)
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
   }, [selected]);
 
   const handleSwitch = (idx: number) => {
@@ -111,13 +118,15 @@ const PricingSwitch = ({
 
   return (
     <div className="flex justify-center">
-      <div className="relative z-10 mx-auto flex w-fit rounded-full bg-neutral-900 border border-neutral-700 p-1">
-        <motion.div
-          className="absolute top-1 bottom-1 rounded-full border-2 shadow-sm shadow-green-600 border-green-500 bg-gradient-to-t from-green-600 to-green-500"
-          initial={false}
-          animate={{ left: indicator.left, width: indicator.width }}
-          transition={{ type: "spring", stiffness: 500, damping: 30 }}
-        />
+      <div ref={containerRef} className="relative z-10 mx-auto flex w-fit rounded-full bg-neutral-900 border border-neutral-700 p-1">
+        {indicator && (
+          <motion.div
+            className="absolute top-1 bottom-1 rounded-full border-2 shadow-sm shadow-green-600 border-green-500 bg-gradient-to-t from-green-600 to-green-500"
+            initial={false}
+            animate={{ left: indicator.left, width: indicator.width }}
+            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+          />
+        )}
 
         <button
           ref={btnRefs[0]}
@@ -342,21 +351,22 @@ export default function PricingSection() {
               timelineRef={pricingRef}
               customVariants={revealVariants}
             >
+              <div className={cn("relative", plan.popular && "mt-3")}>
+                {plan.popular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30">
+                    <span className="bg-green-600 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-lg shadow-green-900/50">
+                      Populaire
+                    </span>
+                  </div>
+                )}
               <Card
                 className={cn(
-                  "relative text-white border-neutral-800 rounded-xl",
+                  "relative text-white border-neutral-800 rounded-xl overflow-visible",
                   plan.popular
                     ? "bg-gradient-to-r from-neutral-900 via-neutral-800 to-neutral-900 shadow-[0px_-13px_300px_0px_#16a34a80] z-20"
                     : "bg-gradient-to-r from-neutral-900 via-neutral-800 to-neutral-900 z-10"
                 )}
               >
-                {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="bg-green-600 text-white text-xs font-semibold px-3 py-1 rounded-full">
-                      Populaire
-                    </span>
-                  </div>
-                )}
 
                 <CardHeader className="text-left">
                   <div className="flex items-center gap-2 mb-2">
@@ -478,6 +488,7 @@ export default function PricingSection() {
                   </div>
                 </CardContent>
               </Card>
+              </div>
             </TimelineContent>
           );
         })}
