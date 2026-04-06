@@ -390,20 +390,22 @@ class StripeWebhookView(APIView):
         self._activate_license(license_obj, payment_intent["id"])
 
     def _activate_license(self, license_obj: TournamentLicense, payment_intent_id: str):
-        """Set validity window: 30 days before/after tournament date."""
+        """Set validity window: from now until 30 days after tournament end."""
         tournament = license_obj.tournament
-        start_date = datetime.combine(
-            tournament.start_date, datetime.min.time(), tzinfo=timezone.utc
-        )
+        now = datetime.now(tz=timezone.utc)
         license_obj.stripe_payment_intent_id = payment_intent_id
-        license_obj.valid_from = start_date - timedelta(days=30)
-        license_obj.valid_until = start_date + timedelta(days=60)  # start + 30 after end
-        # Use end_date if available for a tighter window
+        license_obj.valid_from = now  # usable immediately after purchase
+        # valid_until = end_date + 30 days (or start_date + 60 if no end_date)
         if tournament.end_date:
             end_date = datetime.combine(
                 tournament.end_date, datetime.min.time(), tzinfo=timezone.utc
             )
             license_obj.valid_until = end_date + timedelta(days=30)
+        else:
+            start_date = datetime.combine(
+                tournament.start_date, datetime.min.time(), tzinfo=timezone.utc
+            )
+            license_obj.valid_until = start_date + timedelta(days=60)
         license_obj.is_active = True
         license_obj.save()
         logger.info(
