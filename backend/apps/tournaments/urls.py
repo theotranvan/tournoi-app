@@ -1,8 +1,10 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from apps.matches.postpone import PostponeMatchView
 from apps.matches.views import MatchViewSet
 from apps.teams.views import GroupViewSet, TeamViewSet
+from apps.tournaments.insights import TournamentInsightsView
 from apps.tournaments.views import (
     CategoryViewSet,
     FieldViewSet,
@@ -55,8 +57,18 @@ urlpatterns = [
         include(match_router.urls),
     ),
     path(
+        "<uuid:tournament_id>/matches/<uuid:match_id>/postpone/",
+        PostponeMatchView.as_view(),
+        name="match-postpone",
+    ),
+    path(
         "<uuid:tournament_id>/schedule/",
         include("apps.scheduling.urls"),
+    ),
+    path(
+        "<uuid:tournament_id>/insights/",
+        TournamentInsightsView.as_view(),
+        name="tournament-insights",
     ),
     # Nested under tournaments/{id}/categories/{id}/groups/
     path(

@@ -34,6 +34,10 @@ import {
   Pencil,
   Trash2,
   Shuffle,
+  Printer,
+  FlaskConical,
+  BarChart3,
+  Mic2,
 } from "lucide-react";
 import { useTournament } from "@/hooks/use-tournaments";
 import { useCategories } from "@/hooks/use-categories";
@@ -920,6 +924,36 @@ export default function TournamentDetail({
             <p className="text-2xl font-bold mt-1">{t.nb_fields}</p>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Quick tools */}
+      <div className="flex flex-wrap gap-2">
+        <Link href={`/admin/tournois/${id}/print`}>
+          <Button variant="outline" size="sm">
+            <Printer className="size-4 mr-1" />
+            Kit imprimable
+          </Button>
+        </Link>
+        <Link href={`/admin/tournois/${id}/simulator`}>
+          <Button variant="outline" size="sm">
+            <FlaskConical className="size-4 mr-1" />
+            Simulateur
+          </Button>
+        </Link>
+        <Link href={`/admin/tournois/${id}/insights`}>
+          <Button variant="outline" size="sm">
+            <BarChart3 className="size-4 mr-1" />
+            Insights
+          </Button>
+        </Link>
+        {t.slug && (
+          <Link href={`/tournoi/${t.slug}/speaker`} target="_blank">
+            <Button variant="outline" size="sm">
+              <Mic2 className="size-4 mr-1" />
+              Mode speaker
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Tabs */}
