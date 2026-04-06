@@ -62,7 +62,7 @@ class TournamentViewSet(viewsets.ModelViewSet):
         qs = Tournament.objects.filter(
             db_models.Q(club__owner=user) | db_models.Q(club__members=user)
         ).distinct()
-        qs = _annotate_tournament_qs(qs)
+        qs = _annotate_tournament_qs(qs).order_by("-start_date")
         # Filtres optionnels
         club = self.request.query_params.get("club")
         if club:
