@@ -41,7 +41,7 @@ export function PremiumGate({ children, fallback }: PremiumGateProps) {
       <h2 className="text-xl font-bold">Fonctionnalité Premium</h2>
       <p className="text-muted-foreground max-w-sm">
         Cette fonctionnalité nécessite un abonnement actif.
-        Abonnez-vous pour débloquer toutes les fonctionnalités de Kickoff.
+        Abonne-toi pour débloquer toutes les fonctionnalités de Footix.
       </p>
       <Link href="/admin/abonnement">
         <Button size="lg">
