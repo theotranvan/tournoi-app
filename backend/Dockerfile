@@ -28,7 +28,4 @@ USER appuser
 
 EXPOSE 8000
 
-CMD mkdir -p /app/staticfiles && \
-    python manage.py migrate && \
-    python manage.py collectstatic --noinput && \
-    daphne -b 0.0.0.0 -p ${PORT:-8000} kickoff.asgi:application
+CMD mkdir -p /app/staticfiles && python manage.py migrate && python manage.py collectstatic --noinput && daphne -b 0.0.0.0 -p ${PORT:-8000} kickoff.asgi:application
