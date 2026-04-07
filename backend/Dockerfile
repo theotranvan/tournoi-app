@@ -30,4 +30,6 @@ USER appuser
 
 EXPOSE 8000
 
-CMD daphne -b 0.0.0.0 -p ${PORT:-8000} kickoff.asgi:application
+CMD python manage.py migrate && \
+    python manage.py collectstatic --noinput && \
+    daphne -b 0.0.0.0 -p ${PORT:-8000} kickoff.asgi:application
