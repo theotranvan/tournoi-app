@@ -12,12 +12,12 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python deps (layer-cached)
-COPY pyproject.toml .
+COPY backend/pyproject.toml .
 RUN pip install --no-cache-dir tomli 2>/dev/null; \
     python -c "import tomllib; deps=tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']; print('\n'.join(d for d in deps if not d.strip().startswith('#')))" > /tmp/reqs.txt && \
     pip install --no-cache-dir -r /tmp/reqs.txt && rm /tmp/reqs.txt
 
-COPY . .
+COPY backend/ .
 
 RUN python manage.py collectstatic --noinput 2>/dev/null || true
 
