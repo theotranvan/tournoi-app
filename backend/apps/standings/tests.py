@@ -293,3 +293,58 @@ class TestEdgeCases:
         standings = compute_group_standings(grp.id, bypass_cache=True)
         alpha = next(s for s in standings if s["team_name"] == "Alpha")
         assert alpha["played"] == 0  # match with outsider ignored
+
+
+# ─── Standings Views API ─────────────────────────────────────────────────────
+
+
+class TestStandingsViewsAPI:
+    def setup_method(self):
+        cache.clear()
+
+    def test_category_standings_view_requires_auth(self, category):
+        from rest_framework.test import APIClient
+        api = APIClient()
+        resp = api.get(f"/api/v1/categories/{category.id}/standings/")
+        assert resp.status_code == 401
+
+    def test_category_standings_view_returns_groups(self, organizer, tournament, category, group_with_teams):
+        from rest_framework.test import APIClient
+        grp, teams = group_with_teams
+        api = APIClient()
+        api.force_authenticate(user=organizer)
+        resp = api.get(f"/api/v1/categories/{category.id}/standings/")
+        assert resp.status_code == 200
+        assert resp.data["category"]["name"] == "U12"
+        assert len(resp.data["groups"]) == 1
+        assert resp.data["groups"][0]["group"]["name"] == "A"
+
+    def test_group_standings_view_returns_standings(self, organizer, tournament, category, group_with_teams):
+        from rest_framework.test import APIClient
+        grp, teams = group_with_teams
+        _make_finished_match(tournament, category, grp, teams[0], teams[1], 2, 0)
+        api = APIClient()
+        api.force_authenticate(user=organizer)
+        resp = api.get(f"/api/v1/groups/{grp.id}/standings/")
+        assert resp.status_code == 200
+        assert resp.data["group"]["name"] == "A"
+        standings = resp.data["standings"]
+        assert len(standings) == 4
+        alpha = next(s for s in standings if s["team_name"] == "Alpha")
+        assert alpha["points"] == 3
+
+    def test_standings_refresh_view_recalculates(self, organizer, tournament, category, group_with_teams):
+        from rest_framework.test import APIClient
+        grp, teams = group_with_teams
+        _make_finished_match(tournament, category, grp, teams[0], teams[1], 1, 0)
+        # Warm cache
+        compute_group_standings(grp.id)
+
+        api = APIClient()
+        api.force_authenticate(user=organizer)
+        resp = api.post(f"/api/v1/categories/{category.id}/standings/refresh/")
+        assert resp.status_code == 200
+        assert resp.data["category"]["name"] == "U12"
+        standings = resp.data["groups"][0]["standings"]
+        alpha = next(s for s in standings if s["team_name"] == "Alpha")
+        assert alpha["won"] == 1

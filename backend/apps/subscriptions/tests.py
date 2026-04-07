@@ -5,10 +5,17 @@ from datetime import datetime, timezone as dt_tz
 from unittest.mock import MagicMock, patch
 
 from django.test import override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.subscriptions.models import Subscription, TournamentLicense
-from tests.factories import TournamentFactory, UserFactory
+from tests.factories import (
+    CategoryFactory,
+    ClubFactory,
+    TeamFactory,
+    TournamentFactory,
+    UserFactory,
+)
 
 
 @pytest.fixture
@@ -361,3 +368,334 @@ class TestTournamentLicense:
             is_active=False,
         )
         assert license_obj.is_valid is False
+
+
+# ─── ONE_SHOT Webhook Tests ──────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestOneShotWebhookFlow:
+    """Checkout completed / payment_intent.succeeded → license activation."""
+
+    def _post_webhook(self, client, payload=b'{}', sig="sig_test"):
+        return client.post(
+            "/api/v1/subscriptions/webhook/",
+            data=payload,
+            content_type="application/json",
+            HTTP_STRIPE_SIGNATURE=sig,
+        )
+
+    @patch("apps.subscriptions.views.stripe.Webhook.construct_event")
+    @override_settings(STRIPE_WEBHOOK_SECRET="whsec_test")
+    def test_checkout_completed_activates_license(self, mock_construct, user):
+        tournament = TournamentFactory(club__owner=user)
+        license_obj = TournamentLicense.objects.create(
+            user=user,
+            tournament=tournament,
+            stripe_checkout_session_id="cs_test_123",
+            is_active=False,
+        )
+
+        mock_construct.return_value = {
+            "type": "checkout.session.completed",
+            "data": {"object": {
+                "id": "cs_test_123",
+                "mode": "payment",
+                "payment_intent": "pi_webhook_123",
+                "metadata": {
+                    "user_id": str(user.id),
+                    "plan": "one_shot",
+                    "tournament_id": str(tournament.id),
+                },
+            }},
+        }
+
+        resp = self._post_webhook(APIClient())
+        assert resp.status_code == 200
+
+        license_obj.refresh_from_db()
+        assert license_obj.is_active is True
+        assert license_obj.stripe_payment_intent_id == "pi_webhook_123"
+        assert license_obj.valid_from is not None
+        assert license_obj.valid_until is not None
+
+    @patch("apps.subscriptions.views.stripe.Webhook.construct_event")
+    @override_settings(STRIPE_WEBHOOK_SECRET="whsec_test")
+    def test_checkout_completed_ignores_subscription_mode(self, mock_construct):
+        mock_construct.return_value = {
+            "type": "checkout.session.completed",
+            "data": {"object": {
+                "id": "cs_sub",
+                "mode": "subscription",
+                "metadata": {"plan": "club_monthly"},
+            }},
+        }
+        resp = self._post_webhook(APIClient())
+        assert resp.status_code == 200  # no crash
+
+    @patch("apps.subscriptions.views.stripe.Webhook.construct_event")
+    @override_settings(STRIPE_WEBHOOK_SECRET="whsec_test")
+    def test_payment_intent_activates_license_fallback(self, mock_construct, user):
+        tournament = TournamentFactory(club__owner=user)
+        TournamentLicense.objects.create(
+            user=user,
+            tournament=tournament,
+            is_active=False,
+        )
+
+        mock_construct.return_value = {
+            "type": "payment_intent.succeeded",
+            "data": {"object": {
+                "id": "pi_fallback_456",
+                "metadata": {
+                    "plan": "one_shot",
+                    "tournament_id": str(tournament.id),
+                },
+            }},
+        }
+
+        resp = self._post_webhook(APIClient())
+        assert resp.status_code == 200
+
+        lic = TournamentLicense.objects.get(tournament=tournament)
+        assert lic.is_active is True
+        assert lic.stripe_payment_intent_id == "pi_fallback_456"
+
+    @patch("apps.subscriptions.views.stripe.Webhook.construct_event")
+    @override_settings(STRIPE_WEBHOOK_SECRET="whsec_test")
+    def test_payment_intent_skips_already_active(self, mock_construct, user):
+        tournament = TournamentFactory(club__owner=user)
+        TournamentLicense.objects.create(
+            user=user,
+            tournament=tournament,
+            is_active=True,
+            stripe_payment_intent_id="pi_original",
+        )
+
+        mock_construct.return_value = {
+            "type": "payment_intent.succeeded",
+            "data": {"object": {
+                "id": "pi_duplicate",
+                "metadata": {
+                    "plan": "one_shot",
+                    "tournament_id": str(tournament.id),
+                },
+            }},
+        }
+
+        resp = self._post_webhook(APIClient())
+        assert resp.status_code == 200
+
+        lic = TournamentLicense.objects.get(tournament=tournament)
+        assert lic.stripe_payment_intent_id == "pi_original"  # not overwritten
+
+    @patch("apps.subscriptions.views.stripe.Webhook.construct_event")
+    @override_settings(STRIPE_WEBHOOK_SECRET="whsec_test")
+    def test_license_validity_with_end_date(self, mock_construct, user):
+        """License valid_until = tournament.end_date + 30 days."""
+        from datetime import date
+        tournament = TournamentFactory(
+            club__owner=user,
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 6, 2),
+        )
+        TournamentLicense.objects.create(
+            user=user,
+            tournament=tournament,
+            stripe_checkout_session_id="cs_val",
+            is_active=False,
+        )
+
+        mock_construct.return_value = {
+            "type": "checkout.session.completed",
+            "data": {"object": {
+                "id": "cs_val",
+                "mode": "payment",
+                "payment_intent": "pi_val",
+                "metadata": {
+                    "plan": "one_shot",
+                    "tournament_id": str(tournament.id),
+                },
+            }},
+        }
+
+        self._post_webhook(APIClient())
+
+        lic = TournamentLicense.objects.get(tournament=tournament)
+        assert lic.valid_until.date() == date(2026, 7, 2)  # end_date + 30
+
+
+# ─── Expire Licenses Task Tests ──────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestExpireLicensesTask:
+    def test_expires_past_due_licenses(self):
+        from apps.subscriptions.tasks import expire_licenses
+        from datetime import timedelta
+
+        user = UserFactory()
+        t1 = TournamentFactory(club__owner=user)
+        t2 = TournamentFactory(club__owner=user)
+
+        # Expired license
+        TournamentLicense.objects.create(
+            user=user, tournament=t1,
+            is_active=True,
+            valid_until=timezone.now() - timedelta(days=1),
+        )
+        # Still valid license
+        TournamentLicense.objects.create(
+            user=user, tournament=t2,
+            is_active=True,
+            valid_until=timezone.now() + timedelta(days=30),
+        )
+
+        count = expire_licenses()
+        assert count == 1
+        assert TournamentLicense.objects.get(tournament=t1).is_active is False
+        assert TournamentLicense.objects.get(tournament=t2).is_active is True
+
+    def test_ignores_already_inactive(self):
+        from apps.subscriptions.tasks import expire_licenses
+        from datetime import timedelta
+
+        user = UserFactory()
+        t = TournamentFactory(club__owner=user)
+        TournamentLicense.objects.create(
+            user=user, tournament=t,
+            is_active=False,
+            valid_until=timezone.now() - timedelta(days=10),
+        )
+        count = expire_licenses()
+        assert count == 0
+
+    def test_ignores_null_valid_until(self):
+        from apps.subscriptions.tasks import expire_licenses
+
+        user = UserFactory()
+        t = TournamentFactory(club__owner=user)
+        TournamentLicense.objects.create(
+            user=user, tournament=t,
+            is_active=True,
+            valid_until=None,
+        )
+        count = expire_licenses()
+        assert count == 0
+
+
+# ─── Tournament Plan View Tests ──────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestTournamentPlanView:
+    def test_returns_free_for_no_license(self, api, user):
+        tournament = TournamentFactory(club__owner=user)
+        resp = api.get(f"/api/v1/subscriptions/tournament/{tournament.id}/plan/")
+        assert resp.status_code == 200
+        assert resp.data["plan"] == "FREE"
+
+    def test_returns_one_shot_with_active_license(self, api, user):
+        tournament = TournamentFactory(club__owner=user)
+        TournamentLicense.objects.create(
+            user=user, tournament=tournament, is_active=True,
+        )
+        resp = api.get(f"/api/v1/subscriptions/tournament/{tournament.id}/plan/")
+        assert resp.status_code == 200
+        assert resp.data["plan"] == "ONE_SHOT"
+
+    def test_returns_club_for_club_subscriber(self, api, user):
+        Subscription.objects.filter(user=user).delete()
+        Subscription.objects.create(
+            user=user,
+            plan=Subscription.Plan.CLUB_MONTHLY,
+            status=Subscription.Status.ACTIVE,
+        )
+        tournament = TournamentFactory(club__owner=user)
+        resp = api.get(f"/api/v1/subscriptions/tournament/{tournament.id}/plan/")
+        assert resp.status_code == 200
+        assert resp.data["plan"] == "CLUB"
+
+    def test_returns_404_for_nonexistent_tournament(self, api):
+        import uuid
+        resp = api.get(f"/api/v1/subscriptions/tournament/{uuid.uuid4()}/plan/")
+        assert resp.status_code == 404
+
+    def test_requires_auth(self):
+        client = APIClient()
+        import uuid
+        resp = client.get(f"/api/v1/subscriptions/tournament/{uuid.uuid4()}/plan/")
+        assert resp.status_code in (401, 403)
+
+
+# ─── Plans Logic Tests ───────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestPlansLogic:
+    def test_free_user_cannot_use_premium_features(self):
+        from apps.subscriptions.plans import can_use_feature
+        user = UserFactory()
+        assert can_use_feature(user, "knockout_phase") is False
+        assert can_use_feature(user, "pdf_kit") is False
+        assert can_use_feature(user, "club_branding") is False
+
+    def test_club_user_can_use_all_features(self):
+        from apps.subscriptions.plans import can_use_feature, CLUB_FEATURES
+        user = UserFactory()
+        Subscription.objects.create(
+            user=user,
+            plan=Subscription.Plan.CLUB_MONTHLY,
+            status=Subscription.Status.ACTIVE,
+        )
+        for feat in CLUB_FEATURES:
+            assert can_use_feature(user, feat) is True
+
+    def test_one_shot_excludes_club_only_features(self):
+        from apps.subscriptions.plans import can_use_feature
+        user = UserFactory()
+        tournament = TournamentFactory(club__owner=user)
+        TournamentLicense.objects.create(user=user, tournament=tournament, is_active=True)
+        assert can_use_feature(user, "knockout_phase", tournament) is True
+        assert can_use_feature(user, "club_branding", tournament) is False
+
+    def test_check_free_limits_teams(self):
+        from apps.subscriptions.plans import check_free_limits, FREE_LIMITS
+        user = UserFactory()
+        tournament = TournamentFactory(club__owner=user)
+        cat = CategoryFactory(tournament=tournament)
+        for _ in range(FREE_LIMITS.max_teams_per_tournament + 1):
+            TeamFactory(tournament=tournament, category=cat)
+        violations = check_free_limits(user, tournament)
+        assert len(violations) >= 1
+        assert "équipes" in violations[0]
+
+    def test_check_free_limits_ok_when_within(self):
+        from apps.subscriptions.plans import check_free_limits
+        user = UserFactory()
+        tournament = TournamentFactory(club__owner=user)
+        violations = check_free_limits(user, tournament)
+        assert violations == []
+
+    def test_check_can_create_tournament_free_limit(self):
+        from apps.subscriptions.plans import check_can_create_tournament
+        user = UserFactory()
+        club = ClubFactory(owner=user)
+        TournamentFactory(club=club, status="draft")
+        error = check_can_create_tournament(user)
+        assert error is not None
+        assert "limité" in error
+
+    def test_check_can_create_tournament_club_unlimited(self):
+        from apps.subscriptions.plans import check_can_create_tournament
+        user = UserFactory()
+        Subscription.objects.create(
+            user=user,
+            plan=Subscription.Plan.CLUB_MONTHLY,
+            status=Subscription.Status.ACTIVE,
+        )
+        club = ClubFactory(owner=user)
+        TournamentFactory(club=club, status="draft")
+        TournamentFactory(club=club, status="draft")
+        error = check_can_create_tournament(user)
+        assert error is None

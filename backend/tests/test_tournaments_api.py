@@ -314,3 +314,105 @@ class TestFieldsCRUD:
             format="json",
         )
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+# ── Tournament Defaults & Public Code ────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestTournamentDefaults:
+    def test_tournament_has_public_code_on_create(self, api):
+        from apps.tournaments.models import Tournament
+        user = _make_user("org_def")
+        api.force_authenticate(user=user)
+        club = ClubFactory(owner=user)
+        resp = api.post(
+            "/api/v1/tournaments/",
+            {
+                "club": str(club.id),
+                "name": "Tournoi Defaults",
+                "location": "Paris",
+                "start_date": "2026-07-01",
+                "end_date": "2026-07-02",
+            },
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_201_CREATED
+        t = Tournament.objects.get(id=resp.data["id"])
+        assert len(t.public_code) == 6
+
+    def test_tournament_is_public_by_default(self, api):
+        from apps.tournaments.models import Tournament
+        user = _make_user("org_pub")
+        api.force_authenticate(user=user)
+        club = ClubFactory(owner=user)
+        resp = api.post(
+            "/api/v1/tournaments/",
+            {
+                "club": str(club.id),
+                "name": "Tournoi Public",
+                "location": "Lyon",
+                "start_date": "2026-08-01",
+                "end_date": "2026-08-02",
+            },
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_201_CREATED
+        t = Tournament.objects.get(id=resp.data["id"])
+        assert t.is_public is True
+
+    def test_external_user_cannot_access_other_tournament(self, api):
+        owner = _make_user("org_owner")
+        outsider = _make_user("org_outsider")
+        club = ClubFactory(owner=owner)
+        t = TournamentFactory(club=club)
+        api.force_authenticate(user=outsider)
+        resp = api.get(f"/api/v1/tournaments/{t.id}/")
+        assert resp.status_code in (403, 404)
+
+
+# ── FREE Plan Limits ─────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestFreePlanLimits:
+    def test_check_can_create_tournament_blocked_on_free(self):
+        from apps.subscriptions.plans import check_can_create_tournament
+        user = UserFactory()
+        club = ClubFactory(owner=user)
+        TournamentFactory(club=club, status="draft")
+        result = check_can_create_tournament(user)
+        assert result is not None
+
+    def test_check_free_limits_categories(self):
+        from apps.subscriptions.plans import check_free_limits, FREE_LIMITS
+        user = UserFactory()
+        tournament = TournamentFactory(club__owner=user)
+        for _ in range(FREE_LIMITS.max_categories_per_tournament + 1):
+            CategoryFactory(tournament=tournament)
+        violations = check_free_limits(user, tournament)
+        assert any("catégories" in v for v in violations)
+
+    def test_check_free_limits_fields(self):
+        from apps.subscriptions.plans import check_free_limits, FREE_LIMITS
+        user = UserFactory()
+        tournament = TournamentFactory(club__owner=user)
+        for _ in range(FREE_LIMITS.max_fields_per_tournament + 1):
+            FieldFactory(tournament=tournament)
+        violations = check_free_limits(user, tournament)
+        assert any("terrains" in v for v in violations)
+
+    def test_club_plan_bypasses_limits(self):
+        from apps.subscriptions.plans import check_free_limits
+        user = UserFactory()
+        Subscription.objects.create(
+            user=user,
+            plan=Subscription.Plan.CLUB_MONTHLY,
+            status=Subscription.Status.ACTIVE,
+        )
+        tournament = TournamentFactory(club__owner=user)
+        cat = CategoryFactory(tournament=tournament)
+        for _ in range(50):
+            TeamFactory(tournament=tournament, category=cat)
+        violations = check_free_limits(user, tournament)
+        assert violations == []
