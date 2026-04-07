@@ -2,6 +2,7 @@ from django.db.models import Q
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 from apps.matches.models import Match
@@ -40,10 +41,15 @@ class PublicTournamentView(APIView):
         )
 
 
+class CodeLookupThrottle(AnonRateThrottle):
+    rate = "20/minute"
+
+
 class PublicTournamentByCodeView(APIView):
     """Lookup a tournament by its public_code and return its slug."""
 
     permission_classes = [AllowAny]
+    throttle_classes = [CodeLookupThrottle]
 
     def get(self, request, code):
         code = code.upper().strip()

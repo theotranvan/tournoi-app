@@ -110,6 +110,12 @@ CELERY_TIMEZONE = "Europe/Paris"
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 300  # 5 min hard limit
 CELERY_TASK_SOFT_TIME_LIMIT = 240  # 4 min soft limit
+CELERY_BEAT_SCHEDULE = {
+    "expire-licenses-daily": {
+        "task": "subscriptions.expire_licenses",
+        "schedule": 86400,  # every 24 hours
+    },
+}
 
 # ─── Auth ────────────────────────────────────────────────────────────────────
 AUTH_USER_MODEL = "accounts.User"

@@ -10,14 +10,21 @@ import type {
 /**
  * Fetch current user subscription + active licenses.
  * Response shape: { subscription: SubscriptionData, licenses: TournamentLicenseData[] }
+ *
+ * Automatically disabled when no access token is present to avoid 401s.
+ * Callers can still override with `enabled: false` to disable explicitly.
  */
 export function useSubscription(options?: { enabled?: boolean }) {
+  const hasToken =
+    typeof window !== "undefined" &&
+    !!localStorage.getItem("access_token");
+
   return useQuery<SubscriptionStatusResponse>({
     queryKey: ["subscription"],
     queryFn: () => api.get("/subscriptions/status/"),
     staleTime: 60_000,
     retry: 1,
-    enabled: options?.enabled ?? true,
+    enabled: (options?.enabled ?? true) && hasToken,
   });
 }
 
