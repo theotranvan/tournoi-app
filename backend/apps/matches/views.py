@@ -60,13 +60,14 @@ class MatchViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def start(self, request, tournament_id=None, id=None):
-        match = self.get_object()
-        if match.status != Match.Status.SCHEDULED:
-            raise InvalidStateTransition(
-                "Seul un match programmé peut être démarré."
-            )
-        match.status = Match.Status.LIVE
-        match.save(update_fields=["status", "updated_at"])
+        with transaction.atomic():
+            match = Match.objects.select_for_update().get(pk=self.get_object().pk)
+            if match.status != Match.Status.SCHEDULED:
+                raise InvalidStateTransition(
+                    "Seul un match programmé peut être démarré."
+                )
+            match.status = Match.Status.LIVE
+            match.save(update_fields=["status", "updated_at"])
         return Response(MatchDetailSerializer(match).data)
 
     @action(detail=True, methods=["post"])
@@ -112,18 +113,19 @@ class MatchViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def finish(self, request, tournament_id=None, id=None):
-        match = self.get_object()
-        if match.status != Match.Status.LIVE:
-            raise InvalidStateTransition(
-                "Seul un match en cours peut être terminé."
-            )
-        if match.score_home is None or match.score_away is None:
-            raise BusinessRuleViolation(
-                "Le score doit être saisi avant de terminer un match."
-            )
-        match.status = Match.Status.FINISHED
-        match.score_validated = True
-        match.save(update_fields=["status", "score_validated", "updated_at"])
+        with transaction.atomic():
+            match = Match.objects.select_for_update().get(pk=self.get_object().pk)
+            if match.status != Match.Status.LIVE:
+                raise InvalidStateTransition(
+                    "Seul un match en cours peut être terminé."
+                )
+            if match.score_home is None or match.score_away is None:
+                raise BusinessRuleViolation(
+                    "Le score doit être saisi avant de terminer un match."
+                )
+            match.status = Match.Status.FINISHED
+            match.score_validated = True
+            match.save(update_fields=["status", "score_validated", "updated_at"])
         logger.info(
             "match.finished",
             extra={

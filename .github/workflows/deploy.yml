@@ -14,36 +14,26 @@ env:
   IMAGE_PREFIX: ${{ github.repository }}
 
 jobs:
-  # ── Lint + type checks ────────────────────────
-  checks:
+  # ── Backend lint + type checks ─────────────────
+  backend-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Backend lint
+      - name: Install dependencies
         working-directory: backend
-        run: |
-          pip install ".[dev]"
-          ruff check .
-          ruff format --check .
-
-      - name: Frontend checks
-        working-directory: frontend
-        run: |
-          npm ci
-          npm run lint
-          npx tsc --noEmit
-          npm run build
+        run: pip install ".[dev]"
+      - name: Ruff lint
+        working-directory: backend
+        run: ruff check .
+      - name: Ruff format
+        working-directory: backend
+        run: ruff format --check .
+      - name: Mypy
+        working-directory: backend
+        run: mypy apps/ --ignore-missing-imports
 
   # ── Backend tests (required gate) ──────────────
   backend-tests:
@@ -86,13 +76,70 @@ jobs:
       - name: Run migrations
         working-directory: backend
         run: python manage.py migrate --noinput
-      - name: Run tests
+      - name: Run tests with coverage
         working-directory: backend
         run: pytest --cov=apps --cov-report=term-missing --cov-fail-under=70
 
+  # ── Frontend lint + build ──────────────────────
+  frontend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+      - name: Type check
+        working-directory: frontend
+        run: npx tsc --noEmit
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  # ── Frontend E2E tests ────────────────────────
+  frontend-e2e:
+    needs: frontend-checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+      - name: Run E2E tests
+        working-directory: frontend
+        run: npx playwright test
+        env:
+          CI: true
+          BASE_URL: http://localhost:3000
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: frontend/test-results/
+          retention-days: 7
+
   # ── Build & push Docker images (SHA-pinned) ────
   build-images:
-    needs: [checks, backend-tests]
+    needs: [backend-lint, backend-tests, frontend-checks, frontend-e2e]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -110,11 +157,12 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: ./${{ matrix.service }}
+          context: .
+          file: ./${{ matrix.service }}/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest
 
   # ── Deploy (SSH to VPS) ────────────────────────
   deploy:
@@ -133,24 +181,41 @@ jobs:
             set -e
             cd ${{ vars.DEPLOY_PATH || '/opt/kickoff' }}
             export IMAGE_TAG=${{ github.sha }}
+            export REGISTRY=ghcr.io
+            export IMAGE_PREFIX=${{ github.repository }}
+
+            # Save current image tag for rollback
+            PREV_TAG=""
+            if [ -f .deployed_sha ]; then
+              PREV_TAG=$(cat .deployed_sha)
+            fi
 
             # Pre-deploy backup
+            mkdir -p backups
             docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T postgres \
               pg_dump -U ${POSTGRES_USER:-kickoff} ${POSTGRES_DB:-kickoff} --no-owner --no-acl \
-              | gzip > /opt/kickoff/backups/pre_deploy_$(date +%Y%m%d_%H%M%S).sql.gz || true
+              | gzip > backups/pre_deploy_$(date +%Y%m%d_%H%M%S).sql.gz || true
 
             # Pull SHA-pinned images
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull backend frontend
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
 
             # Smoke test — wait for backend health
             for i in 1 2 3 4 5 6; do
               if curl -sf http://localhost:8000/api/v1/public/health/ > /dev/null 2>&1; then
                 echo "✓ Backend healthy"
+                echo "$IMAGE_TAG" > .deployed_sha
+                echo "✓ Deployed version: $IMAGE_TAG"
                 break
               fi
               if [ "$i" -eq 6 ]; then
-                echo "✗ Backend health check failed — check logs"
+                echo "✗ Health check failed — rolling back"
+                if [ -n "$PREV_TAG" ]; then
+                  export IMAGE_TAG=$PREV_TAG
+                  docker compose -f docker-compose.yml -f docker-compose.prod.yml pull backend frontend
+                  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+                  echo "✗ Rolled back to $PREV_TAG"
+                fi
                 exit 1
               fi
               echo "Waiting for backend... ($i/6)"

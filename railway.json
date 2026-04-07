@@ -6,7 +6,7 @@
   },
   "deploy": {
     "startCommand": "daphne -b 0.0.0.0 -p $PORT kickoff.asgi:application",
-    "healthcheckPath": "/api/",
+    "healthcheckPath": "/api/v1/public/health/",
     "restartPolicyType": "ON_FAILURE"
   }
 }

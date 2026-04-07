@@ -29,7 +29,9 @@ services:
 
   # ── Backend (Django + Channels via Daphne) ────
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     command: daphne -b 0.0.0.0 -p 8000 kickoff.asgi:application
     volumes:
       - ./backend:/app
@@ -47,7 +49,9 @@ services:
 
   # ── Celery Worker ─────────────────────────────
   celery-worker:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     command: celery -A kickoff worker -l info --concurrency=2
     volumes:
       - ./backend:/app
@@ -61,7 +65,9 @@ services:
 
   # ── Celery Beat (scheduler) ───────────────────
   celery-beat:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     command: celery -A kickoff beat -l info
     volumes:
       - ./backend:/app
@@ -75,7 +81,9 @@ services:
 
   # ── Frontend (Next.js) ────────────────────────
   frontend:
-    build: ./frontend
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
     ports:
       - "3000:3000"
     environment:

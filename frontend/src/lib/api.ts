@@ -99,8 +99,8 @@ async function apiFetch<T = unknown>(
     body: serializedBody,
   });
 
-  // Auto-refresh on 401 or 403 (token expired or missing)
-  if ((res.status === 401 || res.status === 403) && typeof window !== "undefined") {
+  // Auto-refresh on 401 (token expired) — NOT 403 (permission denied)
+  if (res.status === 401 && typeof window !== "undefined") {
     const newToken = await refreshAccessToken();
     if (newToken) {
       headers["Authorization"] = `Bearer ${newToken}`;
@@ -109,7 +109,7 @@ async function apiFetch<T = unknown>(
         headers,
         body: serializedBody,
       });
-    } else if (res.status === 401 || res.status === 403) {
+    } else if (res.status === 401) {
       // Redirect to login if refresh failed
       if (window.location.pathname !== "/admin/login") {
         window.location.href = "/admin/login";

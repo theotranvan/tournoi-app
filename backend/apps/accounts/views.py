@@ -119,3 +119,23 @@ class MeView(APIView):
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)
+
+
+class LogoutView(APIView):
+    """POST /api/v1/auth/logout/ — Blacklist the refresh token."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        refresh_token = request.data.get("refresh")
+        if not refresh_token:
+            return Response(
+                {"error": "refresh_required", "message": "Le token refresh est requis."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except Exception:
+            pass  # Token already blacklisted or invalid — still return 200
+        return Response(status=status.HTTP_200_OK)

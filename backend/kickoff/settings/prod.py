@@ -47,14 +47,18 @@ CHANNEL_LAYERS = {
 SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=False, cast=bool)
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SECURE = True
-SECURE_HSTS_SECONDS = 31536000
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = "Lax"
+SECURE_HSTS_SECONDS = 63072000  # 2 years
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 X_FRAME_OPTIONS = "DENY"
 SECURE_CONTENT_TYPE_NOSNIFF = True
-SECURE_BROWSER_XSS_FILTER = True
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 
 # ─── Sentry ──────────────────────────────────────────────────────────────────
 # Sentry is already initialized in base.py with integrations,
@@ -83,7 +87,7 @@ if USE_S3_MEDIA:
     AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME", default="fr-par")
     AWS_S3_ENDPOINT_URL = config("AWS_S3_ENDPOINT_URL", default="")
     AWS_S3_CUSTOM_DOMAIN = config("AWS_S3_CUSTOM_DOMAIN", default="")
-    AWS_DEFAULT_ACL = "public-read"
+    AWS_DEFAULT_ACL = None  # Use bucket policy, don't set public-read on each object
     AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/" if AWS_S3_CUSTOM_DOMAIN else f"https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/"
 

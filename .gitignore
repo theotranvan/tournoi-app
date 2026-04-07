@@ -43,3 +43,7 @@ Thumbs.db
 
 # Test scripts
 test_e2e.py
+
+# Deploy state (VPS only)
+.deployed_sha
+backups/

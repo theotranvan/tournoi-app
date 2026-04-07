@@ -26,11 +26,8 @@ RUN addgroup --system --gid 1001 appgroup && \
     adduser --system --uid 1001 --ingroup appgroup appuser && \
     chown -R appuser:appgroup /app
 
-COPY backend/start.sh /start.sh
-RUN chmod +x /start.sh
-
 USER appuser
 
 EXPOSE 8000
 
-CMD ["/start.sh"]
+CMD daphne -b 0.0.0.0 -p ${PORT:-8000} kickoff.asgi:application

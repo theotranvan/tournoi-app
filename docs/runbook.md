@@ -1,144 +1,400 @@
 # Runbook opérationnel — Footix
 
-## Jour de tournoi — Checklist pré-événement
+> Variables: `COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"`
 
+---
+
+## 1. Déploiement
+
+### Procédure standard (via CI)
+1. Push sur `main` → GitHub Actions lance :
+   - `backend-lint` : ruff check + ruff format + mypy
+   - `backend-tests` : pytest avec postgres + redis, coverage ≥ 70%
+   - `frontend-checks` : eslint + tsc + next build
+   - `frontend-e2e` : Playwright E2E (chromium)
+2. Si **tous** les checks passent → build images Docker taguées `SHA` → push GHCR
+3. Deploy via SSH : backup pré-deploy → pull images SHA-tagged → `up -d` → smoke test → rollback auto si santé KO
+
+### Procédure manuelle
 ```bash
-# 1. Vérifier l'état de tous les services
-docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+cd /opt/kickoff
 
-# 2. Health check complet (DB + Redis + Celery)
-curl -s https://api.footix.app/api/v1/health/full/ | python -m json.tool
+# Déployer le HEAD actuel
+./deploy.sh --build --migrate
 
-# 3. Vérifier l'espace disque et la mémoire
-df -h / && free -h
+# Déployer un SHA spécifique (image pré-buildée)
+./deploy.sh --image-tag abc123def456
+```
 
-# 4. Vérifier les logs récents pour des erreurs
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --since=1h backend | grep -i error
+### Vérification post-deploy
+```bash
+# Version déployée
+cat .deployed_sha
 
-# 5. Vérifier que le dernier backup est récent (< 24h)
-ls -la backups/ | head -5
+# Health check complet
+curl -s http://localhost:8000/api/v1/health/full/ | python -m json.tool
 
-# 6. Vérifier les tâches Celery
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec backend celery -A kickoff inspect active
+# Services running
+$COMPOSE ps
+
+# Erreurs récentes
+$COMPOSE logs --since=5m backend | grep -i error
 ```
 
 ---
 
-## Incident Response
+## 2. Rollback
 
-### Backend ne répond plus
+### Symptômes nécessitant un rollback
+- Health check échoue après deploy
+- Erreurs 500 massives dans Sentry
+- Fonctionnalité critique cassée
 
+### Procédure (rollback par image SHA)
 ```bash
-# 1. Vérifier l'état
-docker compose -f docker-compose.yml -f docker-compose.prod.yml ps backend
+cd /opt/kickoff
 
-# 2. Consulter les logs
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=100 backend
+# 1. Voir la version actuelle et les précédentes
+cat .deployed_sha
+git log --oneline -10
 
-# 3. Redémarrer le backend uniquement
-docker compose -f docker-compose.yml -f docker-compose.prod.yml restart backend
+# 2. Rollback vers le SHA précédent
+./scripts/rollback.sh abc123def456
 
-# 4. Si toujours KO, redémarrer tout
-docker compose -f docker-compose.yml -f docker-compose.prod.yml down
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# 3. Rollback + restaurer la DB pré-deploy (si migration destructive)
+./scripts/rollback.sh abc123def456 --restore-db
 ```
 
-### WebSocket déconnecté (scores live en panne)
+### Rollback automatique
+Le CI et `deploy.sh` effectuent un rollback automatique si le health check échoue après déploiement. Le SHA précédent est lu depuis `.deployed_sha`.
 
+### Vérification post-rollback
 ```bash
-# Vérifier les connexions Daphne
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=50 backend | grep -i websocket
-
-# Vérifier Redis (couche channels)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec redis redis-cli ping
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec redis redis-cli info memory
-
-# Redémarrer le backend (reconnexion auto côté client)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml restart backend
+# Version effective
+cat .deployed_sha
+# Health
+curl -s http://localhost:8000/api/v1/health/full/ | python -m json.tool
+# Logs
+$COMPOSE logs --since=5m backend | grep -i error
 ```
 
-### Celery worker mort (notifications bloquées)
+### À ne PAS faire
+- Ne pas `git reset --hard` sur le serveur
+- Ne pas supprimer les backups pré-deploy
+- Ne pas rollback sans vérifier si une migration irréversible a été appliquée
 
+---
+
+## 3. Backup
+
+### Automatique
+- **Cron Docker** : daily 3h UTC (5h Paris été) via service `backup` dans docker-compose.prod.yml
+  - DB: pg_dump → gzip → checksum SHA256 → gunzip -t
+  - Media: tar.gz du volume media
+  - Offsite: upload S3 si `S3_BUCKET` est configuré
+  - Rotation: suppression automatique après `BACKUP_RETENTION` jours (défaut: 30)
+  - Logs: chaque exécution produit un fichier `.log`
+- **Pré-deploy** : automatique à chaque `deploy.sh` et chaque CI deploy
+- **Intégrité** : checksum SHA256 + `gunzip -t` sur chaque backup
+
+### Manuel
 ```bash
-# Vérifier l'état
-docker compose -f docker-compose.yml -f docker-compose.prod.yml ps celery-worker
-
-# Inspecter les workers
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec celery-worker \
-  celery -A kickoff inspect ping
-
-# Redémarrer
-docker compose -f docker-compose.yml -f docker-compose.prod.yml restart celery-worker celery-beat
+./scripts/backup.sh              # Full (DB + media + S3 offsite)
+./scripts/backup.sh --db-only    # DB seulement
+./scripts/backup.sh --media-only # Media seulement
 ```
 
-### Base de données pleine / lente
-
+### Vérifier les backups
 ```bash
-# Vérifier la taille
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec postgres \
-  psql -U kickoff -c "SELECT pg_size_pretty(pg_database_size('kickoff'));"
+# Vérifier intégrité de tous les backups
+./scripts/backup.sh --verify
 
-# Requêtes les plus lentes (si pg_stat_statements activé)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec postgres \
-  psql -U kickoff -c "SELECT pid, now() - pg_stat_activity.query_start AS duration, query
-  FROM pg_stat_activity WHERE state = 'active' ORDER BY duration DESC LIMIT 5;"
+# Test de restauration non-destructif
+./scripts/backup.sh --test-restore
+```
 
-# Kill une requête bloquée
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec postgres \
-  psql -U kickoff -c "SELECT pg_terminate_backend(<pid>);"
+### Vérifier un backup individuel
+```bash
+sha256sum -c backups/db_kickoff_YYYYMMDD.sql.gz.sha256
+gunzip -t backups/db_kickoff_YYYYMMDD.sql.gz
 ```
 
 ---
 
-## Disaster Recovery
+## 4. Restauration
 
-### Restaurer un backup
+### Restaurer la base de données
+```bash
+# 1. Vérifier l'intégrité
+./scripts/backup.sh --verify
 
+# 2. Restaurer (confirmation interactive)
+./scripts/backup.sh --restore backups/db_kickoff_YYYYMMDD.sql.gz
+
+# 3. Vérifier
+$COMPOSE exec backend python manage.py check
+curl -s http://localhost:8000/api/v1/health/full/ | python -m json.tool
+```
+
+### Restaurer les fichiers media
+```bash
+./scripts/backup.sh --restore-media backups/media_YYYYMMDD.tar.gz
+```
+
+### Restauration depuis S3 (backup offsite)
 ```bash
 # 1. Lister les backups disponibles
-ls -la backups/
+aws s3 ls s3://$S3_BUCKET/backups/ --endpoint-url $AWS_S3_ENDPOINT_URL
 
-# 2. Vérifier l'intégrité du backup
-sha256sum -c backups/db_kickoff_YYYYMMDD_HHMMSS.sql.gz.sha256
+# 2. Télécharger
+aws s3 cp s3://$S3_BUCKET/backups/YYYYMMDD_HHMMSS/ ./backups/ --recursive --endpoint-url $AWS_S3_ENDPOINT_URL
 
-# 3. Restaurer (ATTENTION: écrase la base actuelle)
-./scripts/backup.sh --restore backups/db_kickoff_YYYYMMDD_HHMMSS.sql.gz
+# 3. Vérifier et restaurer
+./scripts/backup.sh --verify
+./scripts/backup.sh --restore backups/db_kickoff_YYYYMMDD.sql.gz
+./scripts/backup.sh --restore-media backups/media_YYYYMMDD.tar.gz
 ```
 
-### Rollback complet après deploy raté
+### RPO / RTO
+- **RPO** (perte max) : 24h (backups daily à 3h UTC)
+- **RTO** (temps reprise) : ~15 min (restore DB + media + restart containers)
+- Avec backup offsite S3 : RPO identique, mais survit à la perte totale du serveur
 
+---
+
+## 5. Disaster Recovery — Serveur perdu / VPS mort
+
+### Prérequis
+- Nouveau VPS avec Docker installé
+- Accès au dépôt Git
+- Fichier `.env.production` sauvegardé hors serveur
+- Backup DB + media récent (S3 offsite ou copie locale)
+
+### Procédure
 ```bash
-# 1. Identifier la version précédente
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=5 backend | head
+# 1. Cloner le repo
+git clone https://github.com/theotranvan/tournoi-app.git /opt/kickoff
+cd /opt/kickoff
 
-# 2. Restaurer le backup pré-deploy
-ls -la backups/pre_deploy_* | tail -1
-./scripts/backup.sh --restore backups/pre_deploy_XXXXXXXX_XXXXXX.sql.gz
+# 2. Restaurer la config
+cp /path/to/.env.production .env.production
 
-# 3. Pull l'image précédente (remplacer SHA)
-export IMAGE_TAG=<previous_sha>
-docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# 3. Récupérer les backups depuis S3
+mkdir -p backups
+aws s3 cp s3://$S3_BUCKET/backups/ ./backups/ --recursive --endpoint-url $AWS_S3_ENDPOINT_URL
+
+# 4. Lancer les services (build local si GHCR inaccessible)
+./deploy.sh --build --migrate --ssl
+
+# 5. Restaurer la DB
+./scripts/backup.sh --restore backups/db_kickoff_YYYYMMDD.sql.gz
+
+# 6. Restaurer les media
+./scripts/backup.sh --restore-media backups/media_YYYYMMDD.tar.gz
+
+# 7. Vérifier
+make health
+make version
+```
+
+### Temps estimé : 15-30 minutes (hors provisionning DNS)
+
+---
+
+## 6. Rotation des secrets
+
+### Inventaire des secrets
+| Secret | Localisation | Rotation |
+|--------|-------------|----------|
+| `SECRET_KEY` | `.env.production` | Annuel — invalidera toutes les sessions JWT |
+| `POSTGRES_PASSWORD` | `.env.production` | Annuel — nécessite update postgres + backend |
+| `STRIPE_SECRET_KEY` | `.env.production` + Stripe Dashboard | Si compromis |
+| `STRIPE_WEBHOOK_SECRET` | `.env.production` + Stripe Dashboard | Si compromis |
+| `VAPID_PRIVATE_KEY` | `.env.production` | Si compromis |
+| `EMAIL_HOST_PASSWORD` | `.env.production` + provider email | Si compromis |
+| `DEPLOY_SSH_KEY` | GitHub Secrets | Annuel |
+
+### Procédure rotation SECRET_KEY
+```bash
+# 1. Générer une nouvelle clé
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+
+# 2. Mettre à jour .env.production avec la nouvelle clé
+# 3. Redémarrer le backend
+$COMPOSE restart backend celery-worker celery-beat
+# Note: tous les tokens JWT existants seront invalidés
 ```
 
 ---
 
-## Contacts & Escalade
+## 7. Incidents par composant
 
-| Prio | Situation | Action |
-|------|-----------|--------|
-| P0 | Service totalement down | Redémarrer les containers + vérifier logs |
-| P0 | Perte de données | Restaurer le dernier backup + contacter l'admin |
-| P1 | Scores live ne marchent plus | Redémarrer backend + vérifier Redis |
-| P1 | Notifications bloquées | Redémarrer Celery worker/beat |
-| P2 | Performance dégradée | Vérifier la mémoire, les logs, et les requêtes lentes |
+### Backend ne répond plus
+**Symptômes** : 502/503 nginx, health check échoue
+**Diagnostic** :
+```bash
+$COMPOSE ps backend
+$COMPOSE logs --tail=100 backend
+```
+**Actions** :
+```bash
+$COMPOSE restart backend
+# Si persistant :
+$COMPOSE down backend && $COMPOSE up -d backend
+```
+**À ne pas faire** : ne pas kill -9 le container, utiliser `restart`
+
+### Stripe webhook en erreur
+**Symptômes** : paiements acceptés mais licences non activées, Stripe dashboard montre des webhooks failed
+**Diagnostic** :
+```bash
+$COMPOSE logs --since=1h backend | grep -i stripe
+$COMPOSE logs --since=1h backend | grep -i webhook
+```
+**Actions** :
+```bash
+# 1. Vérifier STRIPE_WEBHOOK_SECRET dans .env.production
+# 2. Vérifier que l'URL webhook est correcte dans Stripe Dashboard
+# 3. Relancer le webhook manuellement depuis Stripe Dashboard
+# 4. Si licence non créée, activer manuellement :
+$COMPOSE exec backend python manage.py shell
+# >>> from apps.subscriptions.models import TournamentLicense
+# >>> TournamentLicense.objects.filter(tournament_id="XXX").update(is_active=True)
+```
+
+### Email transactionnel en panne
+**Symptômes** : emails non reçus, erreurs SMTP dans les logs
+**Diagnostic** :
+```bash
+$COMPOSE logs --since=1h backend | grep -i email
+$COMPOSE exec backend python -c "
+from django.core.mail import send_mail
+send_mail('Test', 'Test body', None, ['admin@footix.app'])
+"
+```
+**Actions** : Vérifier les credentials SMTP dans `.env.production`, vérifier le provider (Resend dashboard)
+
+### WebSocket / temps réel en panne
+**Symptômes** : scores live ne se mettent pas à jour, pas de notifications push côté client
+**Diagnostic** :
+```bash
+# Vérifier Redis (couche channels)
+$COMPOSE exec redis redis-cli ping
+$COMPOSE exec redis redis-cli info memory
+# Vérifier les connexions WS
+$COMPOSE logs --tail=50 backend | grep -i websocket
+```
+**Actions** :
+```bash
+$COMPOSE restart backend
+# Si Redis saturé :
+$COMPOSE exec redis redis-cli flushdb
+$COMPOSE restart backend
+```
+**Note** : Les clients WebSocket se reconnectent automatiquement
+
+### DB indisponible
+**Symptômes** : erreurs 500 massives, health check `/api/v1/health/db/` échoue
+**Diagnostic** :
+```bash
+$COMPOSE ps postgres
+$COMPOSE exec postgres pg_isready -U kickoff
+$COMPOSE logs --tail=50 postgres
+```
+**Actions** :
+```bash
+$COMPOSE restart postgres
+# Attendre 30s pour le healthcheck
+curl -s http://localhost:8000/api/v1/health/db/
+```
+
+### Redis indisponible
+**Symptômes** : WebSocket mort, cache en erreur, Celery bloqué
+**Diagnostic** :
+```bash
+$COMPOSE ps redis
+$COMPOSE exec redis redis-cli ping
+$COMPOSE exec redis redis-cli info memory
+```
+**Actions** :
+```bash
+$COMPOSE restart redis
+$COMPOSE restart backend celery-worker celery-beat
+```
+
+### Saturation disque
+**Symptômes** : erreurs write dans les logs, backup échoue
+**Diagnostic** :
+```bash
+df -h /
+du -sh backups/ /var/lib/docker/
+docker system df
+```
+**Actions** :
+```bash
+# 1. Nettoyer les vieux backups
+find backups/ -name "*.gz" -mtime +7 -delete
+# 2. Nettoyer Docker
+docker image prune -af
+docker volume prune -f
+# 3. Nettoyer les logs
+$COMPOSE logs --tail=0  # ne fait rien, mais montre la taille
+truncate -s 0 /var/lib/docker/containers/*/*-json.log
+```
+
+### Erreurs 500 massives
+**Symptômes** : pic d'erreurs Sentry, plaintes utilisateurs
+**Diagnostic** :
+```bash
+$COMPOSE logs --since=15m backend | grep -c "ERROR"
+$COMPOSE logs --since=15m backend | grep "ERROR" | head -20
+curl -s http://localhost:8000/api/v1/health/full/ | python -m json.tool
+```
+**Actions** : identifier le pattern (DB? Redis? code?) et appliquer le runbook correspondant
 
 ---
 
-## Monitoring — Points clés à surveiller
+## 8. Checklists tournoi
 
-- **Sentry** : Nouvelles erreurs, taux d'erreur montant
-- **Health endpoint** : `GET /api/v1/health/full/` retourne `status: ok` pour db, redis, celery
-- **Espace disque** : Backups + media peuvent remplir le disque
-- **Mémoire Redis** : Configuré à 128MB max avec allkeys-lru
-- **Certificats SSL** : Renouvellement Let's Encrypt automatique (vérifier expiration)
+### Avant tournoi (J-1)
+- [ ] `curl -s https://api.footix.app/api/v1/health/full/` → tout `ok`
+- [ ] Tous les services UP : `$COMPOSE ps`
+- [ ] Backup récent : `ls -la backups/ | head -3`
+- [ ] Espace disque > 2GB : `df -h /`
+- [ ] Pas d'erreurs récentes : `$COMPOSE logs --since=24h backend | grep -c ERROR`
+- [ ] DNS résolu correctement
+- [ ] SSL valide : `curl -vI https://footix.app 2>&1 | grep "expire date"`
+- [ ] Tournoi publié et visible dans l'app
+- [ ] QR codes générés et imprimés
+
+### Jour J
+- [ ] Health check OK au réveil
+- [ ] Garder un terminal SSH ouvert vers le VPS
+- [ ] Surveiller Sentry en continu
+- [ ] Avoir le runbook accessible (bookmark / téléphone)
+
+### Après tournoi
+- [ ] Backup manuel : `./scripts/backup.sh`
+- [ ] Vérifier la facturation Stripe (paiements traités)
+- [ ] Archiver le tournoi si terminé
+- [ ] Vérifier les logs pour erreurs silencieuses
+
+---
+
+## 9. Post-mortem incident
+
+### Template
+```
+Date: YYYY-MM-DD HH:MM
+Durée: Xmin
+Impact: [utilisateurs affectés, fonctionnalités cassées]
+Cause racine: [description technique]
+Détection: [comment l'incident a été détecté]
+Résolution: [actions prises]
+Timeline: [chronologie des événements]
+Actions préventives:
+- [ ] Action 1
+- [ ] Action 2
+Leçons:
+- ...
+```

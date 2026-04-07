@@ -118,9 +118,19 @@ class Tournament(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(f"{self.name}-{self.start_date.year}")
+            base_slug = slugify(f"{self.name}-{self.start_date.year}")
+            slug = base_slug
+            for i in range(1, 100):
+                if not Tournament.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                    break
+                slug = f"{base_slug}-{i}"
+            self.slug = slug
         if not self.public_code:
-            self.public_code = _generate_public_code()
+            for _ in range(100):
+                code = _generate_public_code()
+                if not Tournament.objects.filter(public_code=code).exists():
+                    self.public_code = code
+                    break
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:

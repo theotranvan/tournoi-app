@@ -2,11 +2,11 @@ FROM node:22-alpine AS base
 WORKDIR /app
 
 # Dependencies
-COPY package.json package-lock.json* ./
+COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci
 
 # Build
-COPY . .
+COPY frontend/ .
 RUN npm run build
 
 # Production

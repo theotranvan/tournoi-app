@@ -27,10 +27,11 @@ services:
       retries: 5
 
   backend:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-theotranvan/tournoi-app}/backend:${IMAGE_TAG:-latest}
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
-             daphne -b 0.0.0.0 -p 8000 --proxy-headers kickoff.asgi:application"
+             daphne -b 0.0.0.0 -p ${PORT:-8000} --proxy-headers kickoff.asgi:application"
     volumes:
       - backend_static:/app/staticfiles
       - backend_media:/app/media
@@ -50,6 +51,7 @@ services:
       start_period: 30s
 
   celery-worker:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-theotranvan/tournoi-app}/backend:${IMAGE_TAG:-latest}
     command: celery -A kickoff worker -l warning --concurrency=4 --max-tasks-per-child=1000
     volumes: []
     restart: always
@@ -67,7 +69,8 @@ services:
       start_period: 30s
 
   celery-beat:
-    command: celery -A kickoff beat -l warning
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-theotranvan/tournoi-app}/backend:${IMAGE_TAG:-latest}
+    command: celery -A kickoff beat -l warning --pidfile=/tmp/celerybeat.pid
     volumes: []
     restart: always
     environment:
@@ -77,13 +80,14 @@ services:
         limits:
           memory: 256M
     healthcheck:
-      test: ["CMD-SHELL", "celery -A kickoff inspect ping --timeout 10 2>/dev/null | grep -q OK"]
+      test: ["CMD-SHELL", "test -f /tmp/celerybeat.pid && kill -0 $(cat /tmp/celerybeat.pid) 2>/dev/null"]
       interval: 60s
-      timeout: 15s
+      timeout: 10s
       retries: 3
       start_period: 30s
 
   frontend:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-theotranvan/tournoi-app}/frontend:${IMAGE_TAG:-latest}
     restart: always
     ports: []   # Only exposed via nginx
     environment:
@@ -113,16 +117,80 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-kickoff}
       POSTGRES_USER: ${POSTGRES_USER:-kickoff}
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      S3_BUCKET: ${S3_BUCKET:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_DEFAULT_REGION: ${AWS_S3_REGION_NAME:-fr-par}
+      S3_ENDPOINT: ${AWS_S3_ENDPOINT_URL:-}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION:-30}
     volumes:
       - backups_data:/backups
+      - backend_media:/media:ro
     depends_on:
       - postgres
     entrypoint: /bin/sh
     command:
       - -c
       - |
-        apk add --no-cache dcron &&
-        echo "0 3 * * * DUMP=/backups/db_\$\$(date +\%Y\%m\%d_\%H\%M\%S).sql.gz && pg_dump -h postgres -U \$\$POSTGRES_USER \$\$POSTGRES_DB --no-owner --no-acl | gzip > \$\$DUMP && sha256sum \$\$DUMP > \$\$DUMP.sha256 && gunzip -t \$\$DUMP && find /backups -name '*.gz' -mtime +30 -delete && find /backups -name '*.sha256' -mtime +30 -delete" | crontab - &&
+        apk add --no-cache dcron aws-cli tar >/dev/null 2>&1 || apk add --no-cache dcron tar >/dev/null 2>&1
+        cat > /usr/local/bin/backup.sh << 'SCRIPT'
+        #!/bin/sh
+        set -e
+        TS=$(date +%Y%m%d_%H%M%S)
+        LOGFILE="/backups/backup_$${TS}.log"
+        exec > "$$LOGFILE" 2>&1
+
+        echo "[$$TS] Starting backup..."
+
+        # 1. Database backup
+        DB_DUMP="/backups/db_$${TS}.sql.gz"
+        pg_dump -h postgres -U $$POSTGRES_USER $$POSTGRES_DB --no-owner --no-acl | gzip > "$$DB_DUMP"
+        if ! gunzip -t "$$DB_DUMP" 2>/dev/null; then
+          echo "FATAL: DB backup integrity check FAILED"
+          exit 1
+        fi
+        sha256sum "$$DB_DUMP" > "$$DB_DUMP.sha256"
+        DB_SIZE=$(du -h "$$DB_DUMP" | cut -f1)
+        echo "OK: DB backup $$DB_DUMP ($$DB_SIZE)"
+
+        # 2. Media backup
+        MEDIA_DUMP="/backups/media_$${TS}.tar.gz"
+        if [ -d /media ] && [ "$(ls -A /media 2>/dev/null)" ]; then
+          tar czf "$$MEDIA_DUMP" -C / media
+          sha256sum "$$MEDIA_DUMP" > "$$MEDIA_DUMP.sha256"
+          MEDIA_SIZE=$(du -h "$$MEDIA_DUMP" | cut -f1)
+          echo "OK: Media backup $$MEDIA_DUMP ($$MEDIA_SIZE)"
+        else
+          echo "SKIP: No media files to backup"
+        fi
+
+        # 3. Offsite upload (S3-compatible)
+        if [ -n "$$S3_BUCKET" ] && command -v aws >/dev/null 2>&1; then
+          S3_FLAGS=""
+          if [ -n "$$S3_ENDPOINT" ]; then
+            S3_FLAGS="--endpoint-url $$S3_ENDPOINT"
+          fi
+          aws s3 cp "$$DB_DUMP" "s3://$$S3_BUCKET/backups/$$TS/" $$S3_FLAGS
+          aws s3 cp "$$DB_DUMP.sha256" "s3://$$S3_BUCKET/backups/$$TS/" $$S3_FLAGS
+          if [ -f "$$MEDIA_DUMP" ]; then
+            aws s3 cp "$$MEDIA_DUMP" "s3://$$S3_BUCKET/backups/$$TS/" $$S3_FLAGS
+            aws s3 cp "$$MEDIA_DUMP.sha256" "s3://$$S3_BUCKET/backups/$$TS/" $$S3_FLAGS
+          fi
+          echo "OK: Uploaded to s3://$$S3_BUCKET/backups/$$TS/"
+        else
+          echo "SKIP: S3 offsite upload (S3_BUCKET not set or aws-cli missing)"
+        fi
+
+        # 4. Rotation
+        find /backups -name "*.gz" -mtime +$$BACKUP_RETENTION_DAYS -delete 2>/dev/null
+        find /backups -name "*.sha256" -mtime +$$BACKUP_RETENTION_DAYS -delete 2>/dev/null
+        find /backups -name "*.log" -mtime +$$BACKUP_RETENTION_DAYS -delete 2>/dev/null
+        echo "OK: Cleaned backups older than $$BACKUP_RETENTION_DAYS days"
+
+        echo "[$(date +%Y%m%d_%H%M%S)] Backup complete"
+        SCRIPT
+        chmod +x /usr/local/bin/backup.sh
+        echo "0 3 * * * /usr/local/bin/backup.sh" | crontab -
         crond -f -l 2
     deploy:
       resources:

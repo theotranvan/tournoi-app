@@ -2,20 +2,30 @@
 set -euo pipefail
 
 # Kickoff — Production deploy script
-# Usage: ./deploy.sh [--build] [--migrate] [--ssl]
+# Usage: ./deploy.sh [--build] [--migrate] [--ssl] [--image-tag SHA]
 
 COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+REGISTRY="${REGISTRY:-ghcr.io}"
+IMAGE_PREFIX="${IMAGE_PREFIX:-theotranvan/tournoi-app}"
 
 # ── Parse args ───────────────────────────────────
 BUILD=false
 MIGRATE=false
 SSL=false
+IMAGE_TAG=""
+NEXT_IS_TAG=false
 for arg in "$@"; do
+    if [ "$NEXT_IS_TAG" = true ]; then
+        IMAGE_TAG="$arg"
+        NEXT_IS_TAG=false
+        continue
+    fi
     case $arg in
-        --build)   BUILD=true ;;
-        --migrate) MIGRATE=true ;;
-        --ssl)     SSL=true ;;
-        *)         echo "Unknown arg: $arg"; exit 1 ;;
+        --build)     BUILD=true ;;
+        --migrate)   MIGRATE=true ;;
+        --ssl)       SSL=true ;;
+        --image-tag) NEXT_IS_TAG=true ;;
+        *)           echo "Unknown arg: $arg"; exit 1 ;;
     esac
 done
 
@@ -27,6 +37,22 @@ fi
 
 echo "✓ Loading .env.production"
 export $(grep -v '^#' .env.production | xargs)
+
+# ── Image tag resolution ─────────────────────────
+if [ -z "$IMAGE_TAG" ]; then
+    IMAGE_TAG=$(git rev-parse HEAD 2>/dev/null || echo "latest")
+fi
+export IMAGE_TAG REGISTRY IMAGE_PREFIX
+
+# Save previous version for rollback
+PREV_TAG=""
+if [ -f .deployed_sha ]; then
+    PREV_TAG=$(cat .deployed_sha)
+fi
+echo "→ Deploying image tag: $IMAGE_TAG"
+if [ -n "$PREV_TAG" ]; then
+    echo "  Previous version: $PREV_TAG"
+fi
 
 # ── Pre-deploy backup ────────────────────────────
 echo "→ Creating pre-deploy database backup..."
@@ -71,7 +97,12 @@ fi
 
 # ── Deploy ───────────────────────────────────────
 echo "→ Starting services..."
-$COMPOSE --env-file .env.production up -d --remove-orphans
+if [ "$BUILD" = true ]; then
+    $COMPOSE --env-file .env.production up -d --remove-orphans --build
+else
+    $COMPOSE --env-file .env.production pull backend frontend || true
+    $COMPOSE --env-file .env.production up -d --remove-orphans
+fi
 
 echo "→ Waiting for health check..."
 RETRIES=0
@@ -79,6 +110,8 @@ MAX_RETRIES=6
 while [ $RETRIES -lt $MAX_RETRIES ]; do
     if $COMPOSE exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/full/')" 2>/dev/null; then
         echo "✓ Backend healthy (full check: db + redis + celery)"
+        echo "$IMAGE_TAG" > .deployed_sha
+        echo "✓ Deployed version saved: $IMAGE_TAG"
         break
     fi
     RETRIES=$((RETRIES + 1))
@@ -88,9 +121,16 @@ done
 
 if [ $RETRIES -eq $MAX_RETRIES ]; then
     echo "✗ Backend health check failed after ${MAX_RETRIES} attempts"
-    echo "  Rolling back to previous images..."
-    $COMPOSE down
-    echo "  Check logs: $COMPOSE logs backend"
+    if [ -n "$PREV_TAG" ]; then
+        echo "→ Auto-rolling back to $PREV_TAG..."
+        export IMAGE_TAG="$PREV_TAG"
+        $COMPOSE --env-file .env.production pull backend frontend || true
+        $COMPOSE --env-file .env.production up -d --remove-orphans
+        echo "✗ Rolled back to $PREV_TAG. Check logs: $COMPOSE logs backend"
+    else
+        echo "  No previous version to rollback to. Check logs: $COMPOSE logs backend"
+        $COMPOSE down
+    fi
     exit 1
 fi
 
