@@ -62,7 +62,7 @@ import {
   useGenerateGroups,
   useCreateGroup,
 } from "@/hooks/use-team-mutations";
-import { TeamNameAutocomplete } from "@/components/kickoff/team-name-autocomplete";
+import { ClubAutocomplete } from "@/components/kickoff/club-autocomplete";
 import type {
   TournamentStatus,
   Category,
@@ -73,6 +73,7 @@ import type {
   GroupPayload,
   MatchStatus,
   MatchPhase,
+  FFFClub,
 } from "@/types/api";
 
 const MATCH_STATUS_LABEL: Record<MatchStatus, string> = {
@@ -386,6 +387,20 @@ function QuickTeamDialog({
     coach_phone: "",
     coach_email: "",
   });
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+
+  async function fetchLogoAsFile(url: string, clubName: string) {
+    try {
+      const resp = await fetch(url);
+      const blob = await resp.blob();
+      const ext = blob.type.split("/")[1] || "png";
+      const file = new File([blob], `${clubName}.${ext}`, { type: blob.type });
+      setForm((f) => ({ ...f, logo: file }));
+      setLogoPreview(URL.createObjectURL(file));
+    } catch {
+      // silently ignore if logo download fails
+    }
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -435,21 +450,22 @@ function QuickTeamDialog({
             </div>
             <div className="space-y-1.5">
               <Label>Nom *</Label>
-              <TeamNameAutocomplete
-                tournamentId={tournamentId}
-                excludeCategory={String(form.category)}
+              <ClubAutocomplete
                 value={form.name}
                 onChange={(v) =>
                   setForm((f) => ({ ...f, name: v }))
                 }
-                onSelect={(name) =>
+                onSelect={(club: FFFClub) => {
                   setForm((f) => ({
                     ...f,
-                    name,
-                    short_name: f.short_name || name.substring(0, 5),
-                  }))
-                }
-                required
+                    name: club.name,
+                    short_name: f.short_name || club.short_name || club.name.substring(0, 5),
+                  }));
+                  if (club.logo) {
+                    fetchLogoAsFile(club.logo, club.short_name || club.name);
+                  }
+                }}
+                placeholder="Rechercher un club FFF ou saisir un nom…"
               />
             </div>
             <div className="space-y-1.5">
@@ -472,6 +488,16 @@ function QuickTeamDialog({
                 }
               />
             </div>
+            {logoPreview && (
+              <div className="flex items-center gap-2 sm:col-span-2">
+                <img
+                  src={logoPreview}
+                  alt="Logo"
+                  className="size-10 rounded-full object-contain bg-muted"
+                />
+                <span className="text-xs text-muted-foreground">Logo FFF récupéré</span>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button

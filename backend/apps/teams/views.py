@@ -7,7 +7,7 @@ from django.http import HttpResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import JSONParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from apps.core import BusinessRuleViolation
@@ -65,7 +65,7 @@ class TeamViewSet(viewsets.ModelViewSet):
         team.save(update_fields=["access_code", "updated_at"])
         return Response(TeamAdminSerializer(team, context={"request": request}).data)
 
-    @action(detail=True, methods=["get"], url_path="qr-code")
+    @action(detail=True, methods=["get"], url_path="qr-code", permission_classes=[AllowAny])
     def qr_code(self, request, tournament_id=None, pk=None):
         team = self.get_object()
         frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000")

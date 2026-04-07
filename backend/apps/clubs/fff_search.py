@@ -28,9 +28,9 @@ class ClubSearchFFFView(APIView):
         try:
             resp = requests.get(
                 FFF_API_URL,
-                params={"filter": q, "page": 1},
+                params={"clNom": q},
                 headers={"Accept": "application/json"},
-                timeout=3,
+                timeout=5,
             )
             resp.raise_for_status()
         except (requests.RequestException, ValueError):

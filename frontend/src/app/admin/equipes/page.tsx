@@ -36,7 +36,8 @@ import {
   useBulkImportTeams,
 } from "@/hooks/use-team-mutations";
 import { TeamNameAutocomplete } from "@/components/kickoff/team-name-autocomplete";
-import type { TeamAdmin, TeamPayload, Category } from "@/types/api";
+import { ClubAutocomplete } from "@/components/kickoff/club-autocomplete";
+import type { TeamAdmin, TeamPayload, Category, FFFClub } from "@/types/api";
 
 // ─── Team Form Dialog ───────────────────────────────────────────────────────
 
@@ -66,12 +67,31 @@ function TeamFormDialog({
     coach_phone: team?.coach_phone ?? "",
     coach_email: team?.coach_email ?? "",
   });
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   const set = (field: keyof TeamPayload, value: string | number) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
-  const setLogo = (file: File | null) =>
+  const setLogo = (file: File | null) => {
     setForm((prev) => ({ ...prev, logo: file }));
+    if (file) {
+      setLogoPreview(URL.createObjectURL(file));
+    } else {
+      setLogoPreview(null);
+    }
+  };
+
+  async function fetchLogoAsFile(url: string, clubName: string) {
+    try {
+      const resp = await fetch(url);
+      const blob = await resp.blob();
+      const ext = blob.type.split("/")[1] || "png";
+      const file = new File([blob], `${clubName}.${ext}`, { type: blob.type });
+      setLogo(file);
+    } catch {
+      // silently ignore if logo download fails
+    }
+  }
 
   const canSubmit = form.name.trim() && form.category > 0;
 
@@ -127,17 +147,21 @@ function TeamFormDialog({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="team-name">Nom *</Label>
-              <TeamNameAutocomplete
-                tournamentId={tournamentId}
-                excludeCategory={String(form.category)}
+              <ClubAutocomplete
                 value={form.name}
                 onChange={(v) => set("name", v)}
-                onSelect={(name) => {
-                  set("name", name);
-                  if (!form.short_name) set("short_name", name.substring(0, 5));
+                onSelect={(club: FFFClub) => {
+                  set("name", club.name);
+                  if (!form.short_name && club.short_name) {
+                    set("short_name", club.short_name);
+                  } else if (!form.short_name) {
+                    set("short_name", club.name.substring(0, 5));
+                  }
+                  if (club.logo) {
+                    fetchLogoAsFile(club.logo, club.short_name || club.name);
+                  }
                 }}
-                id="team-name"
-                required
+                placeholder="Rechercher un club FFF ou saisir un nom…"
               />
             </div>
             <div className="space-y-1.5">
@@ -181,13 +205,23 @@ function TeamFormDialog({
             </div>
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="team-logo">Logo</Label>
-              <Input
-                id="team-logo"
-                type="file"
-                accept="image/*"
-                onChange={(e) => setLogo(e.target.files?.[0] ?? null)}
-              />
-              {team?.logo && !form.logo && (
+              <div className="flex items-center gap-3">
+                {(logoPreview || (team?.logo && !form.logo)) && (
+                  <img
+                    src={logoPreview || team?.logo}
+                    alt="Logo"
+                    className="size-10 rounded-full object-contain bg-muted shrink-0"
+                  />
+                )}
+                <Input
+                  id="team-logo"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setLogo(e.target.files?.[0] ?? null)}
+                  className="flex-1"
+                />
+              </div>
+              {team?.logo && !form.logo && !logoPreview && (
                 <p className="text-xs text-muted-foreground">Logo actuel conservé</p>
               )}
             </div>
