@@ -93,11 +93,16 @@ async function apiFetch<T = unknown>(
       ? JSON.stringify(body)
       : undefined;
 
-  let res = await fetch(url.toString(), {
-    ...rest,
-    headers,
-    body: serializedBody,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      ...rest,
+      headers,
+      body: serializedBody,
+    });
+  } catch (networkErr) {
+    throw new ApiError(0, `Erreur réseau — impossible de contacter le serveur (${url.toString()})`);
+  }
 
   // Auto-refresh on 401 (token expired) — NOT 403 (permission denied)
   if (res.status === 401 && typeof window !== "undefined") {

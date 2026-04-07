@@ -5,7 +5,7 @@ const isMobile = process.env.BUILD_TARGET === "mobile";
 const backendUrl =
   process.env.BACKEND_URL ??
   process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "") ??
-  "http://localhost:8000";
+  "https://tournoi-app-bpk4.onrender.com";
 
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
