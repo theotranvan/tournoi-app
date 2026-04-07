@@ -28,6 +28,17 @@ fi
 echo "✓ Loading .env.production"
 export $(grep -v '^#' .env.production | xargs)
 
+# ── Pre-deploy backup ────────────────────────────
+echo "→ Creating pre-deploy database backup..."
+BACKUP_FILE="./backups/pre_deploy_$(date +%Y%m%d_%H%M%S).sql.gz"
+mkdir -p ./backups
+if $COMPOSE exec -T postgres pg_dump -U "${POSTGRES_USER:-kickoff}" "${POSTGRES_DB:-kickoff}" \
+    --no-owner --no-acl | gzip > "$BACKUP_FILE" 2>/dev/null; then
+    echo "✓ Pre-deploy backup: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
+else
+    echo "⚠ Pre-deploy backup skipped (no running database)"
+fi
+
 # ── SSL setup (Let's Encrypt via certbot) ────────
 if [ "$SSL" = true ]; then
     echo "→ Setting up SSL certificates..."

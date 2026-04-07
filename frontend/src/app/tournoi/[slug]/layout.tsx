@@ -75,7 +75,7 @@ export default function PublicTournamentLayout({
         <img src="/logo-footix.png" alt="Footix" className="h-7 w-auto" />
         <span className="text-lg font-bold text-primary">Footix</span>
       </header>
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 overflow-x-hidden">{children}</main>
     </div>
   );
 }

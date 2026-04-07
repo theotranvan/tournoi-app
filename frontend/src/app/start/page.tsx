@@ -79,18 +79,18 @@ export default function StartPage() {
           transition={{ duration: 0.4 }}
           className="mb-8"
         >
-          <h1 className="text-4xl font-bold">Salut 👋</h1>
-          <p className="text-xl text-muted-foreground mt-1">Qui es-tu ?</p>
+          <h1 className="text-4xl font-bold">Bienvenue 👋</h1>
+          <p className="text-lg text-muted-foreground mt-2">Choisis ton rôle pour commencer</p>
         </motion.div>
 
         {/* Role cards */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           <RoleCard
             icon={Eye}
             iconColor="text-purple-500"
             iconBg="bg-purple-500/10"
             title="Je suis spectateur"
-            description="Voir un tournoi en direct"
+            description="Suivre les scores et classements en direct"
             href="/tournoi"
             delay={0.15}
           />
@@ -99,7 +99,7 @@ export default function StartPage() {
             iconColor="text-blue-500"
             iconBg="bg-blue-500/10"
             title="Je suis coach"
-            description="Accéder à l'espace de mon équipe"
+            description="Consulter le planning et les résultats de mon équipe"
             href="/coach/acces"
             delay={0.25}
           />
@@ -108,7 +108,7 @@ export default function StartPage() {
             iconColor="text-primary"
             iconBg="bg-primary/10"
             title="Je suis organisateur"
-            description="Gérer mes tournois"
+            description="Créer et piloter mes tournois de A à Z"
             href="/admin/login"
             delay={0.35}
           />
@@ -134,16 +134,16 @@ export default function StartPage() {
           className="text-center space-y-3"
         >
           <p className="text-sm text-muted-foreground">
-            ✨ Envie de créer ton propre tournoi&nbsp;?
+            Pas encore de compte organisateur&nbsp;?
           </p>
           <Link href="/admin/register">
             <Button
               variant="outline"
               size="lg"
-              className="w-full h-12 font-semibold"
+              className="w-full h-12 font-semibold rounded-xl"
               onClick={() => triggerHaptic("light")}
             >
-              Créer un compte
+              Créer un compte gratuitement
             </Button>
           </Link>
         </motion.div>

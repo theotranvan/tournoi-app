@@ -5,7 +5,9 @@ import type { TeamAdmin, PaginatedResponse } from "@/types/api";
 export const teamKeys = {
   all: ["teams"] as const,
   list: (tournamentId: string, filters?: Record<string, string>) =>
-    [...teamKeys.all, "list", tournamentId, filters] as const,
+    filters && Object.keys(filters).length > 0
+      ? ([...teamKeys.all, "list", tournamentId, filters] as const)
+      : ([...teamKeys.all, "list", tournamentId] as const),
   detail: (tournamentId: string, id: number) =>
     [...teamKeys.all, "detail", tournamentId, id] as const,
   suggestions: (tournamentId: string, search: string, excludeCategory?: string) =>

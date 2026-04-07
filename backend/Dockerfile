@@ -21,6 +21,12 @@ COPY backend/ .
 
 RUN python manage.py collectstatic --noinput 2>/dev/null || true
 
+# Run as non-root user
+RUN addgroup --system --gid 1001 appgroup && \
+    adduser --system --uid 1001 --ingroup appgroup appuser && \
+    chown -R appuser:appgroup /app
+USER appuser
+
 EXPOSE 8000
 
 # Default: run Daphne (ASGI) for both HTTP + WebSocket

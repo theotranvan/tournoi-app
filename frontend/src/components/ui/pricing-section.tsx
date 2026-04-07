@@ -89,11 +89,13 @@ const plans = [
 ];
 
 const PricingSwitch = ({
-  onSwitch,
+  isYearly,
+  onToggle,
 }: {
-  onSwitch: (value: string) => void;
+  isYearly: boolean;
+  onToggle: () => void;
 }) => {
-  const [selected, setSelected] = useState(0);
+  const selected = isYearly ? 1 : 0;
   const containerRef = useRef<HTMLDivElement>(null);
   const btnRefs = [useRef<HTMLButtonElement>(null), useRef<HTMLButtonElement>(null)];
   const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
@@ -106,15 +108,9 @@ const PricingSwitch = ({
       }
     };
     measure();
-    // Re-measure after fonts load (can shift button widths)
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, [selected]);
-
-  const handleSwitch = (idx: number) => {
-    setSelected(idx);
-    onSwitch(String(idx));
-  };
 
   return (
     <div className="flex justify-center">
@@ -131,7 +127,7 @@ const PricingSwitch = ({
         <button
           ref={btnRefs[0]}
           type="button"
-          onClick={() => handleSwitch(0)}
+          onClick={() => { if (isYearly) onToggle(); }}
           className={cn(
             "relative z-10 w-fit h-10 rounded-full sm:px-6 px-3 sm:py-2 py-1 font-medium transition-colors",
             selected === 0 ? "text-white" : "text-gray-200"
@@ -143,7 +139,7 @@ const PricingSwitch = ({
         <button
           ref={btnRefs[1]}
           type="button"
-          onClick={() => handleSwitch(1)}
+          onClick={() => { if (!isYearly) onToggle(); }}
           className={cn(
             "relative z-10 w-fit h-10 flex-shrink-0 rounded-full sm:px-6 px-3 sm:py-2 py-1 font-medium transition-colors",
             selected === 1 ? "text-white" : "text-gray-200"
@@ -168,12 +164,15 @@ export default function PricingSection() {
   const router = useRouter();
 
   // Only fetch subscription if user is logged in (avoids 401 → redirect)
-  const hasToken = typeof window !== "undefined" && !!localStorage.getItem("access_token");
+  const [hasToken, setHasToken] = useState(false);
+  const [canceled, setCanceled] = useState(false);
+  useEffect(() => {
+    setHasToken(!!localStorage.getItem("access_token"));
+    setCanceled(new URLSearchParams(window.location.search).get("canceled") === "true");
+  }, []);
   const { data } = useSubscription({ enabled: hasToken });
   const { data: tournamentsData, isLoading: tournamentsLoading } = useTournaments({}, { enabled: hasToken });
   const checkout = useCheckout();
-
-  const canceled = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("canceled") === "true";
 
   const isClub = data?.subscription?.is_club ?? false;
 
@@ -194,8 +193,7 @@ export default function PricingSection() {
     },
   };
 
-  const togglePricingPeriod = (value: string) =>
-    setIsYearly(Number.parseInt(value) === 1);
+  const togglePricingPeriod = () => setIsYearly((v) => !v);
 
   const handleAction = (planName: string) => {
     if (planName === "One-Shot") {
@@ -317,7 +315,7 @@ export default function PricingSection() {
           timelineRef={pricingRef}
           customVariants={revealVariants}
         >
-          <PricingSwitch onSwitch={togglePricingPeriod} />
+          <PricingSwitch isYearly={isYearly} onToggle={togglePricingPeriod} />
           <p className="text-xs text-gray-500 mt-2">
             Le toggle s&apos;applique au plan Club uniquement
           </p>

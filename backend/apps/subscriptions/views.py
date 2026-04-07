@@ -183,12 +183,11 @@ class CreateCheckoutView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Create or retrieve pending license
-        license_obj, _ = TournamentLicense.objects.get_or_create(
-            tournament=tournament,
-            defaults={"user": request.user, "stripe_customer_id": customer_id},
-        )
-        if license_obj.is_active:
+        # Check if already licensed
+        existing = TournamentLicense.objects.filter(
+            tournament=tournament, is_active=True
+        ).first()
+        if existing:
             return Response(
                 {"error": "Ce tournoi a déjà une licence active."},
                 status=status.HTTP_409_CONFLICT,
@@ -205,6 +204,15 @@ class CreateCheckoutView(APIView):
                 "user_id": str(request.user.id),
                 "plan": "one_shot",
                 "tournament_id": str(tournament_id),
+            },
+        )
+
+        # Create pending license only after successful Stripe session creation
+        license_obj, _ = TournamentLicense.objects.get_or_create(
+            tournament=tournament,
+            defaults={
+                "user": request.user,
+                "stripe_customer_id": customer_id,
             },
         )
         license_obj.stripe_checkout_session_id = session.id

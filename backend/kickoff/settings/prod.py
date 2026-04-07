@@ -6,6 +6,18 @@ import dj_database_url
 
 DEBUG = False
 
+# ─── CSRF ────────────────────────────────────────────────────────────────────
+CSRF_TRUSTED_ORIGINS = config(
+    "CSRF_TRUSTED_ORIGINS",
+    default=",".join(CORS_ALLOWED_ORIGINS),  # noqa: F405
+    cast=Csv(),
+)
+
+# ─── Admin error emails ─────────────────────────────────────────────────────
+_admin_email = config("ADMIN_EMAIL", default="")
+if _admin_email:
+    ADMINS = [("Admin", _admin_email)]
+
 # ─── Database ────────────────────────────────────────────────────────────────
 DATABASE_URL = config("DATABASE_URL")
 

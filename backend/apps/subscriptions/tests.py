@@ -322,13 +322,25 @@ class TestStripeWebhook:
 
 @pytest.mark.django_db
 class TestTournamentLicense:
-    def test_license_active_by_default(self):
+    def test_license_inactive_by_default(self):
         user = UserFactory()
         tournament = TournamentFactory(club__owner=user)
         license_obj = TournamentLicense.objects.create(
             user=user,
             tournament=tournament,
             stripe_payment_intent_id="pi_test",
+        )
+        assert license_obj.is_active is False
+        assert license_obj.is_valid is False
+
+    def test_license_valid_when_activated(self):
+        user = UserFactory()
+        tournament = TournamentFactory(club__owner=user)
+        license_obj = TournamentLicense.objects.create(
+            user=user,
+            tournament=tournament,
+            stripe_payment_intent_id="pi_test",
+            is_active=True,
         )
         assert license_obj.is_active is True
         assert license_obj.is_valid is True
@@ -340,6 +352,7 @@ class TestTournamentLicense:
             user=user,
             tournament=tournament,
             stripe_payment_intent_id="pi_test",
+            is_active=True,
             valid_until=None,
         )
         assert license_obj.is_valid is True
@@ -351,6 +364,7 @@ class TestTournamentLicense:
             user=user,
             tournament=tournament,
             stripe_payment_intent_id="pi_test",
+            is_active=True,
         )
         from apps.subscriptions.plans import can_use_feature, get_effective_plan
 

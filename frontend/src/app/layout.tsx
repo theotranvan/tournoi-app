@@ -64,7 +64,7 @@ export default function RootLayout({
       <head>
         <ThemeScript />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col overflow-x-hidden">
         <QueryProvider>{children}</QueryProvider>
         <Toaster
           position="top-center"

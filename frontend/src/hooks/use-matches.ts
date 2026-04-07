@@ -5,7 +5,9 @@ import type { MatchList, MatchDetail, PaginatedResponse } from "@/types/api";
 export const matchKeys = {
   all: ["matches"] as const,
   list: (tournamentId: string, filters?: Record<string, string>) =>
-    [...matchKeys.all, "list", tournamentId, filters] as const,
+    filters && Object.keys(filters).length > 0
+      ? ([...matchKeys.all, "list", tournamentId, filters] as const)
+      : ([...matchKeys.all, "list", tournamentId] as const),
   detail: (tournamentId: string, id: string) =>
     [...matchKeys.all, "detail", tournamentId, id] as const,
 };

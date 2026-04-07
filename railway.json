@@ -5,8 +5,8 @@
     "dockerfilePath": "backend/Dockerfile"
   },
   "deploy": {
-    "startCommand": "daphne -b 0.0.0.0 -p 8000 kickoff.asgi:application",
-    "healthcheckPath": "/health/",
+    "startCommand": "daphne -b 0.0.0.0 -p $PORT kickoff.asgi:application",
+    "healthcheckPath": "/api/",
     "restartPolicyType": "ON_FAILURE"
   }
 }

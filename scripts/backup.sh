@@ -55,7 +55,17 @@ backup_db() {
         --no-owner --no-acl | gzip > "$dump_file"
     local size
     size=$(du -h "$dump_file" | cut -f1)
-    echo "✓ Database backup: $dump_file ($size)"
+
+    # Verify integrity
+    if ! gunzip -t "$dump_file" 2>/dev/null; then
+        echo "✗ Backup integrity check FAILED: $dump_file"
+        exit 1
+    fi
+
+    # Generate checksum
+    sha256sum "$dump_file" > "$dump_file.sha256"
+
+    echo "✓ Database backup: $dump_file ($size) — integrity verified"
 }
 
 backup_media() {
@@ -88,6 +98,7 @@ cleanup_old() {
     local count
     count=$(find "$BACKUP_DIR" -name "*.gz" -mtime +"$RETENTION_DAYS" | wc -l)
     find "$BACKUP_DIR" -name "*.gz" -mtime +"$RETENTION_DAYS" -delete
+    find "$BACKUP_DIR" -name "*.sha256" -mtime +"$RETENTION_DAYS" -delete
     echo "✓ Removed $count old backup(s)"
 }
 
