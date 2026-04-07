@@ -24,5 +24,6 @@ export function getApiUrl(): string {
   if (isNative()) {
     return "https://api.footix.app/api/v1";
   }
-  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+  // Web: use relative path — Next.js rewrites proxy /api/* to the backend
+  return "/api/v1";
 }
