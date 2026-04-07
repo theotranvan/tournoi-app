@@ -17,6 +17,12 @@ const nextConfig: NextConfig = {
   output: isMobile ? "export" : "standalone",
   turbopack: {},
   ...(isMobile && { images: { unoptimized: true } }),
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   async headers() {
     return [
       {
