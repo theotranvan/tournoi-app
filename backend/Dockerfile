@@ -19,9 +19,6 @@ RUN pip install --no-cache-dir tomli 2>/dev/null; \
 
 COPY backend/ .
 
-RUN SECRET_KEY=build-placeholder mkdir -p /app/staticfiles && \
-    SECRET_KEY=build-placeholder python manage.py collectstatic --noinput
-
 # Run as non-root user
 RUN addgroup --system --gid 1001 appgroup && \
     adduser --system --uid 1001 --ingroup appgroup appuser && \
@@ -31,6 +28,7 @@ USER appuser
 
 EXPOSE 8000
 
-CMD python manage.py migrate && \
+CMD mkdir -p /app/staticfiles && \
+    python manage.py migrate && \
     python manage.py collectstatic --noinput && \
     daphne -b 0.0.0.0 -p ${PORT:-8000} kickoff.asgi:application
