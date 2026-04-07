@@ -1,5 +1,6 @@
 import logging
 
+from django.db import transaction
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -70,40 +71,41 @@ class MatchViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def score(self, request, tournament_id=None, id=None):
-        match = self.get_object()
-        if match.status not in (Match.Status.LIVE, Match.Status.SCHEDULED):
-            raise BusinessRuleViolation(
-                "Le score ne peut être saisi que sur un match en cours ou programmé."
-            )
-
         serializer = ScoreInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        match.score_home = data["score_home"]
-        match.score_away = data["score_away"]
-        match.penalty_score_home = data.get("penalty_score_home")
-        match.penalty_score_away = data.get("penalty_score_away")
-        match.score_entered_by = request.user
-        if match.status == Match.Status.SCHEDULED:
-            match.status = Match.Status.LIVE
-        match.save(update_fields=[
-            "score_home", "score_away", "penalty_score_home", "penalty_score_away",
-            "score_entered_by", "status", "updated_at"
-        ])
+        with transaction.atomic():
+            match = Match.objects.select_for_update().get(pk=self.get_object().pk)
+            if match.status not in (Match.Status.LIVE, Match.Status.SCHEDULED):
+                raise BusinessRuleViolation(
+                    "Le score ne peut être saisi que sur un match en cours ou programmé."
+                )
 
-        # Handle goals
-        if data.get("goals"):
-            match.goals.all().delete()
-            for goal_data in data["goals"]:
-                team = match.team_home if goal_data["team"] == "home" else match.team_away
-                if team:
-                    Goal.objects.create(
-                        match=match,
-                        team=team,
-                        player_name=goal_data.get("player_name", ""),
-                        minute=goal_data.get("minute"),
-                    )
+            match.score_home = data["score_home"]
+            match.score_away = data["score_away"]
+            match.penalty_score_home = data.get("penalty_score_home")
+            match.penalty_score_away = data.get("penalty_score_away")
+            match.score_entered_by = request.user
+            if match.status == Match.Status.SCHEDULED:
+                match.status = Match.Status.LIVE
+            match.save(update_fields=[
+                "score_home", "score_away", "penalty_score_home", "penalty_score_away",
+                "score_entered_by", "status", "updated_at"
+            ])
+
+            # Handle goals
+            if data.get("goals"):
+                match.goals.all().delete()
+                for goal_data in data["goals"]:
+                    team = match.team_home if goal_data["team"] == "home" else match.team_away
+                    if team:
+                        Goal.objects.create(
+                            match=match,
+                            team=team,
+                            player_name=goal_data.get("player_name", ""),
+                            minute=goal_data.get("minute"),
+                        )
 
         match.refresh_from_db()
         return Response(MatchDetailSerializer(match).data)

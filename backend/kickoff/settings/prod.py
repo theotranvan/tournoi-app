@@ -2,34 +2,17 @@
 
 from .base import *  # noqa: F401, F403
 
-import sentry_sdk
-from sentry_sdk.integrations.django import DjangoIntegration
-from sentry_sdk.integrations.celery import CeleryIntegration
-from sentry_sdk.integrations.redis import RedisIntegration
+import dj_database_url
 
 DEBUG = False
 
 # ─── Database ────────────────────────────────────────────────────────────────
 DATABASE_URL = config("DATABASE_URL")
 
-_db_parts = DATABASE_URL.replace("postgres://", "").replace("postgresql://", "")
-_user_pass, _rest = _db_parts.split("@", 1)
-_host_port, _dbname = _rest.split("/", 1)
-_user, _password = _user_pass.split(":", 1)
-_host = _host_port.split(":")[0]
-_port = _host_port.split(":")[1] if ":" in _host_port else "5432"
-
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": _dbname,
-        "USER": _user,
-        "PASSWORD": _password,
-        "HOST": _host,
-        "PORT": _port,
-        "CONN_MAX_AGE": 600,
-        "CONN_HEALTH_CHECKS": True,
-    }
+    "default": dj_database_url.parse(
+        DATABASE_URL, conn_max_age=600, conn_health_checks=True
+    )
 }
 
 # ─── Cache ───────────────────────────────────────────────────────────────────
@@ -62,25 +45,10 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
 
 # ─── Sentry ──────────────────────────────────────────────────────────────────
-SENTRY_DSN = config("SENTRY_DSN", default="")
-if SENTRY_DSN:
-    def _scrub_sensitive(event, hint):
-        # Strip access codes, passwords, tokens
-        if "request" in event:
-            data = event["request"].get("data", {})
-            for key in list(data.keys() if hasattr(data, "keys") else []):
-                if any(s in key.lower() for s in ("password", "token", "secret", "access_code")):
-                    data[key] = "[scrubbed]"
-        return event
-
-    sentry_sdk.init(
-        dsn=SENTRY_DSN,
-        environment=config("SENTRY_ENVIRONMENT", default="production"),
-        integrations=[DjangoIntegration(), CeleryIntegration(), RedisIntegration()],
-        traces_sample_rate=config("SENTRY_TRACES_SAMPLE_RATE", default=0.1, cast=float),
-        send_default_pii=False,
-        before_send=_scrub_sensitive,
-    )
+# Sentry is already initialized in base.py with integrations,
+# before_send scrubbing, and env-based sample rates.
+# prod.py only needs to set SENTRY_ENVIRONMENT / SENTRY_TRACES_SAMPLE_RATE
+# via environment variables (see .env.production.example).
 
 # ─── Email ───────────────────────────────────────────────────────────────────
 EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
@@ -108,6 +76,8 @@ if USE_S3_MEDIA:
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/" if AWS_S3_CUSTOM_DOMAIN else f"https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/"
 
 # ─── Logging ─────────────────────────────────────────────────────────────────
+_LOG_LEVEL = config("LOG_LEVEL", default="INFO")
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -135,7 +105,7 @@ LOGGING = {
         },
         "apps": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": _LOG_LEVEL,
             "propagate": False,
         },
     },

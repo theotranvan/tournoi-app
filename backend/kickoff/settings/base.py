@@ -202,6 +202,9 @@ CORS_ALLOW_CREDENTIALS = True
 SENTRY_DSN = config("SENTRY_DSN", default="")
 if SENTRY_DSN:
     import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.redis import RedisIntegration
 
     _SENSITIVE_KEYS = {"access_code", "password", "token", "secret", "authorization"}
 
@@ -229,7 +232,13 @@ if SENTRY_DSN:
 
     sentry_sdk.init(
         dsn=SENTRY_DSN,
-        traces_sample_rate=0.2,
+        environment=config("SENTRY_ENVIRONMENT", default="development"),
+        integrations=[
+            DjangoIntegration(),
+            CeleryIntegration(),
+            RedisIntegration(),
+        ],
+        traces_sample_rate=config("SENTRY_TRACES_SAMPLE_RATE", default=0.2, cast=float),
         profiles_sample_rate=0.1,
         send_default_pii=False,
         before_send=_sentry_before_send,

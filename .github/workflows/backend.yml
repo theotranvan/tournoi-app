@@ -70,4 +70,4 @@ jobs:
       - name: Run migrations
         run: python manage.py migrate --noinput
       - name: Run tests
-        run: pytest --cov=apps --cov-report=term-missing
+        run: pytest --cov=apps --cov-report=term-missing --cov-fail-under=70

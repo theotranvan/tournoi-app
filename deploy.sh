@@ -63,12 +63,24 @@ echo "→ Starting services..."
 $COMPOSE --env-file .env.production up -d --remove-orphans
 
 echo "→ Waiting for health check..."
-sleep 10
+RETRIES=0
+MAX_RETRIES=6
+while [ $RETRIES -lt $MAX_RETRIES ]; do
+    if $COMPOSE exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/full/')" 2>/dev/null; then
+        echo "✓ Backend healthy (full check: db + redis + celery)"
+        break
+    fi
+    RETRIES=$((RETRIES + 1))
+    echo "  Waiting... ($RETRIES/$MAX_RETRIES)"
+    sleep 5
+done
 
-if $COMPOSE exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/public/health/')" 2>/dev/null; then
-    echo "✓ Backend healthy"
-else
-    echo "⚠ Backend health check failed — check logs with: $COMPOSE logs backend"
+if [ $RETRIES -eq $MAX_RETRIES ]; then
+    echo "✗ Backend health check failed after ${MAX_RETRIES} attempts"
+    echo "  Rolling back to previous images..."
+    $COMPOSE down
+    echo "  Check logs: $COMPOSE logs backend"
+    exit 1
 fi
 
 # ── Cleanup ──────────────────────────────────────

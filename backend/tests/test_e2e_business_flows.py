@@ -254,7 +254,7 @@ class TestPublicPageAccess(TestCase):
             f"/api/v1/public/tournaments/{self.tournament.slug}/matches/"
         )
         self.assertEqual(r.status_code, 200)
-        self.assertGreaterEqual(len(r.data), 1)
+        self.assertGreaterEqual(r.data["count"], 1)
 
     def test_014_public_standings(self):
         r = self.c.get(

@@ -171,28 +171,29 @@ class TestPublicMatchesView:
         slug = tournament_with_data["tournament"].slug
         resp = api.get(f"/api/v1/public/tournaments/{slug}/matches/")
         assert resp.status_code == 200
-        assert len(resp.data) == 3
+        assert resp.data["count"] == 3
+        assert len(resp.data["results"]) == 3
 
     def test_filter_by_status(self, api, tournament_with_data):
         slug = tournament_with_data["tournament"].slug
         resp = api.get(f"/api/v1/public/tournaments/{slug}/matches/?status=live")
         assert resp.status_code == 200
-        assert len(resp.data) == 1
-        assert resp.data[0]["status"] == "live"
+        assert len(resp.data["results"]) == 1
+        assert resp.data["results"][0]["status"] == "live"
 
     def test_filter_by_category(self, api, tournament_with_data):
         slug = tournament_with_data["tournament"].slug
         cat_id = tournament_with_data["category"].id
         resp = api.get(f"/api/v1/public/tournaments/{slug}/matches/?category={cat_id}")
         assert resp.status_code == 200
-        assert len(resp.data) == 3
+        assert resp.data["count"] == 3
 
     def test_response_does_not_contain_access_code(self, api, tournament_with_data):
         """Public match responses should not leak team access codes."""
         slug = tournament_with_data["tournament"].slug
         resp = api.get(f"/api/v1/public/tournaments/{slug}/matches/")
         assert resp.status_code == 200
-        raw = str(resp.data)
+        raw = str(resp.data["results"])
         assert "access_code" not in raw
 
     def test_private_tournament_returns_404(self, api, private_tournament):
@@ -357,12 +358,11 @@ class TestPublicByCode:
         assert resp.status_code == 200
         assert resp.data["slug"] == public_tournament.slug
 
-    def test_by_code_works_even_if_not_public(self, api, organizer):
+    def test_by_code_private_tournament_returns_404(self, api, organizer):
         club = ClubFactory(owner=organizer)
-        t = TournamentFactory(club=club, is_public=False, public_code="PRIV01")
+        TournamentFactory(club=club, is_public=False, public_code="PRIV01")
         resp = api.get("/api/v1/public/tournaments/by-code/PRIV01/")
-        assert resp.status_code == 200
-        assert resp.data["slug"] == t.slug
+        assert resp.status_code == 404
 
     def test_by_code_case_insensitive(self, api, public_tournament):
         public_tournament.public_code = "ABC123"

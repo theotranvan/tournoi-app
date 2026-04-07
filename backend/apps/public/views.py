@@ -1,5 +1,8 @@
 from django.db.models import Q
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from rest_framework.generics import get_object_or_404
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
@@ -54,7 +57,7 @@ class PublicTournamentByCodeView(APIView):
     def get(self, request, code):
         code = code.upper().strip()
         tournament = get_object_or_404(
-            Tournament, public_code=code
+            Tournament.objects.filter(is_public=True), public_code=code
         )
         return Response(
             {
@@ -105,9 +108,14 @@ class PublicMatchesView(APIView):
         status_filter = request.query_params.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        return Response(MatchListSerializer(qs[:200], many=True).data)
+        paginator = LimitOffsetPagination()
+        paginator.default_limit = 50
+        paginator.max_limit = 200
+        page = paginator.paginate_queryset(qs.order_by("start_time"), request)
+        return paginator.get_paginated_response(MatchListSerializer(page, many=True).data)
 
 
+@method_decorator(cache_page(30), name="get")
 class PublicStandingsView(APIView):
     permission_classes = [AllowAny]
 
@@ -155,6 +163,7 @@ class PublicTeamView(APIView):
         )
 
 
+@method_decorator(cache_page(10), name="get")
 class PublicLiveView(APIView):
     permission_classes = [AllowAny]
 

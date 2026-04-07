@@ -10,11 +10,21 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-kickoff}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     shm_size: 256mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kickoff}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   redis:
     restart: always
     ports: []   # No host exposure in prod
     command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   backend:
     command: >

@@ -1,5 +1,5 @@
-import random
 import re
+import secrets
 import string
 import uuid
 
@@ -39,7 +39,7 @@ def validate_availability(value: list) -> None:
 def _generate_public_code() -> str:
     """Generate a 6-character uppercase alphanumeric code."""
     chars = string.ascii_uppercase + string.digits
-    return "".join(random.choices(chars, k=6))
+    return "".join(secrets.choice(chars) for _ in range(6))
 
 
 class Tournament(models.Model):

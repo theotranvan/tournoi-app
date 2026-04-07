@@ -51,8 +51,13 @@ export function usePublicMatches(
 ) {
   return useQuery({
     queryKey: publicKeys.matches(slug, filters),
-    queryFn: () =>
-      api.get<MatchList[]>(`/public/tournaments/${slug}/matches/`, filters),
+    queryFn: async () => {
+      const resp = await api.get<{ count: number; results: MatchList[] }>(
+        `/public/tournaments/${slug}/matches/`,
+        filters
+      );
+      return resp.results;
+    },
     enabled: !!slug,
   });
 }
