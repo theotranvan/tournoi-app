@@ -19,7 +19,8 @@ RUN pip install --no-cache-dir tomli 2>/dev/null; \
 
 COPY backend/ .
 
-RUN python manage.py collectstatic --noinput 2>/dev/null || true
+RUN mkdir -p /app/staticfiles && \
+    python manage.py collectstatic --noinput
 
 # Run as non-root user
 RUN addgroup --system --gid 1001 appgroup && \
