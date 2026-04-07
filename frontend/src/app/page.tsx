@@ -17,19 +17,26 @@ function Splash() {
 
 export default function Home() {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!mounted) return;
+    // Wait for zustand persist to finish hydrating from localStorage
+    if (useOnboardingStore.persist.hasHydrated()) {
+      setReady(true);
+    } else {
+      useOnboardingStore.persist.onFinishHydration(() => setReady(true));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
     const { hasSeenOnboarding } = useOnboardingStore.getState();
     if (hasSeenOnboarding) {
       router.replace("/start");
     } else {
       router.replace("/bienvenue");
     }
-  }, [mounted, router]);
+  }, [ready, router]);
 
   return <Splash />;
 }
