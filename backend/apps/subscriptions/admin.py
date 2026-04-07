@@ -13,7 +13,7 @@ class SubscriptionAdmin(admin.ModelAdmin):
 
 @admin.register(TournamentLicense)
 class TournamentLicenseAdmin(admin.ModelAdmin):
-    list_display = ("tournament", "user", "is_active", "is_valid", "valid_from", "valid_until")
+    list_display = ("tournament", "user", "is_active", "valid_from", "valid_until")
     list_filter = ("is_active",)
     search_fields = ("user__username", "tournament__name", "stripe_payment_intent_id")
     readonly_fields = ("created_at", "updated_at")
