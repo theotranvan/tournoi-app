@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 
 from apps.tournaments.models import Tournament
 
-from .models import Subscription, TournamentLicense
+from .models import StripeEvent, Subscription, TournamentLicense
 from .plans import get_effective_plan
 from .serializers import SubscriptionSerializer, TournamentLicenseSerializer
 
@@ -268,6 +268,17 @@ class StripeWebhookView(APIView):
         except (ValueError, stripe.error.SignatureVerificationError) as e:
             logger.warning("Stripe webhook signature failed: %s", e)
             return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        # Idempotency: skip already-processed events
+        event_id = event.get("id", "")
+        if event_id:
+            _, created = StripeEvent.objects.get_or_create(
+                event_id=event_id,
+                defaults={"event_type": event["type"]},
+            )
+            if not created:
+                logger.info("Stripe event already processed: %s", event_id)
+                return Response({"status": "already_processed"})
 
         event_type = event["type"]
         data = event["data"]["object"]

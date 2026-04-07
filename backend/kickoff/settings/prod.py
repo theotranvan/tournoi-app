@@ -60,6 +60,10 @@ X_FRAME_OPTIONS = "DENY"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 
+# ─── Upload limits (aligned with nginx client_max_body_size 10M) ─────────────
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
+
 # ─── Sentry ──────────────────────────────────────────────────────────────────
 # Sentry is already initialized in base.py with integrations,
 # before_send scrubbing, and env-based sample rates.

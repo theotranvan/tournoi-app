@@ -56,7 +56,7 @@ backup_db() {
     local dump_file="$BACKUP_DIR/db_${DB_NAME}_${TIMESTAMP}.sql.gz"
     log "→ Backing up database '$DB_NAME'..."
     $COMPOSE exec -T postgres pg_dump -U "$DB_USER" "$DB_NAME" \
-        --no-owner --no-acl | gzip > "$dump_file"
+        --no-owner --no-acl --clean --if-exists | gzip > "$dump_file"
 
     # Verify file is non-empty
     if [ ! -s "$dump_file" ]; then
@@ -157,7 +157,7 @@ restore_db() {
 
     log "→ Restoring database from $RESTORE_FILE..."
     gunzip -c "$RESTORE_FILE" | \
-        $COMPOSE exec -T postgres psql -U "$DB_USER" -d "$DB_NAME" --single-transaction
+        $COMPOSE exec -T postgres psql -U "$DB_USER" -d "$DB_NAME" --single-transaction -v ON_ERROR_STOP=1
     log "✓ Database restored"
 
     # Post-restore validation

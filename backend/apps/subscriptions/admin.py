@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Subscription, TournamentLicense
+from .models import StripeEvent, Subscription, TournamentLicense
 
 
 @admin.register(Subscription)
@@ -17,3 +17,10 @@ class TournamentLicenseAdmin(admin.ModelAdmin):
     list_filter = ("is_active",)
     search_fields = ("user__username", "tournament__name", "stripe_payment_intent_id")
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(StripeEvent)
+class StripeEventAdmin(admin.ModelAdmin):
+    list_display = ("event_id", "event_type", "processed_at")
+    search_fields = ("event_id", "event_type")
+    readonly_fields = ("event_id", "event_type", "processed_at")

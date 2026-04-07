@@ -2,7 +2,6 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
-from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from apps.core.health import (
     HealthCeleryView,
@@ -14,13 +13,6 @@ from apps.core.health import (
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    # OpenAPI schema & docs
-    path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),
-    path(
-        "api/v1/docs/",
-        SpectacularSwaggerView.as_view(url_name="schema"),
-        name="swagger-ui",
-    ),
     # Health
     path("api/v1/health/", HealthView.as_view(), name="health"),
     path("api/v1/health/db/", HealthDBView.as_view(), name="health-db"),
@@ -42,6 +34,19 @@ urlpatterns = [
     # Subscriptions
     path("api/v1/subscriptions/", include("apps.subscriptions.urls")),
 ]
+
+# OpenAPI schema & Swagger docs — only in DEBUG mode
+if settings.DEBUG:
+    from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+
+    urlpatterns += [
+        path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),
+        path(
+            "api/v1/docs/",
+            SpectacularSwaggerView.as_view(url_name="schema"),
+            name="swagger-ui",
+        ),
+    ]
 
 if settings.DEBUG:
     from apps.core.debug import DebugCeleryQueueView, DebugWSGroupsView

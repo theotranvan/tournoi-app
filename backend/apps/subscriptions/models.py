@@ -99,6 +99,20 @@ class TournamentLicense(models.Model):
     def __str__(self) -> str:
         return f"License {self.tournament} — {'active' if self.is_active else 'inactive'}"
 
+
+class StripeEvent(models.Model):
+    """Tracks processed Stripe webhook events for idempotency."""
+
+    event_id = models.CharField(max_length=255, unique=True, db_index=True)
+    event_type = models.CharField(max_length=100)
+    processed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "subscriptions_stripe_event"
+
+    def __str__(self) -> str:
+        return f"{self.event_type} — {self.event_id}"
+
     @property
     def is_valid(self) -> bool:
         if not self.is_active:

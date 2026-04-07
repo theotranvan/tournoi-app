@@ -44,10 +44,25 @@ if [ -z "$IMAGE_TAG" ]; then
 fi
 export IMAGE_TAG REGISTRY IMAGE_PREFIX
 
+# Warn if building locally (bypasses CI gates)
+if [ "$BUILD" = true ]; then
+    echo ""
+    echo "⚠ WARNING: --build builds images locally, bypassing CI test gates."
+    echo "  Only use this for initial setup or emergencies."
+    echo "  For normal deploys, push to main and let CI handle it."
+    echo ""
+    read -rp "  Continue with local build? (yes/no): " confirm
+    if [ "$confirm" != "yes" ]; then
+        echo "Aborted."
+        exit 0
+    fi
+fi
+
 # Save previous version for rollback
 PREV_TAG=""
 if [ -f .deployed_sha ]; then
     PREV_TAG=$(cat .deployed_sha)
+    cp .deployed_sha .deployed_sha.prev
 fi
 echo "→ Deploying image tag: $IMAGE_TAG"
 if [ -n "$PREV_TAG" ]; then
@@ -137,6 +152,12 @@ fi
 # ── Cleanup ──────────────────────────────────────
 echo "→ Pruning old images..."
 docker image prune -f
+
+# ── Smoke test ───────────────────────────────────
+if [ -f scripts/smoke-test.sh ]; then
+    echo "→ Running smoke tests..."
+    bash scripts/smoke-test.sh http://localhost || echo "⚠ Some smoke tests failed (non-blocking)"
+fi
 
 echo ""
 echo "✓ Deployment complete"

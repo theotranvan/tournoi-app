@@ -19,9 +19,9 @@ services:
   redis:
     restart: always
     ports: []   # No host exposure in prod
-    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:-changeme}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme}", "ping"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -39,6 +39,7 @@ services:
     restart: always
     environment:
       - DJANGO_SETTINGS_MODULE=kickoff.settings.prod
+      - IMAGE_TAG=${IMAGE_TAG:-latest}
     deploy:
       resources:
         limits:
@@ -144,7 +145,7 @@ services:
 
         # 1. Database backup
         DB_DUMP="/backups/db_$${TS}.sql.gz"
-        pg_dump -h postgres -U $$POSTGRES_USER $$POSTGRES_DB --no-owner --no-acl | gzip > "$$DB_DUMP"
+        pg_dump -h postgres -U $$POSTGRES_USER $$POSTGRES_DB --no-owner --no-acl --clean --if-exists | gzip > "$$DB_DUMP"
         if ! gunzip -t "$$DB_DUMP" 2>/dev/null; then
           echo "FATAL: DB backup integrity check FAILED"
           exit 1

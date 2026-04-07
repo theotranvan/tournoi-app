@@ -139,16 +139,18 @@ class MatchViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def lock(self, request, tournament_id=None, id=None):
-        match = self.get_object()
-        match.is_locked = True
-        match.save(update_fields=["is_locked", "updated_at"])
+        with transaction.atomic():
+            match = Match.objects.select_for_update().get(pk=self.get_object().pk)
+            match.is_locked = True
+            match.save(update_fields=["is_locked", "updated_at"])
         return Response(MatchDetailSerializer(match).data)
 
     @action(detail=True, methods=["post"])
     def unlock(self, request, tournament_id=None, id=None):
-        match = self.get_object()
-        match.is_locked = False
-        match.save(update_fields=["is_locked", "updated_at"])
+        with transaction.atomic():
+            match = Match.objects.select_for_update().get(pk=self.get_object().pk)
+            match.is_locked = False
+            match.save(update_fields=["is_locked", "updated_at"])
         return Response(MatchDetailSerializer(match).data)
 
     @action(detail=True, methods=["post", "get"], url_path="goals")

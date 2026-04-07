@@ -2,6 +2,19 @@
 
 > Variables: `COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"`
 
+## Runbooks spécialisés
+
+| Sujet | Document |
+|-------|----------|
+| Déploiement | [DEPLOYMENT_RUNBOOK.md](DEPLOYMENT_RUNBOOK.md) |
+| Rollback | [ROLLBACK_RUNBOOK.md](ROLLBACK_RUNBOOK.md) |
+| Backup & Restore | [BACKUP_AND_RESTORE_RUNBOOK.md](BACKUP_AND_RESTORE_RUNBOOK.md) |
+| Disaster Recovery | [DISASTER_RECOVERY_RUNBOOK.md](DISASTER_RECOVERY_RUNBOOK.md) |
+| Sécurité prod | [PRODUCTION_SECURITY_CHECKLIST.md](PRODUCTION_SECURITY_CHECKLIST.md) |
+| Jour de tournoi | [TOURNAMENT_DAY_RUNBOOK.md](TOURNAMENT_DAY_RUNBOOK.md) |
+| Réponse incidents | [INCIDENT_RESPONSE_RUNBOOK.md](INCIDENT_RESPONSE_RUNBOOK.md) |
+| Go-live checklist | [PRODUCTION_GO_LIVE_CHECKLIST.md](PRODUCTION_GO_LIVE_CHECKLIST.md) |
+
 ---
 
 ## 1. Déploiement
@@ -279,8 +292,8 @@ send_mail('Test', 'Test body', None, ['admin@footix.app'])
 **Diagnostic** :
 ```bash
 # Vérifier Redis (couche channels)
-$COMPOSE exec redis redis-cli ping
-$COMPOSE exec redis redis-cli info memory
+$COMPOSE exec redis redis-cli -a $REDIS_PASSWORD ping
+$COMPOSE exec redis redis-cli -a $REDIS_PASSWORD info memory
 # Vérifier les connexions WS
 $COMPOSE logs --tail=50 backend | grep -i websocket
 ```
@@ -288,7 +301,7 @@ $COMPOSE logs --tail=50 backend | grep -i websocket
 ```bash
 $COMPOSE restart backend
 # Si Redis saturé :
-$COMPOSE exec redis redis-cli flushdb
+$COMPOSE exec redis redis-cli -a $REDIS_PASSWORD flushdb
 $COMPOSE restart backend
 ```
 **Note** : Les clients WebSocket se reconnectent automatiquement
@@ -313,8 +326,8 @@ curl -s http://localhost:8000/api/v1/health/db/
 **Diagnostic** :
 ```bash
 $COMPOSE ps redis
-$COMPOSE exec redis redis-cli ping
-$COMPOSE exec redis redis-cli info memory
+$COMPOSE exec redis redis-cli -a $REDIS_PASSWORD ping
+$COMPOSE exec redis redis-cli -a $REDIS_PASSWORD info memory
 ```
 **Actions** :
 ```bash

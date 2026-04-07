@@ -1,4 +1,5 @@
 import logging
+import os
 
 from django.conf import settings
 from django.utils import timezone
@@ -8,6 +9,9 @@ from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
 
+# Deployed image SHA — set via IMAGE_TAG env var in docker-compose.prod.yml
+_DEPLOYED_SHA = os.environ.get("IMAGE_TAG", "dev")
+
 
 class HealthView(APIView):
     permission_classes = [AllowAny]
@@ -16,7 +20,7 @@ class HealthView(APIView):
         return Response(
             {
                 "status": "ok",
-                "version": "1.0.0",
+                "version": _DEPLOYED_SHA,
                 "timestamp": timezone.now().isoformat(),
             }
         )

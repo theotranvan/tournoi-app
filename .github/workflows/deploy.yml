@@ -34,6 +34,9 @@ jobs:
       - name: Mypy
         working-directory: backend
         run: mypy apps/ --ignore-missing-imports
+      - name: Dependency audit (pip-audit)
+        working-directory: backend
+        run: pip install pip-audit && pip-audit --strict
 
   # ── Backend tests (required gate) ──────────────
   backend-tests:
@@ -102,6 +105,9 @@ jobs:
       - name: Build
         working-directory: frontend
         run: npm run build
+      - name: Dependency audit (npm)
+        working-directory: frontend
+        run: npm audit --audit-level=high || true
 
   # ── Frontend E2E tests ────────────────────────
   frontend-e2e:
@@ -188,6 +194,7 @@ jobs:
             PREV_TAG=""
             if [ -f .deployed_sha ]; then
               PREV_TAG=$(cat .deployed_sha)
+              cp .deployed_sha .deployed_sha.prev
             fi
 
             # Pre-deploy backup
@@ -223,3 +230,13 @@ jobs:
             done
 
             docker image prune -f
+
+      - name: Post-deploy smoke test
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd ${{ vars.DEPLOY_PATH || '/opt/kickoff' }}
+            bash scripts/smoke-test.sh http://localhost
