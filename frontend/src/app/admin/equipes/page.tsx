@@ -208,7 +208,7 @@ function TeamFormDialog({
               <div className="flex items-center gap-3">
                 {(logoPreview || (team?.logo && !form.logo)) && (
                   <img
-                    src={logoPreview || team?.logo}
+                    src={logoPreview ?? team?.logo ?? undefined}
                     alt="Logo"
                     className="size-10 rounded-full object-contain bg-muted shrink-0"
                   />

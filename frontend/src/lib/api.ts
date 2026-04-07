@@ -118,14 +118,21 @@ async function apiFetch<T = unknown>(
   }
 
   if (!res.ok) {
-    let detail = "Une erreur est survenue";
+    let detail = `Erreur ${res.status}`;
     let errors: Record<string, string[]> | undefined;
     try {
       const err = await res.json();
       detail = err.detail ?? err.message ?? detail;
       errors = err.errors ?? err.details;
     } catch {
-      // non-JSON error
+      // non-JSON error — try reading as text for debugging
+      try {
+        const text = await res.text();
+        if (text) detail = `Erreur ${res.status}: ${text.slice(0, 200)}`;
+      } catch {
+        // completely opaque response (likely CORS)
+        detail = `Erreur ${res.status} (réponse bloquée — vérifier CORS)`;
+      }
     }
     throw new ApiError(res.status, detail, errors);
   }
