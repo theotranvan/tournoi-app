@@ -118,7 +118,7 @@ async function apiFetch<T = unknown>(
   }
 
   if (!res.ok) {
-    let detail = `Erreur ${res.status}`;
+    let detail = `Erreur ${res.status} — ${url.toString()}`;
     let errors: Record<string, string[]> | undefined;
     try {
       const err = await res.json();
