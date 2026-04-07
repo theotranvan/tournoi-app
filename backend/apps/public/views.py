@@ -48,7 +48,7 @@ class PublicTournamentByCodeView(APIView):
     def get(self, request, code):
         code = code.upper().strip()
         tournament = get_object_or_404(
-            Tournament.objects.filter(is_public=True), public_code=code
+            Tournament, public_code=code
         )
         return Response(
             {

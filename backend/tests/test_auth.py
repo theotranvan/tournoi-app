@@ -74,6 +74,33 @@ class TestRegister:
         })
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
+    def test_register_duplicate_email_rejected(self, api):
+        UserFactory(username="user1", email="dup@test.com")
+        resp = api.post(REGISTER_URL, {
+            "username": "user2",
+            "email": "dup@test.com",
+            "password": "testpass123",
+        })
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_register_duplicate_email_case_insensitive(self, api):
+        UserFactory(username="user1", email="dup@test.com")
+        resp = api.post(REGISTER_URL, {
+            "username": "user2",
+            "email": "DUP@TEST.COM",
+            "password": "testpass123",
+        })
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_register_duplicate_username_case_insensitive(self, api):
+        UserFactory(username="alice")
+        resp = api.post(REGISTER_URL, {
+            "username": "ALICE",
+            "email": "new@test.com",
+            "password": "testpass123",
+        })
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
 
 # ── Login ────────────────────────────────────────────────────────────────
 
@@ -139,10 +166,7 @@ class TestMe:
 
     def test_me_unauthenticated(self, api):
         resp = api.get(ME_URL)
-        assert resp.status_code in (
-            status.HTTP_401_UNAUTHORIZED,
-            status.HTTP_403_FORBIDDEN,
-        )
+        assert resp.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 # ── Team Access ──────────────────────────────────────────────────────────

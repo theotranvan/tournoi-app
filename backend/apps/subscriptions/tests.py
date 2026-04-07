@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 from django.test import override_settings
 from rest_framework.test import APIClient
 
-from apps.subscriptions.models import Subscription
-from tests.factories import UserFactory
+from apps.subscriptions.models import Subscription, TournamentLicense
+from tests.factories import TournamentFactory, UserFactory
 
 
 @pytest.fixture
@@ -308,3 +308,56 @@ class TestStripeWebhook:
         subscription.refresh_from_db()
         assert subscription.status == "trialing"
         assert subscription.cancel_at_period_end is True
+
+
+# ─── License Model Tests ─────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestTournamentLicense:
+    def test_license_active_by_default(self):
+        user = UserFactory()
+        tournament = TournamentFactory(club__owner=user)
+        license_obj = TournamentLicense.objects.create(
+            user=user,
+            tournament=tournament,
+            stripe_payment_intent_id="pi_test",
+        )
+        assert license_obj.is_active is True
+        assert license_obj.is_valid is True
+
+    def test_license_valid_until_none_means_lifetime(self):
+        user = UserFactory()
+        tournament = TournamentFactory(club__owner=user)
+        license_obj = TournamentLicense.objects.create(
+            user=user,
+            tournament=tournament,
+            stripe_payment_intent_id="pi_test",
+            valid_until=None,
+        )
+        assert license_obj.is_valid is True
+
+    def test_license_unlocks_one_shot_features(self):
+        user = UserFactory()
+        tournament = TournamentFactory(club__owner=user)
+        TournamentLicense.objects.create(
+            user=user,
+            tournament=tournament,
+            stripe_payment_intent_id="pi_test",
+        )
+        from apps.subscriptions.plans import can_use_feature, get_effective_plan
+
+        assert get_effective_plan(user, tournament) == "ONE_SHOT"
+        assert can_use_feature(user, "knockout_phase", tournament) is True
+        assert can_use_feature(user, "pdf_kit", tournament) is True
+
+    def test_inactive_license_is_not_valid(self):
+        user = UserFactory()
+        tournament = TournamentFactory(club__owner=user)
+        license_obj = TournamentLicense.objects.create(
+            user=user,
+            tournament=tournament,
+            stripe_payment_intent_id="pi_test",
+            is_active=False,
+        )
+        assert license_obj.is_valid is False

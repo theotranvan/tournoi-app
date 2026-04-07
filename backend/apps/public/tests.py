@@ -336,3 +336,33 @@ class TestHealthCheck:
         resp = api.get("/api/v1/public/health/")
         assert resp.status_code == 200
         assert resp.data["status"] == "ok"
+
+
+# ─── By-Code Tests ───────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestPublicByCode:
+    def test_by_code_returns_tournament(self, api, public_tournament):
+        public_tournament.public_code = "TEST01"
+        public_tournament.save()
+        resp = api.get("/api/v1/public/tournaments/by-code/TEST01/")
+        assert resp.status_code == 200
+        assert resp.data["slug"] == public_tournament.slug
+
+    def test_by_code_works_even_if_not_public(self, api, organizer):
+        club = ClubFactory(owner=organizer)
+        t = TournamentFactory(club=club, is_public=False, public_code="PRIV01")
+        resp = api.get("/api/v1/public/tournaments/by-code/PRIV01/")
+        assert resp.status_code == 200
+        assert resp.data["slug"] == t.slug
+
+    def test_by_code_case_insensitive(self, api, public_tournament):
+        public_tournament.public_code = "ABC123"
+        public_tournament.save()
+        resp = api.get("/api/v1/public/tournaments/by-code/abc123/")
+        assert resp.status_code == 200
+
+    def test_by_code_invalid_returns_404(self, api):
+        resp = api.get("/api/v1/public/tournaments/by-code/ZZZZZZ/")
+        assert resp.status_code == 404
