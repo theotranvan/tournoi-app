@@ -13,6 +13,8 @@ RUN apt-get update && \
 
 # Install Python deps (layer-cached)
 COPY backend/pyproject.toml .
+COPY backend/apps ./apps
+COPY backend/kickoff ./kickoff
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir .
 
