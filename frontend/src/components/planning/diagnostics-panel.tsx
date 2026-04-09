@@ -175,9 +175,13 @@ function MatchDiagnosticRow({
                 Suggérer un échange
               </Button>
 
-              {showSuggestion && suggestMut.isSuccess && suggestMut.data && (
+              {showSuggestion &&
+                suggestMut.isSuccess &&
+                suggestMut.data &&
+                typeof suggestMut.data === "object" &&
+                "description" in suggestMut.data && (
                 <div className="mt-2 p-2 rounded bg-primary/5 border border-primary/20 text-xs space-y-1.5">
-                  <p>{suggestMut.data.description}</p>
+                  <p>{String(suggestMut.data.description)}</p>
                   <Button
                     size="sm"
                     className="text-xs h-6"

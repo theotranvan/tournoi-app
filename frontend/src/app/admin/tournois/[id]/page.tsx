@@ -150,9 +150,9 @@ function CategoryFormDialog({
     players_per_team: category?.players_per_team ?? null,
     day: category?.day ?? null,
     number_of_pools: category?.number_of_pools ?? null,
-    finals_format: category?.finals_format ?? null,
-    min_rest_matches: category?.min_rest_matches ?? null,
-    max_consecutive_matches: category?.max_consecutive_matches ?? null,
+    finals_format: category?.finals_format ?? undefined,
+    min_rest_matches: category?.min_rest_matches ?? undefined,
+    max_consecutive_matches: category?.max_consecutive_matches ?? undefined,
   });
 
   const set = (field: string, value: unknown) =>

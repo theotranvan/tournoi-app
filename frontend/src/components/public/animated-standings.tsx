@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -112,7 +112,7 @@ export function AnimatedStandings({
 }) {
   // Track previous ranks for change arrows
   const prevRanks = useRef<Record<string, number>>({});
-  const rankChanges = useRef<Record<string, number>>({});
+  const [rankChanges, setRankChanges] = useState<Record<string, number>>({});
 
   // Build current rank map & compute changes
   const currentRankMap = useMemo(() => {
@@ -137,16 +137,22 @@ export function AnimatedStandings({
         changes[key] = prev - rank;
       }
     }
-    rankChanges.current = changes;
     prevRanks.current = currentRankMap;
+
+    const frame = window.requestAnimationFrame(() => setRankChanges(changes));
 
     // Clear arrows after 2 seconds
     if (Object.keys(changes).length > 0) {
       const timer = setTimeout(() => {
-        rankChanges.current = {};
+        setRankChanges({});
       }, 2000);
-      return () => clearTimeout(timer);
+      return () => {
+        window.cancelAnimationFrame(frame);
+        clearTimeout(timer);
+      };
     }
+
+    return () => window.cancelAnimationFrame(frame);
   }, [currentRankMap]);
 
   const filtered =
@@ -201,7 +207,7 @@ export function AnimatedStandings({
                                 key={s.team_id}
                                 s={s}
                                 slug={slug}
-                                rankChange={rankChanges.current[key] ?? 0}
+                                rankChange={rankChanges[key] ?? 0}
                               />
                             );
                           })}

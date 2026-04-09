@@ -45,6 +45,8 @@ export function TeamNameAutocomplete({
   );
 
   const showDropdown = open && value.length >= 1 && filtered.length > 0;
+  const effectiveHighlightIndex =
+    highlightIndex >= 0 && highlightIndex < filtered.length ? highlightIndex : -1;
 
   // Close on outside click
   useEffect(() => {
@@ -56,11 +58,6 @@ export function TeamNameAutocomplete({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
-
-  // Reset highlight when suggestions change
-  useEffect(() => {
-    setHighlightIndex(-1);
-  }, [filtered.length]);
 
   const selectSuggestion = useCallback(
     (name: string) => {
@@ -80,9 +77,9 @@ export function TeamNameAutocomplete({
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setHighlightIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter" && highlightIndex >= 0) {
+    } else if (e.key === "Enter" && effectiveHighlightIndex >= 0) {
       e.preventDefault();
-      selectSuggestion(filtered[highlightIndex]);
+      selectSuggestion(filtered[effectiveHighlightIndex]);
     } else if (e.key === "Escape") {
       setOpen(false);
     }
@@ -90,11 +87,11 @@ export function TeamNameAutocomplete({
 
   // Scroll highlighted item into view
   useEffect(() => {
-    if (highlightIndex >= 0 && listRef.current) {
-      const el = listRef.current.children[highlightIndex] as HTMLElement;
+    if (effectiveHighlightIndex >= 0 && listRef.current) {
+      const el = listRef.current.children[effectiveHighlightIndex] as HTMLElement;
       el?.scrollIntoView({ block: "nearest" });
     }
-  }, [highlightIndex]);
+  }, [effectiveHighlightIndex]);
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -103,6 +100,7 @@ export function TeamNameAutocomplete({
         value={value}
         onChange={(e) => {
           onChange(e.target.value);
+          setHighlightIndex(-1);
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
@@ -125,10 +123,10 @@ export function TeamNameAutocomplete({
             <li
               key={name}
               role="option"
-              aria-selected={i === highlightIndex}
+              aria-selected={i === effectiveHighlightIndex}
               className={cn(
                 "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors",
-                i === highlightIndex
+                i === effectiveHighlightIndex
                   ? "bg-accent text-accent-foreground"
                   : "hover:bg-accent/50"
               )}

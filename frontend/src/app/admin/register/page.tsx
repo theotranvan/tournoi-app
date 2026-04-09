@@ -46,7 +46,7 @@ export default function AdminRegister() {
           if (err.errors) {
             return Object.values(err.errors).flat().join(" ");
           }
-          return err.detail ?? err.message ?? "Erreur lors de l\u2019inscription. Veuillez r\u00e9essayer.";
+          return err.detail ?? "Erreur lors de l\u2019inscription. Veuillez r\u00e9essayer.";
         })()
       : "");
 

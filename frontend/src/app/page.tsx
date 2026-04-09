@@ -20,13 +20,19 @@ export default function Home() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // Wait for zustand persist to finish hydrating from localStorage
-    if (useOnboardingStore.persist.hasHydrated()) {
-      setReady(true);
-    } else {
-      useOnboardingStore.persist.onFinishHydration(() => setReady(true));
+    if (ready || typeof window === "undefined") return;
+
+    const persistApi = useOnboardingStore.persist;
+    if (!persistApi) return;
+
+    if (persistApi.hasHydrated()) {
+      const frame = window.requestAnimationFrame(() => setReady(true));
+      return () => window.cancelAnimationFrame(frame);
     }
-  }, []);
+
+    // Wait for zustand persist to finish hydrating from localStorage.
+    return persistApi.onFinishHydration(() => setReady(true));
+  }, [ready]);
 
   useEffect(() => {
     if (!ready) return;

@@ -21,6 +21,16 @@ import { scheduleKeys } from "./use-schedule";
 import { matchKeys } from "./use-matches";
 import { groupKeys } from "./use-groups";
 
+interface SuggestSwapResult {
+  description: string;
+  applied: boolean;
+  swap_with_match_id: string;
+  swap_with_display: string;
+  swap_with_time: string;
+  swap_with_field: string;
+  improvement: number;
+}
+
 // ─── Tournaments ────────────────────────────────────────────────────────────
 
 export function useCreateTournament() {
@@ -208,7 +218,7 @@ export function useSuggestSwap(tournamentId: string) {
       matchId: string;
       apply?: boolean;
     }) =>
-      api.post(
+      api.post<SuggestSwapResult>(
         `/tournaments/${tournamentId}/schedule/suggest-swap/${matchId}/${apply ? "?apply=true" : ""}`
       ),
     onSuccess: () => {
@@ -268,7 +278,7 @@ export function useAutoGeneratePools(tournamentId: string) {
         `/tournaments/${tournamentId}/categories/${categoryId}/auto-pools/`
       ),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: groupKeys.list(tournamentId) });
+      qc.invalidateQueries({ queryKey: groupKeys.all });
       qc.invalidateQueries({ queryKey: matchKeys.list(tournamentId) });
       qc.invalidateQueries({ queryKey: scheduleKeys.feasibility(tournamentId) });
     },
