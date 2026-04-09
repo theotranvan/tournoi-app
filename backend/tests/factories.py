@@ -5,7 +5,7 @@ from apps.accounts.models import User
 from apps.clubs.models import Club
 from apps.matches.models import Goal, Match
 from apps.teams.models import Group, Team
-from apps.tournaments.models import Category, Field, Tournament
+from apps.tournaments.models import Category, Day, Field, Tournament
 
 
 class UserFactory(factory.django.DjangoModelFactory):
@@ -95,6 +95,20 @@ class GroupFactory(factory.django.DjangoModelFactory):
     category = factory.SubFactory(CategoryFactory)
     name = factory.Sequence(lambda n: f"Poule {chr(65 + n % 26)}")
     display_order = factory.Sequence(lambda n: n)
+
+
+class DayFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Day
+
+    tournament = factory.SubFactory(TournamentFactory)
+    date = factory.LazyAttribute(lambda o: o.tournament.start_date)
+    label = factory.Sequence(lambda n: f"Jour {n + 1}")
+    start_time = "08:30"
+    end_time = "17:30"
+    lunch_start = "12:00"
+    lunch_end = "13:00"
+    order = factory.Sequence(lambda n: n)
 
 
 class MatchFactory(factory.django.DjangoModelFactory):

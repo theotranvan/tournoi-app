@@ -3,6 +3,8 @@
 from django.urls import path
 
 from apps.scheduling.views import (
+    AutoGeneratePoolsView,
+    GenerateFinalsView,
     GenerateScheduleView,
     RecalculateScheduleView,
     ResolveBracketsView,

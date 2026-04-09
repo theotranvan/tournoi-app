@@ -7,12 +7,19 @@ import type {
   CategoryPayload,
   TournamentField,
   FieldPayload,
-  ScheduleTaskResponse,
+  Day,
+  DayPayload,
+  GenerateResult,
+  FinalsResult,
+  AutoPoolsResult,
 } from "@/types/api";
 import { tournamentKeys } from "./use-tournaments";
 import { categoryKeys } from "./use-categories";
 import { fieldKeys } from "./use-fields";
+import { dayKeys } from "./use-days";
 import { scheduleKeys } from "./use-schedule";
+import { matchKeys } from "./use-matches";
+import { groupKeys } from "./use-groups";
 
 // ─── Tournaments ────────────────────────────────────────────────────────────
 
@@ -166,13 +173,15 @@ export function useUpdateField(tournamentId: string, id: number) {
 export function useGenerateSchedule(tournamentId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (options?: { async?: boolean }) =>
-      api.post<ScheduleTaskResponse>(
+    mutationFn: (options?: Record<string, unknown>) =>
+      api.post<GenerateResult>(
         `/tournaments/${tournamentId}/schedule/generate/`,
         options
       ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: scheduleKeys.list(tournamentId) });
+      qc.invalidateQueries({ queryKey: scheduleKeys.feasibility(tournamentId) });
+      qc.invalidateQueries({ queryKey: matchKeys.list(tournamentId) });
     },
   });
 }
@@ -207,6 +216,76 @@ export function useSuggestSwap(tournamentId: string) {
       qc.invalidateQueries({
         queryKey: scheduleKeys.diagnostics(tournamentId),
       });
+    },
+  });
+}
+
+// ─── Days ───────────────────────────────────────────────────────────────────
+
+export function useCreateDay(tournamentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: DayPayload) =>
+      api.post<Day>(`/tournaments/${tournamentId}/days/`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: dayKeys.list(tournamentId) });
+      qc.invalidateQueries({ queryKey: scheduleKeys.feasibility(tournamentId) });
+    },
+  });
+}
+
+export function useUpdateDay(tournamentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: DayPayload & { id: number }) =>
+      api.patch<Day>(`/tournaments/${tournamentId}/days/${id}/`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: dayKeys.list(tournamentId) });
+      qc.invalidateQueries({ queryKey: scheduleKeys.feasibility(tournamentId) });
+    },
+  });
+}
+
+export function useDeleteDay(tournamentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      api.delete(`/tournaments/${tournamentId}/days/${id}/`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: dayKeys.list(tournamentId) });
+      qc.invalidateQueries({ queryKey: scheduleKeys.feasibility(tournamentId) });
+    },
+  });
+}
+
+// ─── Auto Pools & Finals ────────────────────────────────────────────────────
+
+export function useAutoGeneratePools(tournamentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (categoryId: number) =>
+      api.post<AutoPoolsResult>(
+        `/tournaments/${tournamentId}/categories/${categoryId}/auto-pools/`
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: groupKeys.list(tournamentId) });
+      qc.invalidateQueries({ queryKey: matchKeys.list(tournamentId) });
+      qc.invalidateQueries({ queryKey: scheduleKeys.feasibility(tournamentId) });
+    },
+  });
+}
+
+export function useGenerateFinals(tournamentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (categoryId: number) =>
+      api.post<FinalsResult>(
+        `/tournaments/${tournamentId}/categories/${categoryId}/finals/`
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: matchKeys.list(tournamentId) });
+      qc.invalidateQueries({ queryKey: scheduleKeys.list(tournamentId) });
+      qc.invalidateQueries({ queryKey: scheduleKeys.feasibility(tournamentId) });
     },
   });
 }

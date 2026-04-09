@@ -55,8 +55,8 @@ class TestGenerateSchedule:
         url = f"/api/v1/tournaments/{ready_tournament.id}/schedule/generate/"
         resp = api.post(url, {"strategy": "balanced", "async_mode": False}, format="json")
         assert resp.status_code == 200
-        assert "placed_count" in resp.data
-        assert resp.data["placed_count"] > 0
+        assert resp.data["success"] is True
+        assert resp.data["stats"]["total_matches"] > 0
 
     def test_generate_requires_auth(self, anon_api, ready_tournament):
         url = f"/api/v1/tournaments/{ready_tournament.id}/schedule/generate/"
@@ -64,9 +64,11 @@ class TestGenerateSchedule:
         assert resp.status_code in (401, 403)
 
     def test_generate_invalid_strategy(self, api, ready_tournament):
+        """Strategy parameter is now ignored by the new engine — any value succeeds."""
         url = f"/api/v1/tournaments/{ready_tournament.id}/schedule/generate/"
         resp = api.post(url, {"strategy": "invalid_xyz", "async_mode": False}, format="json")
-        assert resp.status_code == 400
+        # New engine ignores strategy field; generation succeeds if tournament is valid
+        assert resp.status_code == 200
 
 
 # ── Schedule list endpoint ───────────────────────────────────────────────────
@@ -78,7 +80,9 @@ class TestScheduleList:
         url = f"/api/v1/tournaments/{ready_tournament.id}/schedule/"
         resp = api.get(url)
         assert resp.status_code == 200
-        assert resp.data["total_matches"] == 0
+        # ScheduleListView now returns a list of ScheduleDay dicts
+        assert isinstance(resp.data, list)
+        assert len(resp.data) == 0
 
     def test_list_after_generate(self, api, ready_tournament):
         gen_url = f"/api/v1/tournaments/{ready_tournament.id}/schedule/generate/"
@@ -87,7 +91,11 @@ class TestScheduleList:
         url = f"/api/v1/tournaments/{ready_tournament.id}/schedule/"
         resp = api.get(url)
         assert resp.status_code == 200
-        assert resp.data["total_matches"] > 0
+        assert isinstance(resp.data, list)
+        total_matches = sum(
+            len(f["matches"]) for day in resp.data for f in day["fields"]
+        )
+        assert total_matches > 0
 
     def test_list_requires_auth(self, anon_api, ready_tournament):
         url = f"/api/v1/tournaments/{ready_tournament.id}/schedule/"

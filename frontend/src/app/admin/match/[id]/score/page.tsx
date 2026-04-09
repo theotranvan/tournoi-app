@@ -18,10 +18,11 @@ import {
   SheetDescription,
   SheetFooter,
 } from "@/components/ui/sheet";
-import { Minus, Plus, Check, ArrowLeft, Loader2, Play, Flag, Target, Users, X } from "lucide-react";
+import { Minus, Plus, Check, ArrowLeft, Loader2, Play, Flag, Target, Users, X, Trophy } from "lucide-react";
 import Link from "next/link";
-import { useMatch } from "@/hooks/use-matches";
+import { useMatch, useMatches } from "@/hooks/use-matches";
 import { useSubmitScore, useStartMatch } from "@/hooks/use-match-mutations";
+import { useGenerateFinals } from "@/hooks/use-mutations";
 import { triggerHaptic } from "@/lib/haptics";
 import type { GoalInput } from "@/types/api";
 
@@ -52,8 +53,10 @@ export default function ScoreEntry({
   const router = useRouter();
 
   const { data: match, isLoading } = useMatch(tournamentId, matchId);
+  const { data: matchesData } = useMatches(tournamentId);
   const submitScore = useSubmitScore(tournamentId, matchId);
   const startMatch = useStartMatch(tournamentId, matchId);
+  const generateFinals = useGenerateFinals(tournamentId);
 
   const [homeScore, setHomeScore] = useState(0);
   const [awayScore, setAwayScore] = useState(0);
@@ -61,6 +64,8 @@ export default function ScoreEntry({
   const [penaltyAway, setPenaltyAway] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [showGoalSheet, setShowGoalSheet] = useState(false);
+  const [showFinalsPrompt, setShowFinalsPrompt] = useState(false);
+  const [finalsGenerated, setFinalsGenerated] = useState(false);
   const [goals, setGoals] = useState<GoalInput[]>([]);
 
   const addGoal = useCallback((team: "home" | "away") => {
@@ -89,6 +94,15 @@ export default function ScoreEntry({
     []
   );
 
+  // Check if all group matches in the same category are finished (after submitting this one)
+  const checkAllGroupMatchesDone = useCallback(() => {
+    if (!match || match.phase !== "group" || !matchesData?.results) return false;
+    const catGroupMatches = matchesData.results.filter(
+      (m) => m.category === match.category && m.phase === "group" && m.id !== match.id
+    );
+    return catGroupMatches.every((m) => m.status === "finished");
+  }, [match, matchesData]);
+
   // Prefill from existing scores
   if (match && !submitted && homeScore === 0 && awayScore === 0) {
     if (match.score_home !== null) setHomeScore(match.score_home);
@@ -110,7 +124,12 @@ export default function ScoreEntry({
       {
         onSuccess: () => {
           setSubmitted(true);
-          setShowGoalSheet(true);
+          // Check if all group matches done → propose finals generation
+          if (match?.phase === "group" && checkAllGroupMatchesDone()) {
+            setShowFinalsPrompt(true);
+          } else {
+            setShowGoalSheet(true);
+          }
         },
       }
     );
@@ -543,6 +562,83 @@ export default function ScoreEntry({
             <Button variant="ghost" onClick={handleSkipGoals}>
               Passer cette étape
             </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      {/* Finals generation prompt */}
+      <Sheet open={showFinalsPrompt} onOpenChange={setShowFinalsPrompt}>
+        <SheetContent side="bottom" className="max-h-[60vh]">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Trophy className="size-5 text-amber-500" />
+              Phase de poules terminée !
+            </SheetTitle>
+            <SheetDescription>
+              Tous les matchs de poule de la catégorie <strong>{match?.category_name}</strong> sont terminés.
+              Voulez-vous générer les phases finales ?
+            </SheetDescription>
+          </SheetHeader>
+
+          {finalsGenerated && (
+            <div className="px-4 py-3 text-center">
+              <div className="size-12 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-2">
+                <Check className="size-6 text-green-500" />
+              </div>
+              <p className="text-sm font-medium">Phases finales générées !</p>
+            </div>
+          )}
+
+          {generateFinals.isError && (
+            <div className="px-4">
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2">
+                <p className="text-sm text-destructive text-center">
+                  Erreur lors de la génération des finales.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <SheetFooter>
+            {!finalsGenerated ? (
+              <>
+                <Button
+                  onClick={() => {
+                    if (!match) return;
+                    triggerHaptic("medium");
+                    generateFinals.mutate(match.category, {
+                      onSuccess: () => setFinalsGenerated(true),
+                    });
+                  }}
+                  disabled={generateFinals.isPending}
+                >
+                  {generateFinals.isPending ? (
+                    <Loader2 className="size-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trophy className="size-4 mr-2" />
+                  )}
+                  Générer les finales
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowFinalsPrompt(false);
+                    setShowGoalSheet(true);
+                  }}
+                >
+                  Plus tard
+                </Button>
+              </>
+            ) : (
+              <Button
+                onClick={() => {
+                  setShowFinalsPrompt(false);
+                  router.push(`/admin/tournois/${tournamentId}`);
+                }}
+              >
+                Retour au tournoi
+              </Button>
+            )}
           </SheetFooter>
         </SheetContent>
       </Sheet>

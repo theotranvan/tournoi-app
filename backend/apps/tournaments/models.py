@@ -98,6 +98,24 @@ class Tournament(models.Model):
         help_text="Multiplicateur de repos entre dernière poule et première phase finale",
     )
 
+    class SchedulingMode(models.TextChoices):
+        CATEGORY_BLOCK = "CATEGORY_BLOCK", "Par catégorie (une catégorie après l'autre)"
+        INTERLEAVE = "INTERLEAVE", "Entrelacé (matchs de toutes catégories mélangés)"
+
+    scheduling_mode = models.CharField(
+        max_length=20,
+        choices=SchedulingMode.choices,
+        default=SchedulingMode.CATEGORY_BLOCK,
+    )
+    default_min_rest_matches = models.PositiveIntegerField(
+        default=1,
+        help_text="Nombre minimum de créneaux de repos entre deux matchs d'une même équipe",
+    )
+    max_consecutive_matches = models.PositiveIntegerField(
+        default=2,
+        help_text="Nombre maximum de matchs consécutifs pour une équipe",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -140,6 +158,10 @@ class Tournament(models.Model):
 class Category(models.Model):
     """Catégorie d'âge : U8, U10, U13, Senior, etc."""
 
+    class FinalsFormat(models.TextChoices):
+        TOP2_CROSSOVER = "TOP2_CROSSOVER", "1er vs 2e croisé (demi-finales)"
+        TOP1_FINAL = "TOP1_FINAL", "1er de chaque poule en finale directe"
+
     tournament = models.ForeignKey(
         Tournament, on_delete=models.CASCADE, related_name="categories"
     )
@@ -151,6 +173,38 @@ class Category(models.Model):
     match_duration = models.PositiveIntegerField(null=True, blank=True)
     transition_time = models.PositiveIntegerField(null=True, blank=True)
     rest_time = models.PositiveIntegerField(null=True, blank=True)
+
+    # Slot-based rest (from store.js approach)
+    min_rest_matches = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Nombre minimum de créneaux de repos (surcharge tournoi)",
+    )
+    max_consecutive_matches = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Nombre maximum de matchs consécutifs (surcharge tournoi)",
+    )
+
+    # Pool / Finals configuration
+    number_of_pools = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Nombre de poules souhaité pour l'auto-génération",
+    )
+    finals_format = models.CharField(
+        max_length=20,
+        choices=FinalsFormat.choices,
+        default=FinalsFormat.TOP2_CROSSOVER,
+    )
+    finals_same_day = models.BooleanField(
+        default=True,
+        help_text="Si True, les finales sont le même jour que les poules",
+    )
+
+    # Day assignment (from store.js)
+    day = models.ForeignKey(
+        "Day", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="categories",
+        help_text="Jour assigné à cette catégorie (vide = répartition auto)",
+    )
 
     # Règles métier
     players_per_team = models.PositiveIntegerField(default=7)
@@ -249,3 +303,50 @@ class SchedulingConstraint(models.Model):
 
     def __str__(self) -> str:
         return f"{self.tournament.name} - {self.name}"
+
+
+class Day(models.Model):
+    """Journée de tournoi avec horaires et pause déjeuner."""
+
+    tournament = models.ForeignKey(
+        Tournament, on_delete=models.CASCADE, related_name="days"
+    )
+    date = models.DateField()
+    label = models.CharField(max_length=100, blank=True)
+    start_time = models.CharField(
+        max_length=5, default="08:30",
+        help_text="Heure de début (HH:MM)",
+    )
+    end_time = models.CharField(
+        max_length=5, default="17:30",
+        help_text="Heure de fin (HH:MM)",
+    )
+    lunch_start = models.CharField(
+        max_length=5, default="12:00", blank=True,
+        help_text="Début pause déjeuner (HH:MM)",
+    )
+    lunch_end = models.CharField(
+        max_length=5, default="13:00", blank=True,
+        help_text="Fin pause déjeuner (HH:MM)",
+    )
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "date"]
+        unique_together = ("tournament", "date")
+
+    def __str__(self) -> str:
+        return f"{self.label or self.date} ({self.tournament.name})"
+
+    def playable_minutes(self) -> int:
+        """Calculate total playable minutes accounting for lunch break."""
+        sh, sm = map(int, self.start_time.split(":"))
+        eh, em = map(int, self.end_time.split(":"))
+        total = (eh * 60 + em) - (sh * 60 + sm)
+
+        if self.lunch_start and self.lunch_end:
+            lsh, lsm = map(int, self.lunch_start.split(":"))
+            leh, lem = map(int, self.lunch_end.split(":"))
+            total -= (leh * 60 + lem) - (lsh * 60 + lsm)
+
+        return max(0, total)

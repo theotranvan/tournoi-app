@@ -63,6 +63,36 @@ class Match(TrackChangesMixin, models.Model):
     )
     placeholder_away = models.CharField(max_length=100, blank=True)
 
+    # Source match references for bracket propagation (from store.js approach)
+    source_home = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="next_home_matches",
+        help_text="Match source pour l'équipe domicile (ex: demi-finale)",
+    )
+    source_away = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="next_away_matches",
+        help_text="Match source pour l'équipe extérieur",
+    )
+    source_home_type = models.CharField(
+        max_length=10, blank=True,
+        help_text="'winner' ou 'loser' du match source_home",
+    )
+    source_away_type = models.CharField(
+        max_length=10, blank=True,
+        help_text="'winner' ou 'loser' du match source_away",
+    )
+
+    # Day reference for slot-based scheduling
+    day = models.ForeignKey(
+        "tournaments.Day", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="matches",
+    )
+    slot_index = models.IntegerField(
+        null=True, blank=True,
+        help_text="Index du créneau global (pour tri chronologique)",
+    )
+
     field = models.ForeignKey(
         Field, on_delete=models.SET_NULL, null=True, related_name="matches"
     )

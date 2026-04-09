@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.tournaments.models import Category, Field, SchedulingConstraint, Tournament
+from apps.tournaments.models import Category, Day, Field, SchedulingConstraint, Tournament
 
 
 class TournamentListSerializer(serializers.ModelSerializer):
@@ -59,6 +59,9 @@ class TournamentDetailSerializer(serializers.ModelSerializer):
             "default_rest_time",
             "phase_separation_mode",
             "knockout_rest_multiplier",
+            "scheduling_mode",
+            "default_min_rest_matches",
+            "max_consecutive_matches",
             "nb_categories",
             "nb_teams",
             "nb_matches",
@@ -92,6 +95,9 @@ class TournamentCreateSerializer(serializers.ModelSerializer):
             "default_rest_time",
             "phase_separation_mode",
             "knockout_rest_multiplier",
+            "scheduling_mode",
+            "default_min_rest_matches",
+            "max_consecutive_matches",
         )
         read_only_fields = ("id", "slug", "status")
 
@@ -120,6 +126,12 @@ class CategorySerializer(serializers.ModelSerializer):
             "match_duration",
             "transition_time",
             "rest_time",
+            "min_rest_matches",
+            "max_consecutive_matches",
+            "number_of_pools",
+            "finals_format",
+            "finals_same_day",
+            "day",
             "players_per_team",
             "points_win",
             "points_draw",
@@ -167,3 +179,23 @@ class SchedulingConstraintSerializer(serializers.ModelSerializer):
             "created_at",
         )
         read_only_fields = ("id", "tournament", "created_at")
+
+
+class DaySerializer(serializers.ModelSerializer):
+    playable_minutes = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Day
+        fields = (
+            "id",
+            "tournament",
+            "date",
+            "label",
+            "start_time",
+            "end_time",
+            "lunch_start",
+            "lunch_end",
+            "order",
+            "playable_minutes",
+        )
+        read_only_fields = ("id", "tournament")

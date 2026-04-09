@@ -42,6 +42,7 @@ import {
 import { useTournament } from "@/hooks/use-tournaments";
 import { useCategories } from "@/hooks/use-categories";
 import { useFields } from "@/hooks/use-fields";
+import { useDays } from "@/hooks/use-days";
 import { useTeams } from "@/hooks/use-teams";
 import { useGroups } from "@/hooks/use-groups";
 import { useMatches } from "@/hooks/use-matches";
@@ -69,6 +70,7 @@ import type {
   CategoryPayload,
   TournamentField,
   FieldPayload,
+  Day,
   TeamPayload,
   GroupPayload,
   MatchStatus,
@@ -124,11 +126,13 @@ function CategoryFormDialog({
   onOpenChange,
   tournamentId,
   category,
+  days,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tournamentId: string;
   category?: Category;
+  days?: Day[];
 }) {
   const isEdit = !!category;
   const createMut = useCreateCategory(tournamentId);
@@ -144,10 +148,17 @@ function CategoryFormDialog({
     points_loss: category?.points_loss ?? 0,
     match_duration: category?.match_duration ?? null,
     players_per_team: category?.players_per_team ?? null,
+    day: category?.day ?? null,
+    number_of_pools: category?.number_of_pools ?? null,
+    finals_format: category?.finals_format ?? null,
+    min_rest_matches: category?.min_rest_matches ?? null,
+    max_consecutive_matches: category?.max_consecutive_matches ?? null,
   });
 
   const set = (field: string, value: unknown) =>
     setForm((prev) => ({ ...prev, [field]: value }));
+
+  const sortedDays = (days ?? []).slice().sort((a, b) => a.order - b.order);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -162,7 +173,7 @@ function CategoryFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent onClose={() => onOpenChange(false)}>
+      <DialogContent onClose={() => onOpenChange(false)} className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? "Modifier la catégorie" : "Nouvelle catégorie"}
@@ -188,6 +199,25 @@ function CategoryFormDialog({
                 className="h-9 p-1"
               />
             </div>
+
+            {/* Day assignment */}
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Jour assigné</Label>
+              <Select
+                value={form.day != null ? String(form.day) : ""}
+                onChange={(e) =>
+                  set("day", e.target.value ? Number(e.target.value) : null)
+                }
+                options={[
+                  { value: "", label: "— Tous les jours —" },
+                  ...sortedDays.map((d) => ({
+                    value: String(d.id),
+                    label: d.label || d.date,
+                  })),
+                ]}
+              />
+            </div>
+
             <div className="space-y-1.5">
               <Label>Pts victoire</Label>
               <Input
@@ -236,6 +266,70 @@ function CategoryFormDialog({
                 placeholder="—"
               />
             </div>
+
+            {/* Pools & Finals */}
+            <div className="space-y-1.5">
+              <Label>Nombre de poules</Label>
+              <Input
+                type="number"
+                min={1}
+                value={form.number_of_pools ?? ""}
+                onChange={(e) =>
+                  set(
+                    "number_of_pools",
+                    e.target.value ? Number(e.target.value) : null
+                  )
+                }
+                placeholder="Auto"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Format finales</Label>
+              <Select
+                value={form.finals_format ?? ""}
+                onChange={(e) =>
+                  set("finals_format", e.target.value || null)
+                }
+                options={[
+                  { value: "", label: "— Aucune —" },
+                  { value: "TOP2_CROSSOVER", label: "Top 2 croisé" },
+                  { value: "TOP1_FINAL", label: "Top 1 → Finale" },
+                ]}
+              />
+            </div>
+
+            {/* Rest / consecutive constraints */}
+            <div className="space-y-1.5">
+              <Label>Repos min (matchs)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={form.min_rest_matches ?? ""}
+                onChange={(e) =>
+                  set(
+                    "min_rest_matches",
+                    e.target.value ? Number(e.target.value) : null
+                  )
+                }
+                placeholder="Défaut tournoi"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Max consécutifs</Label>
+              <Input
+                type="number"
+                min={1}
+                value={form.max_consecutive_matches ?? ""}
+                onChange={(e) =>
+                  set(
+                    "max_consecutive_matches",
+                    e.target.value ? Number(e.target.value) : null
+                  )
+                }
+                placeholder="Défaut tournoi"
+              />
+            </div>
+
             <div className="space-y-1.5">
               <Label>Ordre d&apos;affichage</Label>
               <Input
@@ -271,11 +365,13 @@ function FieldFormDialog({
   onOpenChange,
   tournamentId,
   field,
+  days,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tournamentId: string;
   field?: TournamentField;
+  days?: Day[];
 }) {
   const isEdit = !!field;
   const createMut = useCreateField(tournamentId);
@@ -286,7 +382,79 @@ function FieldFormDialog({
     name: field?.name ?? "",
     display_order: field?.display_order ?? 0,
     is_active: field?.is_active ?? true,
+    availability: field?.availability ?? null,
   });
+
+  // Auto-fill availability from tournament days when creating a new field
+  const sortedDays = (days ?? []).slice().sort((a, b) => a.order - b.order);
+
+  function handleAutoFill() {
+    if (!sortedDays.length) return;
+    const avail: Record<string, { start: string; end: string }[]> = {};
+    for (const d of sortedDays) {
+      avail[d.date] = [{ start: d.start_time, end: d.end_time }];
+    }
+    setForm((f) => ({ ...f, availability: avail }));
+  }
+
+  function setSlot(
+    date: string,
+    idx: number,
+    key: "start" | "end",
+    value: string
+  ) {
+    setForm((f) => {
+      const avail = { ...(f.availability ?? {}) };
+      const slots = [...(avail[date] ?? [])];
+      slots[idx] = { ...slots[idx], [key]: value };
+      avail[date] = slots;
+      return { ...f, availability: avail };
+    });
+  }
+
+  function addSlot(date: string) {
+    setForm((f) => {
+      const avail = { ...(f.availability ?? {}) };
+      const slots = [...(avail[date] ?? [])];
+      slots.push({ start: "08:00", end: "18:00" });
+      avail[date] = slots;
+      return { ...f, availability: avail };
+    });
+  }
+
+  function removeSlot(date: string, idx: number) {
+    setForm((f) => {
+      const avail = { ...(f.availability ?? {}) };
+      const slots = [...(avail[date] ?? [])];
+      slots.splice(idx, 1);
+      if (slots.length === 0) {
+        delete avail[date];
+      } else {
+        avail[date] = slots;
+      }
+      return { ...f, availability: Object.keys(avail).length ? avail : null };
+    });
+  }
+
+  function addDay() {
+    setForm((f) => {
+      const avail = { ...(f.availability ?? {}) };
+      // Find a date not already used
+      const usedDates = new Set(Object.keys(avail));
+      for (const d of sortedDays) {
+        if (!usedDates.has(d.date)) {
+          avail[d.date] = [{ start: d.start_time, end: d.end_time }];
+          return { ...f, availability: avail };
+        }
+      }
+      // Fallback: add today
+      const today = new Date().toISOString().slice(0, 10);
+      if (!usedDates.has(today)) {
+        avail[today] = [{ start: "08:00", end: "18:00" }];
+      }
+      return { ...f, availability: Object.keys(avail).length ? avail : null };
+    });
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -299,9 +467,13 @@ function FieldFormDialog({
     }
   }
 
+  const dateEntries = Object.entries(form.availability ?? {}).sort(
+    ([a], [b]) => a.localeCompare(b)
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent onClose={() => onOpenChange(false)}>
+      <DialogContent onClose={() => onOpenChange(false)} className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? "Modifier le terrain" : "Nouveau terrain"}
@@ -346,6 +518,122 @@ function FieldFormDialog({
               <Label htmlFor="field-active">Terrain actif</Label>
             </div>
           </div>
+
+          {/* Availability Section */}
+          <div className="space-y-2 border-t pt-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Disponibilités</Label>
+              <div className="flex gap-1">
+                {sortedDays.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAutoFill}
+                    className="text-xs h-7"
+                  >
+                    Auto-remplir depuis jours
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addDay}
+                  className="text-xs h-7"
+                >
+                  <Plus className="size-3 mr-1" />
+                  Jour
+                </Button>
+              </div>
+            </div>
+
+            {dateEntries.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Aucune disponibilité configurée. Le terrain sera considéré
+                disponible tous les jours du tournoi.
+              </p>
+            )}
+
+            {dateEntries.map(([date, slots]) => (
+              <div key={date} className="rounded border p-2 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Input
+                    type="date"
+                    value={date}
+                    onChange={(e) => {
+                      const newDate = e.target.value;
+                      if (!newDate || newDate === date) return;
+                      setForm((f) => {
+                        const avail = { ...(f.availability ?? {}) };
+                        avail[newDate] = avail[date];
+                        delete avail[date];
+                        return { ...f, availability: avail };
+                      });
+                    }}
+                    className="h-7 text-xs w-36"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setForm((f) => {
+                        const avail = { ...(f.availability ?? {}) };
+                        delete avail[date];
+                        return {
+                          ...f,
+                          availability: Object.keys(avail).length
+                            ? avail
+                            : null,
+                        };
+                      });
+                    }}
+                    className="h-6 w-6 p-0 text-muted-foreground"
+                  >
+                    <Trash2 className="size-3" />
+                  </Button>
+                </div>
+                {slots.map((slot, idx) => (
+                  <div key={idx} className="flex items-center gap-1.5">
+                    <Input
+                      type="time"
+                      value={slot.start}
+                      onChange={(e) => setSlot(date, idx, "start", e.target.value)}
+                      className="h-7 text-xs flex-1"
+                    />
+                    <span className="text-xs text-muted-foreground">→</span>
+                    <Input
+                      type="time"
+                      value={slot.end}
+                      onChange={(e) => setSlot(date, idx, "end", e.target.value)}
+                      className="h-7 text-xs flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeSlot(date, idx)}
+                      className="h-6 w-6 p-0 text-muted-foreground"
+                    >
+                      <Trash2 className="size-3" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => addSlot(date)}
+                  className="text-xs h-6"
+                >
+                  <Plus className="size-3 mr-1" />
+                  Créneau
+                </Button>
+              </div>
+            ))}
+          </div>
+
           <DialogFooter>
             <Button
               type="button"
@@ -780,6 +1068,7 @@ export default function TournamentDetail({
   const { data: tournament, isLoading } = useTournament(id);
   const { data: categories } = useCategories(id);
   const { data: fields } = useFields(id);
+  const { data: days } = useDays(id);
   const { data: teamsData } = useTeams(id);
   const { data: matchesData } = useMatches(id);
 
@@ -1062,6 +1351,7 @@ export default function TournamentDetail({
             onOpenChange={setCatDialogOpen}
             tournamentId={id}
             category={editCategory}
+            days={days}
           />
         </TabsContent>
 
@@ -1305,6 +1595,7 @@ export default function TournamentDetail({
             onOpenChange={setFieldDialogOpen}
             tournamentId={id}
             field={editField}
+            days={days}
           />
         </TabsContent>
 

@@ -16,10 +16,11 @@ from apps.subscriptions.plans import (
     check_can_create_tournament,
     get_effective_plan,
 )
-from apps.tournaments.models import Category, Field, SchedulingConstraint, Tournament
+from apps.tournaments.models import Category, Day, Field, SchedulingConstraint, Tournament
 from apps.tournaments.serializers import (
     BulkCategorySerializer,
     CategorySerializer,
+    DaySerializer,
     FieldSerializer,
     SchedulingConstraintSerializer,
     TournamentCreateSerializer,
@@ -321,6 +322,21 @@ class SchedulingConstraintViewSet(viewsets.ModelViewSet):
         if tournament_id:
             return SchedulingConstraint.objects.filter(tournament_id=tournament_id)
         return SchedulingConstraint.objects.none()
+
+    def perform_create(self, serializer):
+        tournament = _get_tournament_for_nested(self.kwargs, self.request.user)
+        serializer.save(tournament=tournament)
+
+
+class DayViewSet(viewsets.ModelViewSet):
+    serializer_class = DaySerializer
+    permission_classes = [IsAuthenticated, IsOrganizer]
+
+    def get_queryset(self):
+        tournament_id = self.kwargs.get("tournament_id")
+        if tournament_id:
+            return Day.objects.filter(tournament_id=tournament_id).order_by("order", "date")
+        return Day.objects.none()
 
     def perform_create(self, serializer):
         tournament = _get_tournament_for_nested(self.kwargs, self.request.user)

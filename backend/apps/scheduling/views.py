@@ -21,6 +21,13 @@ class ScheduleGenerateThrottle(UserRateThrottle):
     rate = "5/hour"
 from apps.matches.models import Match
 from apps.scheduling.engine import SchedulingEngine
+from apps.scheduling.generate import (
+    auto_generate_pools,
+    calculate_feasibility,
+    generate_finals,
+    generate_schedule,
+    propagate_winner,
+)
 from apps.scheduling.serializers import GenerateScheduleSerializer, RecalculateSerializer
 from apps.scheduling.tasks import generate_schedule_task
 from apps.scheduling.bracket_resolver import resolve_brackets
@@ -32,7 +39,7 @@ logger = logging.getLogger(__name__)
 class GenerateScheduleView(APIView):
     """POST /api/v1/tournaments/{id}/schedule/generate/
 
-    Launch schedule generation (sync or async via Celery).
+    Launch schedule generation using the new slot-based algorithm.
     """
 
     permission_classes = [IsAuthenticated, IsOrganizer]
@@ -43,36 +50,20 @@ class GenerateScheduleView(APIView):
             {"tournament_id": tournament_id}, request.user,
         )
 
-        serializer = GenerateScheduleSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        strategy = serializer.validated_data["strategy"]
-        async_mode = serializer.validated_data["async_mode"]
+        result = generate_schedule(tournament)
 
-        if async_mode:
-            result = generate_schedule_task.delay(
-                str(tournament.id), strategy=strategy,
+        if result.get("success"):
+            logger.info(
+                "schedule.generated",
+                extra={
+                    "tournament_id": str(tournament.id),
+                    "user_id": str(request.user.id),
+                    "total_matches": result.get("stats", {}).get("total_matches", 0),
+                },
             )
-            return Response(
-                {"task_id": result.id, "status": "pending"},
-                status=status.HTTP_202_ACCEPTED,
-            )
-
-        engine = SchedulingEngine(tournament, strategy=strategy)
-        report = engine.generate()
-
-        with transaction.atomic():
-            engine.commit_to_db()
-
-        logger.info(
-            "schedule.generated",
-            extra={
-                "tournament_id": str(tournament.id),
-                "strategy": strategy,
-                "user_id": str(request.user.id),
-                "total_matches": report.to_dict().get("total_matches", 0),
-            },
-        )
-        return Response(report.to_dict(), status=status.HTTP_200_OK)
+            return Response(result, status=status.HTTP_200_OK)
+        else:
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ScheduleTaskStatusView(APIView):
@@ -158,6 +149,7 @@ class ScheduleListView(APIView):
                 "penalty_score_home": m.penalty_score_home,
                 "penalty_score_away": m.penalty_score_away,
                 "is_locked": m.is_locked,
+                "slot_index": m.slot_index,
             })
 
         result = [
@@ -261,7 +253,6 @@ class ScheduleFeasibilityView(APIView):
     """GET /api/v1/tournaments/{id}/schedule/feasibility/
 
     Quick feasibility check before scheduling (ported from tournoi-exemple).
-    Returns total matches, available slots, utilization %, and feasibility.
     """
 
     permission_classes = [IsAuthenticated]
@@ -270,7 +261,7 @@ class ScheduleFeasibilityView(APIView):
         tournament = _get_tournament_for_nested(
             {"tournament_id": tournament_id}, request.user,
         )
-        result = SchedulingEngine.check_feasibility(tournament)
+        result = calculate_feasibility(tournament)
         return Response(result)
 
 
@@ -343,3 +334,65 @@ class SuggestSwapView(APIView):
             suggestion["applied"] = False
 
         return Response(suggestion)
+
+
+class AutoGeneratePoolsView(APIView):
+    """POST /api/v1/tournaments/{id}/categories/{cat_id}/auto-pools/
+
+    Auto-generate balanced pools for a category.
+    """
+
+    permission_classes = [IsAuthenticated, IsOrganizer]
+
+    def post(self, request, tournament_id, category_id):
+        from apps.tournaments.models import Category
+
+        _get_tournament_for_nested(
+            {"tournament_id": tournament_id}, request.user,
+        )
+        try:
+            category = Category.objects.get(pk=category_id, tournament_id=tournament_id)
+        except Category.DoesNotExist:
+            return Response(
+                {"error": "Catégorie introuvable"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        result = auto_generate_pools(category)
+        pool_data = [
+            {"id": p.id, "name": p.name, "team_count": p.teams.count()}
+            for p in result.get("pools", [])
+        ]
+        return Response({
+            "warnings": result.get("warnings", []),
+            "pools": pool_data,
+        })
+
+
+class GenerateFinalsView(APIView):
+    """POST /api/v1/tournaments/{id}/categories/{cat_id}/finals/
+
+    Generate knockout/finals matches after pool phase.
+    """
+
+    permission_classes = [IsAuthenticated, IsOrganizer]
+
+    def post(self, request, tournament_id, category_id):
+        from apps.tournaments.models import Category
+
+        _get_tournament_for_nested(
+            {"tournament_id": tournament_id}, request.user,
+        )
+        try:
+            category = Category.objects.get(pk=category_id, tournament_id=tournament_id)
+        except Category.DoesNotExist:
+            return Response(
+                {"error": "Catégorie introuvable"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        result = generate_finals(category)
+        if result.get("success"):
+            return Response(result)
+        else:
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)

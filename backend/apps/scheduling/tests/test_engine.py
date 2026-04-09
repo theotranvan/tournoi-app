@@ -139,8 +139,8 @@ class TestScheduleAPI:
             format="json",
         )
         assert resp.status_code == status.HTTP_200_OK
-        assert resp.data["total_count"] == 6
-        assert resp.data["placed_count"] == 6
+        assert resp.data["success"] is True
+        assert resp.data["stats"]["total_matches"] == 6
         assert Match.objects.filter(tournament=tournament).count() == 6
 
     def test_schedule_list_view(self, api, organizer):
@@ -155,8 +155,12 @@ class TestScheduleAPI:
         api.force_authenticate(user=organizer)
         resp = api.get(f"/api/v1/tournaments/{tournament.id}/schedule/")
         assert resp.status_code == 200
-        assert "schedule" in resp.data
-        assert resp.data["total_matches"] >= 1
+        # ScheduleListView now returns a list of ScheduleDay dicts
+        assert isinstance(resp.data, list)
+        total_matches = sum(
+            len(f["matches"]) for day in resp.data for f in day["fields"]
+        )
+        assert total_matches >= 1
 
     def test_conflicts_view_empty_on_valid_schedule(self, api, organizer):
         tournament = make_tournament(

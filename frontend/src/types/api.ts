@@ -88,6 +88,9 @@ export interface TournamentDetail extends TournamentList {
   default_rest_time: number;
   phase_separation_mode: "none" | "same_day_rest" | "next_day";
   knockout_rest_multiplier: number;
+  scheduling_mode: "CATEGORY_BLOCK" | "INTERLEAVE";
+  default_min_rest_matches: number;
+  max_consecutive_matches: number;
   updated_at: string;
 }
 
@@ -106,7 +109,30 @@ export interface TournamentPayload {
   default_rest_time?: number;
   phase_separation_mode?: "none" | "same_day_rest" | "next_day";
   knockout_rest_multiplier?: number;
+  scheduling_mode?: "CATEGORY_BLOCK" | "INTERLEAVE";
+  default_min_rest_matches?: number;
+  max_consecutive_matches?: number;
 }
+
+// ─── Days ───────────────────────────────────────────────────────────────────
+
+export interface Day {
+  id: number;
+  tournament: string;
+  date: string;
+  label: string;
+  start_time: string;
+  end_time: string;
+  lunch_start: string;
+  lunch_end: string;
+  order: number;
+  playable_minutes: number;
+}
+
+export type DayPayload = Pick<Day, "date" | "label" | "start_time" | "end_time" | "order"> & {
+  lunch_start?: string;
+  lunch_end?: string;
+};
 
 // ─── Categories ─────────────────────────────────────────────────────────────
 
@@ -119,6 +145,12 @@ export interface Category {
   match_duration: number | null;
   transition_time: number | null;
   rest_time: number | null;
+  min_rest_matches: number;
+  max_consecutive_matches: number;
+  number_of_pools: number | null;
+  finals_format: "TOP2_CROSSOVER" | "TOP1_FINAL";
+  finals_same_day: boolean;
+  day: number | null;
   players_per_team: number | null;
   points_win: number;
   points_draw: number;
@@ -141,6 +173,12 @@ export type CategoryPayload = Pick<
       | "match_duration"
       | "transition_time"
       | "rest_time"
+      | "min_rest_matches"
+      | "max_consecutive_matches"
+      | "number_of_pools"
+      | "finals_format"
+      | "finals_same_day"
+      | "day"
       | "players_per_team"
       | "points_win"
       | "points_draw"
@@ -420,18 +458,53 @@ export interface FeasibilityCategory {
 }
 
 export interface FeasibilityResult {
-  feasibility_score: number;
+  feasibility_score?: number;
   total_matches: number;
-  total_slots: number;
+  total_available_slots: number;
+  total_slots?: number;
   feasible: boolean;
   utilization: number;
-  rest_overhead_pct: number;
+  rest_overhead_pct?: number;
   fields_count: number;
-  categories_count: number;
-  teams_count: number;
-  days: FeasibilityDay[];
-  categories: FeasibilityCategory[];
-  bottlenecks: string[];
+  categories_count?: number;
+  days_count: number;
+  teams_count?: number;
+  cat_details: { name: string; match_count: number }[];
+  day_details: {
+    day: string;
+    playable_min: number;
+    slots_per_day: number;
+    parallel_slots: number;
+    day_match_count: number;
+    feasible: boolean;
+  }[];
+  days?: FeasibilityDay[];
+  categories?: FeasibilityCategory[];
+  bottlenecks?: string[];
+}
+
+// ─── Generate Results ───────────────────────────────────────────────────────
+
+export interface GenerateResult {
+  success: boolean;
+  error?: string;
+  warnings?: string[];
+  stats?: {
+    total_matches: number;
+    placed: number;
+    forced: number;
+  };
+}
+
+export interface FinalsResult {
+  success: boolean;
+  error?: string;
+  match_count?: number;
+}
+
+export interface AutoPoolsResult {
+  warnings: string[];
+  pools: { id: number; name: string }[];
 }
 
 // ─── Diagnostics ────────────────────────────────────────────────────────────

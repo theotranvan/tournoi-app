@@ -12,6 +12,7 @@ from apps.tournaments.models import Tournament
 from tests.factories import (
     CategoryFactory,
     ClubFactory,
+    DayFactory,
     FieldFactory,
     TeamFactory,
     TournamentFactory,
@@ -56,6 +57,17 @@ def make_tournament(
     for d in range(n_days):
         day = start + timedelta(days=d)
         availability.append({"date": str(day), "start": start_hour, "end": end_hour})
+
+    # Create Day objects (required by new scheduling engine)
+    for d in range(n_days):
+        DayFactory(
+            tournament=tournament,
+            date=start + timedelta(days=d),
+            label=f"Jour {d + 1}",
+            start_time=start_hour,
+            end_time=end_hour,
+            order=d,
+        )
 
     for i in range(n_fields):
         FieldFactory(

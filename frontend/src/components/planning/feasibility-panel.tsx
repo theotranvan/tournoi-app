@@ -27,6 +27,20 @@ function scoreLabel(score: number) {
   return "Critique";
 }
 
+/** Derive a 0-100 score from utilization %.
+ *  - 0-70% utilization → score 100-75 (comfortable)
+ *  - 70-90% → score 75-50
+ *  - 90-100% → score 50-25
+ *  - >100% → score 0
+ */
+function deriveScore(utilization: number, feasible: boolean): number {
+  if (!feasible) return Math.min(20, Math.max(0, 100 - utilization));
+  if (utilization <= 70) return 100 - (utilization / 70) * 25;     // 100→75
+  if (utilization <= 90) return 75 - ((utilization - 70) / 20) * 25; // 75→50
+  if (utilization <= 100) return 50 - ((utilization - 90) / 10) * 25; // 50→25
+  return 0;
+}
+
 function CircularGauge({ score }: { score: number }) {
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
@@ -85,15 +99,32 @@ function UtilizationBar({ label, value }: { label: string; value: number }) {
 }
 
 function FeasibilityContent({ data }: { data: FeasibilityResult }) {
+  const score = data.feasibility_score ?? deriveScore(data.utilization, data.feasible);
+  const totalMatches = data.total_matches;
+  const totalSlots = data.total_available_slots ?? data.total_slots ?? 0;
+
+  // Derive bottlenecks from day_details
+  const warnings: string[] = [...(data.bottlenecks ?? [])];
+  for (const dd of data.day_details) {
+    if (!dd.feasible) {
+      warnings.push(
+        `${dd.day} : ${dd.day_match_count} matchs pour ${dd.parallel_slots} créneaux (${dd.playable_min} min jouables)`
+      );
+    }
+  }
+  if (data.utilization > 90 && warnings.length === 0) {
+    warnings.push("Taux d'utilisation très élevé (>90%) — peu de marge.");
+  }
+
   return (
     <div className="space-y-4">
       {/* Score + summary */}
       <div className="flex items-center gap-4">
-        <CircularGauge score={data.feasibility_score} />
+        <CircularGauge score={score} />
         <div className="flex-1 space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className={`text-sm font-semibold ${scoreColor(data.feasibility_score)}`}>
-              {scoreLabel(data.feasibility_score)}
+            <span className={`text-sm font-semibold ${scoreColor(score)}`}>
+              {scoreLabel(score)}
             </span>
             <Badge variant={data.feasible ? "default" : "destructive"} className="text-[10px]">
               {data.feasible ? "Réalisable" : "Non réalisable"}
@@ -101,23 +132,44 @@ function FeasibilityContent({ data }: { data: FeasibilityResult }) {
           </div>
           <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
             <div>
-              <span className="text-foreground font-medium">{data.teams_count}</span> équipes
-            </div>
-            <div>
-              <span className="text-foreground font-medium">{data.total_matches}</span> matchs
+              <span className="text-foreground font-medium">{totalMatches}</span> matchs
             </div>
             <div>
               <span className="text-foreground font-medium">{data.fields_count}</span> terrains
             </div>
+            <div>
+              <span className="text-foreground font-medium">{data.days_count}</span> jour{data.days_count !== 1 ? "s" : ""}
+            </div>
           </div>
           <div className="text-xs text-muted-foreground">
-            {data.total_slots} créneaux disponibles • Utilisation globale {Math.round(data.utilization)}%
+            {totalSlots} créneaux disponibles • Utilisation globale {Math.round(data.utilization)}%
           </div>
         </div>
       </div>
 
-      {/* Per-day utilization */}
-      {data.days.length > 0 && (
+      {/* Per-day utilization from day_details */}
+      {data.day_details.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Utilisation par jour
+          </h4>
+          {data.day_details.map((dd) => {
+            const dayUtil = dd.parallel_slots > 0
+              ? (dd.day_match_count / dd.parallel_slots) * 100
+              : 0;
+            return (
+              <UtilizationBar
+                key={dd.day}
+                label={`${dd.day} (${dd.day_match_count}/${dd.parallel_slots} créneaux)`}
+                value={dayUtil}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Legacy per-day (if old API) */}
+      {data.days && data.days.length > 0 && data.day_details.length === 0 && (
         <div className="space-y-2">
           <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Utilisation par jour
@@ -136,8 +188,29 @@ function FeasibilityContent({ data }: { data: FeasibilityResult }) {
         </div>
       )}
 
-      {/* Per-category utilization */}
-      {data.categories.length > 0 && (
+      {/* Per-category from cat_details */}
+      {data.cat_details.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Par catégorie
+          </h4>
+          <div className="space-y-1.5">
+            {data.cat_details.map((cat) => {
+              const catPct = totalSlots > 0 ? (cat.match_count / totalSlots) * 100 : 0;
+              return (
+                <UtilizationBar
+                  key={cat.name}
+                  label={`${cat.name} (${cat.match_count} matchs)`}
+                  value={catPct}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Legacy per-category */}
+      {data.categories && data.categories.length > 0 && data.cat_details.length === 0 && (
         <div className="space-y-2">
           <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Par catégorie
@@ -154,14 +227,14 @@ function FeasibilityContent({ data }: { data: FeasibilityResult }) {
         </div>
       )}
 
-      {/* Bottlenecks */}
-      {data.bottlenecks.length > 0 && (
+      {/* Warnings */}
+      {warnings.length > 0 && (
         <div className="space-y-1.5">
           <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Points d&apos;attention
           </h4>
           <ul className="space-y-1">
-            {data.bottlenecks.map((tip, i) => (
+            {warnings.map((tip, i) => (
               <li key={i} className="flex items-start gap-1.5 text-xs text-amber-400">
                 <AlertTriangle className="size-3 mt-0.5 shrink-0" />
                 <span>{tip}</span>
@@ -171,7 +244,7 @@ function FeasibilityContent({ data }: { data: FeasibilityResult }) {
         </div>
       )}
 
-      {data.bottlenecks.length === 0 && data.feasibility_score >= 75 && (
+      {warnings.length === 0 && score >= 75 && (
         <div className="flex items-center gap-1.5 text-xs text-green-400">
           <CheckCircle2 className="size-3.5" />
           Aucun problème détecté — le tournoi est bien dimensionné.

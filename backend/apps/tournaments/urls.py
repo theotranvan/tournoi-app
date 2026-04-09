@@ -3,10 +3,12 @@ from rest_framework.routers import DefaultRouter
 
 from apps.matches.postpone import PostponeMatchView
 from apps.matches.views import MatchViewSet
+from apps.scheduling.views import AutoGeneratePoolsView, GenerateFinalsView
 from apps.teams.views import GroupViewSet, TeamViewSet
 from apps.tournaments.insights import TournamentInsightsView
 from apps.tournaments.views import (
     CategoryViewSet,
+    DayViewSet,
     FieldViewSet,
     SchedulingConstraintViewSet,
     TournamentViewSet,
@@ -33,6 +35,9 @@ match_router.register("", MatchViewSet, basename="matches")
 
 group_router = DefaultRouter()
 group_router.register("", GroupViewSet, basename="groups")
+
+day_router = DefaultRouter()
+day_router.register("", DayViewSet, basename="days")
 
 urlpatterns = [
     # Nested under tournaments/{id}/
@@ -74,6 +79,22 @@ urlpatterns = [
     path(
         "<uuid:tournament_id>/categories/<int:category_id>/groups/",
         include(group_router.urls),
+    ),
+    # Auto-generate pools & finals
+    path(
+        "<uuid:tournament_id>/categories/<int:category_id>/auto-pools/",
+        AutoGeneratePoolsView.as_view(),
+        name="category-auto-pools",
+    ),
+    path(
+        "<uuid:tournament_id>/categories/<int:category_id>/finals/",
+        GenerateFinalsView.as_view(),
+        name="category-generate-finals",
+    ),
+    # Days CRUD
+    path(
+        "<uuid:tournament_id>/days/",
+        include(day_router.urls),
     ),
     # Tournament CRUD + actions
     path("", include(router.urls)),

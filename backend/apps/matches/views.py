@@ -126,6 +126,11 @@ class MatchViewSet(viewsets.ModelViewSet):
             match.status = Match.Status.FINISHED
             match.score_validated = True
             match.save(update_fields=["status", "score_validated", "updated_at"])
+
+            # Propagate winner for knockout matches
+            if match.phase != Match.Phase.GROUP:
+                from apps.scheduling.generate import propagate_winner
+                propagate_winner(match)
         logger.info(
             "match.finished",
             extra={
