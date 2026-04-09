@@ -18,12 +18,12 @@ export function getPlatform(): "ios" | "android" | "web" {
 /**
  * Resolves the correct API base URL depending on the runtime environment.
  * - Native apps always target the production API.
- * - Web falls back to the NEXT_PUBLIC_API_URL env variable or localhost.
+ * - Web falls back to the NEXT_PUBLIC_API_URL env variable or Render URL.
  */
 export function getApiUrl(): string {
   if (isNative()) {
     return "https://api.footix.app/api/v1";
   }
-  // Web: use relative path — Next.js rewrites proxy /api/* to the backend
-  return "/api/v1";
+  // Web: use env override, otherwise default to Render backend URL.
+  return process.env.NEXT_PUBLIC_API_URL ?? "https://tournoi-app-bpk4.onrender.com/api/v1";
 }
