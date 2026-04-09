@@ -19,7 +19,6 @@ from apps.core.permissions import IsOrganizer
 
 class ScheduleGenerateThrottle(UserRateThrottle):
     rate = "5/hour"
-from apps.matches.serializers import MatchListSerializer
 from apps.matches.models import Match
 from apps.scheduling.engine import SchedulingEngine
 from apps.scheduling.serializers import GenerateScheduleSerializer, RecalculateSerializer
@@ -114,34 +113,31 @@ class ScheduleListView(APIView):
         tournament = _get_tournament_for_nested(
             {"tournament_id": tournament_id}, request.user,
         )
+
         matches = (
-            Match.objects.filter(tournament=tournament)
+            Match.objects.filter(tournament=tournament, status=Match.Status.SCHEDULED)
             .select_related("field", "category", "team_home", "team_away", "group")
             .order_by("start_time")
         )
 
-        days_dict: dict = {}
+        # Group by day → field
+        schedule: dict[str, dict[str, list]] = defaultdict(lambda: defaultdict(list))
         for m in matches:
             day = m.start_time.date().isoformat() if m.start_time else "unknown"
-            field_id = m.field_id or 0
-            field_name = m.field.name if m.field else "Aucun terrain"
+            field_name = m.field.name if m.field else "Aucun"
+            schedule[day][field_name].append({
+                "id": str(m.id),
+                "phase": m.phase,
+                "category": m.category.name,
+                "team_home": m.team_home.name if m.team_home else m.placeholder_home,
+                "team_away": m.team_away.name if m.team_away else m.placeholder_away,
+                "start_time": m.start_time.isoformat() if m.start_time else None,
+                "duration": m.duration_minutes,
+                "is_locked": m.is_locked,
+                "group": m.group.name if m.group else None,
+            })
 
-            if day not in days_dict:
-                days_dict[day] = {}
-            if field_id not in days_dict[day]:
-                days_dict[day][field_id] = {
-                    "field": {"id": field_id, "name": field_name},
-                    "matches": [],
-                }
-            days_dict[day][field_id]["matches"].append(
-                MatchListSerializer(m, context={"request": request}).data
-            )
-
-        result = [
-            {"date": day, "fields": list(fields.values())}
-            for day, fields in sorted(days_dict.items())
-        ]
-        return Response(result)
+        return Response({"schedule": dict(schedule), "total_matches": matches.count()})
 
 
 class RecalculateScheduleView(APIView):
