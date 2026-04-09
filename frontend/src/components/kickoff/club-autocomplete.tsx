@@ -30,6 +30,8 @@ export function ClubAutocomplete({
   const { data: clubs = [] } = useClubFFFSearch(value);
 
   const showDropdown = open && value.length >= 2 && clubs.length > 0;
+  const effectiveHighlightIndex =
+    highlightIndex >= 0 && highlightIndex < clubs.length ? highlightIndex : -1;
 
   // Close on outside click
   useEffect(() => {
@@ -44,11 +46,6 @@ export function ClubAutocomplete({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
-
-  // Reset highlight when results change
-  useEffect(() => {
-    setHighlightIndex(-1);
-  }, [clubs.length]);
 
   const selectClub = useCallback(
     (club: FFFClub) => {
@@ -68,9 +65,9 @@ export function ClubAutocomplete({
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setHighlightIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter" && highlightIndex >= 0) {
+    } else if (e.key === "Enter" && effectiveHighlightIndex >= 0) {
       e.preventDefault();
-      selectClub(clubs[highlightIndex]);
+      selectClub(clubs[effectiveHighlightIndex]);
     } else if (e.key === "Escape") {
       setOpen(false);
     }
@@ -78,11 +75,11 @@ export function ClubAutocomplete({
 
   // Scroll highlighted item into view
   useEffect(() => {
-    if (highlightIndex >= 0 && listRef.current) {
-      const el = listRef.current.children[highlightIndex] as HTMLElement;
+    if (effectiveHighlightIndex >= 0 && listRef.current) {
+      const el = listRef.current.children[effectiveHighlightIndex] as HTMLElement;
       el?.scrollIntoView({ block: "nearest" });
     }
-  }, [highlightIndex]);
+  }, [effectiveHighlightIndex]);
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -90,6 +87,7 @@ export function ClubAutocomplete({
         value={value}
         onChange={(e) => {
           onChange(e.target.value);
+          setHighlightIndex(-1);
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
@@ -111,10 +109,10 @@ export function ClubAutocomplete({
             <li
               key={club.fff_id}
               role="option"
-              aria-selected={i === highlightIndex}
+              aria-selected={i === effectiveHighlightIndex}
               className={cn(
                 "flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors",
-                i === highlightIndex
+                i === effectiveHighlightIndex
                   ? "bg-accent text-accent-foreground"
                   : "hover:bg-accent/50",
               )}
