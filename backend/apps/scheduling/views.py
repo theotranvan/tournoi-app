@@ -104,7 +104,8 @@ class ScheduleTaskStatusView(APIView):
 class ScheduleListView(APIView):
     """GET /api/v1/tournaments/{id}/schedule/
 
-    Return the complete schedule grouped by day and field.
+    Return the complete schedule as ScheduleDay[] (grouped by date -> field).
+    Each match includes all fields expected by the frontend MatchList type.
     """
 
     permission_classes = [IsAuthenticated]
@@ -115,29 +116,55 @@ class ScheduleListView(APIView):
         )
 
         matches = (
-            Match.objects.filter(tournament=tournament, status=Match.Status.SCHEDULED)
+            Match.objects.filter(tournament=tournament)
             .select_related("field", "category", "team_home", "team_away", "group")
             .order_by("start_time")
         )
 
-        # Group by day → field
-        schedule: dict[str, dict[str, list]] = defaultdict(lambda: defaultdict(list))
+        days_dict: dict = {}
         for m in matches:
             day = m.start_time.date().isoformat() if m.start_time else "unknown"
-            field_name = m.field.name if m.field else "Aucun"
-            schedule[day][field_name].append({
+            field_id = m.field_id or 0
+            field_name = m.field.name if m.field else "Aucun terrain"
+
+            if day not in days_dict:
+                days_dict[day] = {}
+            if field_id not in days_dict[day]:
+                days_dict[day][field_id] = {
+                    "field": {"id": field_id, "name": field_name},
+                    "matches": [],
+                }
+
+            days_dict[day][field_id]["matches"].append({
                 "id": str(m.id),
+                "tournament": str(m.tournament_id),
+                "category": m.category_id,
+                "category_name": m.category.name if m.category else "",
+                "group": m.group_id,
                 "phase": m.phase,
-                "category": m.category.name,
-                "team_home": m.team_home.name if m.team_home else m.placeholder_home,
-                "team_away": m.team_away.name if m.team_away else m.placeholder_away,
+                "team_home": m.team_home_id,
+                "team_away": m.team_away_id,
+                "display_home": m.display_home,
+                "display_away": m.display_away,
+                "placeholder_home": m.placeholder_home or "",
+                "placeholder_away": m.placeholder_away or "",
+                "field": field_id or None,
+                "field_name": field_name,
                 "start_time": m.start_time.isoformat() if m.start_time else None,
-                "duration": m.duration_minutes,
+                "duration_minutes": m.duration_minutes,
+                "status": m.status,
+                "score_home": m.score_home,
+                "score_away": m.score_away,
+                "penalty_score_home": m.penalty_score_home,
+                "penalty_score_away": m.penalty_score_away,
                 "is_locked": m.is_locked,
-                "group": m.group.name if m.group else None,
             })
 
-        return Response({"schedule": dict(schedule), "total_matches": matches.count()})
+        result = [
+            {"date": day, "fields": list(fields.values())}
+            for day, fields in sorted(days_dict.items())
+        ]
+        return Response(result)
 
 
 class RecalculateScheduleView(APIView):
