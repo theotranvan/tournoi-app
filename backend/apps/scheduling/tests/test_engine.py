@@ -155,8 +155,15 @@ class TestScheduleAPI:
         api.force_authenticate(user=organizer)
         resp = api.get(f"/api/v1/tournaments/{tournament.id}/schedule/")
         assert resp.status_code == 200
-        assert "schedule" in resp.data
-        assert resp.data["total_matches"] >= 1
+        # Response is ScheduleDay[] — a list of {date, fields: [{field, matches}]}
+        assert isinstance(resp.data, list)
+        assert len(resp.data) >= 1
+        total_matches = sum(
+            len(field_data["matches"])
+            for day in resp.data
+            for field_data in day["fields"]
+        )
+        assert total_matches >= 1
 
     def test_conflicts_view_empty_on_valid_schedule(self, api, organizer):
         tournament = make_tournament(

@@ -78,7 +78,9 @@ class TestScheduleList:
         url = f"/api/v1/tournaments/{ready_tournament.id}/schedule/"
         resp = api.get(url)
         assert resp.status_code == 200
-        assert resp.data["total_matches"] == 0
+        # Response is ScheduleDay[] — empty list when no matches
+        assert isinstance(resp.data, list)
+        assert len(resp.data) == 0
 
     def test_list_after_generate(self, api, ready_tournament):
         gen_url = f"/api/v1/tournaments/{ready_tournament.id}/schedule/generate/"
@@ -87,7 +89,15 @@ class TestScheduleList:
         url = f"/api/v1/tournaments/{ready_tournament.id}/schedule/"
         resp = api.get(url)
         assert resp.status_code == 200
-        assert resp.data["total_matches"] > 0
+        # Response is ScheduleDay[] — list of {date, fields: [{field, matches}]}
+        assert isinstance(resp.data, list)
+        assert len(resp.data) >= 1
+        total_matches = sum(
+            len(field_data["matches"])
+            for day in resp.data
+            for field_data in day["fields"]
+        )
+        assert total_matches > 0
 
     def test_list_requires_auth(self, anon_api, ready_tournament):
         url = f"/api/v1/tournaments/{ready_tournament.id}/schedule/"
