@@ -70,7 +70,7 @@ async function apiFetch<T = unknown>(
 ): Promise<T> {
   const { body, params, headers: customHeaders, ...rest } = options;
 
-  const url = new URL(`${API_URL}${path}`);
+  const url = new URL(`${API_URL}${path}`, window.location.origin);
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
