@@ -156,7 +156,7 @@ async function apiFetch<T = unknown>(
     let errors: Record<string, string[]> | undefined;
     try {
       const err = await res.json();
-      detail = err.detail ?? err.message ?? detail;
+      detail = err.detail ?? err.error ?? err.message ?? detail;
       errors = err.errors ?? err.details;
     } catch {
       // non-JSON error — try reading as text for debugging

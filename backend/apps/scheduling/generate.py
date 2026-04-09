@@ -245,23 +245,29 @@ def _schedule_across_days(
         by_cat[cat.id] = _optimize_rest(cat_matches, min_rest)
 
     # Assign categories to days
-    cats_by_day: dict[int, list] = {d.id: [] for d in days}
+    # Use object identity as key so virtual days (id=None) stay distinct.
+    cats_by_day: dict[int, list] = {id(d): [] for d in days}
     unassigned = []
     for cat in categories:
-        if cat.day_id and cat.day_id in cats_by_day:
-            cats_by_day[cat.day_id].append(cat)
-        else:
+        assigned = False
+        if cat.day_id:
+            for d in days:
+                if getattr(d, "id", None) == cat.day_id:
+                    cats_by_day[id(d)].append(cat)
+                    assigned = True
+                    break
+        if not assigned:
             unassigned.append(cat)
 
     d_idx = 0
     for cat in unassigned:
-        cats_by_day[days[d_idx % len(days)].id].append(cat)
+        cats_by_day[id(days[d_idx % len(days)])].append(cat)
         d_idx += 1
 
     global_slot = 0
 
     for day in days:
-        day_cats = cats_by_day[day.id]
+        day_cats = cats_by_day[id(day)]
         if not day_cats:
             continue
 
@@ -585,13 +591,34 @@ def generate_schedule(tournament) -> dict:
     categories = list(Category.objects.filter(tournament=tournament).order_by("display_order"))
     fields = list(Field.objects.filter(tournament=tournament, is_active=True).order_by("display_order"))
     days = list(Day.objects.filter(tournament=tournament).order_by("order"))
+    warnings: list[str] = []
 
     if not categories:
         return {"success": False, "error": "Aucune catégorie"}
     if not fields:
         return {"success": False, "error": "Aucun terrain"}
     if not days:
-        return {"success": False, "error": "Aucune journée configurée"}
+        current = tournament.start_date
+        order = 0
+        virtual_days = []
+        while current <= tournament.end_date:
+            virtual_days.append(type("VDay", (), {
+                "id": None,
+                "pk": None,
+                "date": current,
+                "label": str(current),
+                "start_time": "08:00",
+                "end_time": "19:00",
+                "lunch_start": "12:00",
+                "lunch_end": "13:00",
+                "order": order,
+            })())
+            current += timedelta(days=1)
+            order += 1
+        days = virtual_days
+        warnings.append(
+            "⚠️ Aucune journée configurée: génération sur les dates du tournoi (08:00–19:00)."
+        )
 
     groups = list(Group.objects.filter(category__tournament=tournament).prefetch_related("teams"))
     group_by_cat: dict[int, list] = defaultdict(list)
@@ -612,7 +639,6 @@ def generate_schedule(tournament) -> dict:
     Match.objects.filter(category_id__in=cat_ids, is_locked=False).delete()
 
     # Generate round-robin matches for all pools
-    warnings: list[str] = []
     all_matches: list[dict] = []
     for cat in categories:
         for grp in group_by_cat.get(cat.id, []):
