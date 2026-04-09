@@ -41,7 +41,7 @@ import { TeamJourney } from "@/components/planning/team-journey";
 import { BriefingMode } from "@/components/planning/briefing-mode";
 import { PlanningExport } from "@/components/planning/planning-export";
 import { detectConflicts } from "@/lib/conflict-detection";
-import { api } from "@/lib/api";
+import { api, getApiErrorMessage } from "@/lib/api";
 import { matchKeys } from "@/hooks/use-matches";
 import { scheduleKeys } from "@/hooks/use-schedule";
 import type { MatchList, ScheduleDay } from "@/types/api";
@@ -91,6 +91,12 @@ export default function AdminPlanning() {
   const { data: fieldsData } = useFields(selectedTournament);
   const { data: teamsData } = useTeams(selectedTournament);
   const generateMut = useGenerateSchedule(selectedTournament);
+  const generateErrorMessage = generateMut.isError
+    ? getApiErrorMessage(
+        generateMut.error,
+        "Erreur lors de la génération du planning."
+      )
+    : null;
 
   const days = schedule ?? [];
   const currentDay = days[dayIndex];
@@ -576,7 +582,7 @@ export default function AdminPlanning() {
           )}
           {generateMut.isError && (
             <p className="text-sm text-destructive">
-              Erreur lors de la génération du planning.
+              {generateErrorMessage}
             </p>
           )}
         </>

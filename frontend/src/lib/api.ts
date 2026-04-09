@@ -18,6 +18,21 @@ class ApiError extends Error {
   }
 }
 
+export function getApiErrorMessage(
+  error: unknown,
+  fallback = "Une erreur est survenue."
+): string {
+  if (error instanceof ApiError) {
+    return error.detail;
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
 function getAccessToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("access_token");

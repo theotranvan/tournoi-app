@@ -18,7 +18,9 @@ from apps.core.permissions import IsOrganizer
 
 
 class ScheduleGenerateThrottle(UserRateThrottle):
-    rate = "5/hour"
+    # Admins often retry generation while adjusting categories, groups, and days.
+    # A per-hour cap of 5 is too aggressive and quickly blocks legitimate use.
+    rate = "30/hour"
 from apps.matches.models import Match
 from apps.scheduling.engine import SchedulingEngine
 from apps.scheduling.generate import (
