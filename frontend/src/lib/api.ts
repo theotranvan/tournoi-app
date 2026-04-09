@@ -25,7 +25,9 @@ function getAccessToken(): string | null {
 
 function buildApiUrl(path: string): URL {
   const baseOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost";
-  const url = new URL(path, new URL(API_URL, baseOrigin));
+  const apiBase = API_URL.endsWith("/") ? API_URL : `${API_URL}/`;
+  const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+  const url = new URL(normalizedPath, new URL(apiBase, baseOrigin));
 
   // Django expects APPEND_SLASH-compatible endpoints, force a trailing slash.
   if (!url.pathname.endsWith("/")) {
