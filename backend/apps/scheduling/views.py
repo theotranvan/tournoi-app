@@ -19,6 +19,7 @@ from apps.core.permissions import IsOrganizer
 
 class ScheduleGenerateThrottle(UserRateThrottle):
     rate = "5/hour"
+from apps.matches.serializers import MatchListSerializer
 from apps.matches.models import Match
 from apps.scheduling.engine import SchedulingEngine
 from apps.scheduling.serializers import GenerateScheduleSerializer, RecalculateSerializer
@@ -104,7 +105,7 @@ class ScheduleTaskStatusView(APIView):
 class ScheduleListView(APIView):
     """GET /api/v1/tournaments/{id}/schedule/
 
-    Return the complete schedule grouped by day and field (ScheduleDay[] format).
+    Return the complete schedule grouped by day and field.
     """
 
     permission_classes = [IsAuthenticated]
@@ -132,31 +133,9 @@ class ScheduleListView(APIView):
                     "field": {"id": field_id, "name": field_name},
                     "matches": [],
                 }
-
-            days_dict[day][field_id]["matches"].append({
-                "id": str(m.id),
-                "tournament": str(m.tournament_id),
-                "category": m.category_id,
-                "category_name": m.category.name if m.category else "",
-                "group": m.group_id,
-                "phase": m.phase,
-                "team_home": m.team_home_id,
-                "team_away": m.team_away_id,
-                "display_home": m.display_home,
-                "display_away": m.display_away,
-                "placeholder_home": m.placeholder_home or "",
-                "placeholder_away": m.placeholder_away or "",
-                "field": field_id or None,
-                "field_name": field_name,
-                "start_time": m.start_time.isoformat() if m.start_time else None,
-                "duration_minutes": m.duration_minutes,
-                "status": m.status,
-                "score_home": m.score_home,
-                "score_away": m.score_away,
-                "penalty_score_home": m.penalty_score_home,
-                "penalty_score_away": m.penalty_score_away,
-                "is_locked": m.is_locked,
-            })
+            days_dict[day][field_id]["matches"].append(
+                MatchListSerializer(m, context={"request": request}).data
+            )
 
         result = [
             {"date": day, "fields": list(fields.values())}
