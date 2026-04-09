@@ -23,6 +23,18 @@ function getAccessToken(): string | null {
   return localStorage.getItem("access_token");
 }
 
+function buildApiUrl(path: string): URL {
+  const baseOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+  const url = new URL(path, new URL(API_URL, baseOrigin));
+
+  // Django expects APPEND_SLASH-compatible endpoints, force a trailing slash.
+  if (!url.pathname.endsWith("/")) {
+    url.pathname = `${url.pathname}/`;
+  }
+
+  return url;
+}
+
 let refreshPromise: Promise<string | null> | null = null;
 
 async function refreshAccessToken(): Promise<string | null> {
@@ -70,7 +82,7 @@ async function apiFetch<T = unknown>(
 ): Promise<T> {
   const { body, params, headers: customHeaders, ...rest } = options;
 
-  const url = new URL(`${API_URL}${path}`, window.location.origin);
+  const url = buildApiUrl(path);
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
