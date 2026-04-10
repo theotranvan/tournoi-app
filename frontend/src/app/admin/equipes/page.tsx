@@ -24,8 +24,9 @@ import {
   Upload,
   Loader2,
   RefreshCw,
-  QrCode,
+  Copy,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useTournaments } from "@/hooks/use-tournaments";
 import { useTeams } from "@/hooks/use-teams";
 import { useCategories } from "@/hooks/use-categories";
@@ -401,11 +402,6 @@ function TeamRow({
               <Badge variant="secondary" className="text-[10px] shrink-0">
                 {team.short_name}
               </Badge>
-              {team.access_code && (
-                <span className="text-[10px] font-mono text-muted-foreground bg-muted rounded px-1.5 py-0.5 shrink-0" title="Code d'accès">
-                  {team.access_code}
-                </span>
-              )}
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -414,16 +410,19 @@ function TeamRow({
                 {team.coach_name}
               </span>
             )}
-            {team.qr_code_url && (
-              <a
-                href={team.qr_code_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="QR Code"
-                className="inline-flex items-center justify-center size-7 rounded-md hover:bg-accent transition-colors"
+            {team.access_code && (
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(team.access_code);
+                  toast.success("Code copié !");
+                }}
+                title="Copier le code d'accès"
+                className="inline-flex items-center gap-1 text-[10px] font-mono text-muted-foreground bg-muted rounded px-1.5 py-0.5 hover:bg-accent transition-colors"
               >
-                <QrCode className="size-3.5" />
-              </a>
+                {team.access_code}
+                <Copy className="size-3" />
+              </button>
             )}
             <Button variant="ghost" size="icon-sm" onClick={onEdit}>
               <Pencil className="size-3.5" />

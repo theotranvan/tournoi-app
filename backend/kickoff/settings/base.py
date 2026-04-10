@@ -191,6 +191,14 @@ CORS_ALLOWED_ORIGINS = config(
     cast=Csv(),
 )
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "authorization",
+    "content-type",
+    "origin",
+    "x-csrftoken",
+    "x-requested-with",
+]
 
 # ─── Sentry ──────────────────────────────────────────────────────────────────
 SENTRY_DSN = config("SENTRY_DSN", default="")

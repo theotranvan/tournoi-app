@@ -11,19 +11,67 @@ class ApiError extends Error {
   constructor(
     public status: number,
     public detail: string,
-    public errors?: Record<string, string[]>
+    public errors?: Record<string, string[]>,
+    public code?: string
   ) {
     super(detail);
     this.name = "ApiError";
   }
 }
 
-export function getApiErrorMessage(
+// ─── Friendly error mapping ────────────────────────────────────────────────
+const FRIENDLY_MESSAGES: Record<string, string> = {
+  permission_denied:
+    "Vous avez atteint la limite de votre forfait gratuit. Passez au Pro pour créer davantage de tournois 🚀",
+  authentication_failed:
+    "Session expirée — veuillez vous reconnecter.",
+  not_authenticated:
+    "Session expirée — veuillez vous reconnecter.",
+  token_not_valid:
+    "Session expirée — veuillez vous reconnecter.",
+  throttled:
+    "Trop de requêtes. Patientez quelques instants avant de réessayer.",
+  not_found:
+    "La ressource demandée n'existe pas ou a été supprimée.",
+  schedule_generation_failed:
+    "Impossible de régénérer le planning pour l'instant. Vérifiez que toutes les catégories ont une durée de match configurée.",
+};
+
+const FRIENDLY_STATUS: Record<number, string> = {
+  400: "Données invalides. Vérifiez les champs du formulaire.",
+  403: "Vous n'avez pas les droits pour effectuer cette action.",
+  404: "La ressource demandée n'existe pas.",
+  409: "Un conflit a été détecté. Rechargez la page et réessayez.",
+  429: "Trop de requêtes. Patientez quelques instants.",
+  500: "Erreur serveur. Réessayez dans quelques instants.",
+  502: "Serveur temporairement indisponible. Réessayez dans quelques instants.",
+  503: "Service en maintenance. Réessayez dans quelques instants.",
+  0: "Impossible de contacter le serveur. Vérifiez votre connexion internet.",
+};
+
+/**
+ * Returns a user-friendly error message from any error.
+ * Maps backend error codes and HTTP statuses to French messages.
+ */
+export function friendlyError(
   error: unknown,
   fallback = "Une erreur est survenue."
 ): string {
   if (error instanceof ApiError) {
-    return error.detail;
+    // Try code-based mapping first
+    if (error.code && FRIENDLY_MESSAGES[error.code]) {
+      return FRIENDLY_MESSAGES[error.code];
+    }
+    // Try detail-based mapping (some backends return code as detail)
+    const detailKey = error.detail?.toLowerCase().replace(/[\s.]/g, "_");
+    if (detailKey && FRIENDLY_MESSAGES[detailKey]) {
+      return FRIENDLY_MESSAGES[detailKey];
+    }
+    // Try status-based mapping
+    if (FRIENDLY_STATUS[error.status]) {
+      return FRIENDLY_STATUS[error.status];
+    }
+    return error.detail || fallback;
   }
 
   if (error instanceof Error && error.message) {
@@ -31,6 +79,14 @@ export function getApiErrorMessage(
   }
 
   return fallback;
+}
+
+/** @deprecated Use friendlyError() instead */
+export function getApiErrorMessage(
+  error: unknown,
+  fallback = "Une erreur est survenue."
+): string {
+  return friendlyError(error, fallback);
 }
 
 function getAccessToken(): string | null {
@@ -143,21 +199,20 @@ async function apiFetch<T = unknown>(
         headers,
         body: serializedBody,
       });
-    } else if (res.status === 401) {
-      // Redirect to login if refresh failed
-      if (window.location.pathname !== "/admin/login") {
-        window.location.href = "/admin/login";
-      }
     }
+    // If still 401 after refresh, throw — let the UI (layout / query provider) handle it.
+    // NEVER hard-redirect here: it wipes React state and causes "tournament disappeared" bugs.
   }
 
   if (!res.ok) {
-    let detail = `Erreur ${res.status} — ${url.toString()}`;
+    let detail = `Erreur ${res.status}`;
     let errors: Record<string, string[]> | undefined;
+    let code: string | undefined;
     try {
       const err = await res.json();
       detail = err.detail ?? err.error ?? err.message ?? detail;
       errors = err.errors ?? err.details;
+      code = err.code;
     } catch {
       // non-JSON error — try reading as text for debugging
       try {
@@ -168,7 +223,7 @@ async function apiFetch<T = unknown>(
         detail = `Erreur ${res.status} (réponse bloquée — vérifier CORS)`;
       }
     }
-    throw new ApiError(res.status, detail, errors);
+    throw new ApiError(res.status, detail, errors, code);
   }
 
   if (res.status === 204) return undefined as T;

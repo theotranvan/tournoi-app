@@ -75,7 +75,6 @@ export default function PrintPage(props: { params: Promise<{ id: string }> }) {
     try {
       const { default: jsPDF } = await import("jspdf");
       const { default: autoTable } = await import("jspdf-autotable");
-      const QRCode = await import("qrcode");
 
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", putOnlyUsedFonts: true });
       const pageW = doc.internal.pageSize.getWidth();
@@ -263,28 +262,24 @@ export default function PrintPage(props: { params: Promise<{ id: string }> }) {
             doc.text(`Coach: ${team.coach_name}`, margin + 8, yBase + 29);
           }
 
-          // QR code (access code)
-          try {
-            const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-            const qrUrl = `${appUrl}/coach/acces?code=${team.access_code}`;
-            const qrDataUrl = await QRCode.toDataURL(qrUrl, {
-              width: 200,
-              margin: 1,
-            });
-            const qrSize = 35;
-            doc.addImage(
-              qrDataUrl,
-              "PNG",
-              margin + cardW - qrSize - 8,
-              yBase + 6,
-              qrSize,
-              qrSize,
-            );
-            doc.setFontSize(6);
-            doc.text("Scanner pour l'espace coach", margin + cardW - qrSize - 8, yBase + 44);
-          } catch {
-            // QR generation failed — skip
-          }
+          // Access code (large, clear text — replaces QR code)
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "normal");
+          doc.text("Code d'accès coach :", margin + cardW - 50, yBase + 10);
+          doc.setFontSize(18);
+          doc.setFont("helvetica", "bold");
+          doc.text(
+            team.access_code || "—",
+            margin + cardW - 50,
+            yBase + 22,
+          );
+          doc.setFontSize(7);
+          doc.setFont("helvetica", "normal");
+          doc.text(
+            "Saisir ce code sur l'app pour accéder à l'espace coach",
+            margin + cardW - 50,
+            yBase + 28,
+          );
 
           // Team matches
           const teamMatches = matches
@@ -392,7 +387,7 @@ export default function PrintPage(props: { params: Promise<{ id: string }> }) {
     { key: "cover" as const, label: "Page de garde", icon: FileText },
     { key: "schedule" as const, label: "Planning complet", icon: FileText },
     { key: "fieldSheets" as const, label: "Fiches par terrain", icon: MapPin },
-    { key: "teamCards" as const, label: "Fiches équipes + QR", icon: Users },
+    { key: "teamCards" as const, label: "Fiches équipes + codes", icon: Users },
     { key: "matchSheets" as const, label: "Fiches de match (arbitre)", icon: FileText },
   ];
 

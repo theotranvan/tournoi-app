@@ -1,7 +1,8 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { toast } from "sonner";
+import { api, friendlyError } from "@/lib/api";
 import type {
   SubscriptionStatusResponse,
   TournamentPlanResponse,
@@ -58,12 +59,7 @@ export function useCheckout() {
       window.location.href = data.checkout_url;
     },
     onError: (error) => {
-      console.error("Checkout failed:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Erreur lors de la création du paiement. Réessaie."
-      );
+      toast.error(friendlyError(error, "Erreur lors de la création du paiement. Réessayez."));
     },
   });
 }

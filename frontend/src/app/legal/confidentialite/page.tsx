@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { LegalSection } from "@/components/legal/legal-section";
+import { BackButton } from "@/components/ui/back-button";
 
 export const metadata = {
   title: "Politique de confidentialité — Footix",
@@ -17,13 +17,7 @@ export default function ConfidentialitePage() {
       <div className="relative w-full max-w-prose space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <Link
-            href="/start"
-            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="size-4" />
-            Retour
-          </Link>
+          <BackButton />
         </div>
 
         <div className="text-center space-y-2">

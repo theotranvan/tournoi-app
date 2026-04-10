@@ -497,7 +497,7 @@ export default function PricingSection() {
         <p>Paiement sécurisé par Stripe. Annulation possible à tout moment.</p>
         <p>
           Les prix incluent la TVA.{" "}
-          <a href="/legal/mentions" className="underline hover:text-gray-300">
+          <a href="/legal/mentions" className="underline hover:text-gray-300" target="_blank" rel="noopener noreferrer">
             Mentions légales
           </a>
         </p>

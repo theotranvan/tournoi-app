@@ -7,6 +7,7 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 import { PendingScoresBadge } from "@/components/pwa/pending-scores-badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { useAuthStore } from "@/stores/auth-store";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const emptySubscribe = () => () => {};
 
@@ -35,8 +36,21 @@ export default function AdminLayout({
     return <>{children}</>;
   }
 
-  // Block rendering until mounted and auth is confirmed
-  if (!mounted || !isAuthenticated) return null;
+  // Show a loading skeleton while mounting (prevents blank screen)
+  if (!mounted) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="space-y-4 w-full max-w-md px-4">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  // If not authenticated after mount, the useEffect above will redirect
+  if (!isAuthenticated) return null;
 
   return (
     <div className="flex h-full">

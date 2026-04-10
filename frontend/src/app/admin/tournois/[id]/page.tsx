@@ -1567,6 +1567,12 @@ export default function TournamentDetail({
 
       {/* Quick tools */}
       <div className="flex flex-wrap gap-2">
+        <Link href={`/admin/tournois/${id}/live`}>
+          <Button variant={t.status === "live" ? "default" : "outline"} size="sm">
+            <Play className="size-4 mr-1" />
+            Mode Live
+          </Button>
+        </Link>
         <Link href={`/admin/tournois/${id}/print`}>
           <Button variant="outline" size="sm">
             <Printer className="size-4 mr-1" />
@@ -2061,9 +2067,15 @@ export default function TournamentDetail({
                   Tournoi en cours 🎯
                 </p>
                 <p className="text-green-700 dark:text-green-400 text-sm mt-1">
-                  Saisissez les scores des matchs depuis le planning ou le mode speaker.
+                  Saisissez les scores des matchs depuis le mode Live ou le planning.
                 </p>
                 <div className="flex gap-2 mt-2">
+                  <Link href={`/admin/tournois/${id}/live`}>
+                    <Button size="sm">
+                      <Play className="size-3.5 mr-1" />
+                      Mode Live
+                    </Button>
+                  </Link>
                   <Button
                     variant="outline"
                     size="sm"

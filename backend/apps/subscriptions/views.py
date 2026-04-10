@@ -111,6 +111,13 @@ class CreateCheckoutView(APIView):
         plan = request.data.get("plan", "")
         frontend_url = settings.FRONTEND_URL
 
+        # Guard: Stripe must be configured
+        if not stripe.api_key:
+            return Response(
+                {"detail": "Le système de paiement n'est pas encore configuré.", "code": "stripe_not_configured"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
         # Validate plan early — before any Stripe call
         valid_plans = {"one_shot"} | set(CLUB_PRICE_MAP.keys()) | set(PRICE_MAP.keys())
         if plan not in valid_plans:
