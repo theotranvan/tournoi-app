@@ -72,18 +72,18 @@ function useInsights(tournamentId: string) {
 function PremiumBlock() {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 text-center space-y-4">
-      <div className="size-20 rounded-full bg-amber-100 dark:bg-amber-950/30 flex items-center justify-center">
-        <Lock className="size-10 text-amber-600 dark:text-amber-400" />
+      <div className="size-20 rounded-full bg-yellow-100 dark:bg-yellow-950/30 flex items-center justify-center">
+        <Crown className="size-10 text-yellow-500" />
       </div>
-      <h2 className="text-2xl font-bold">Fonctionnalité Premium 🏆</h2>
+      <h2 className="text-2xl font-bold">Fonctionnalité Pro 🏆</h2>
       <p className="text-muted-foreground max-w-md">
-        Les Insights avancés sont réservés aux abonnés Premium.
-        Accédez à des statistiques détaillées, meilleurs buteurs, utilisation des terrains et plus encore.
+        Cette fonctionnalité est réservée aux abonnés Pro. Passez au forfait
+        supérieur pour en profiter.
       </p>
       <Link href="/pricing">
         <Button size="lg" className="mt-2">
           <Crown className="size-4 mr-2" />
-          Voir les offres
+          Voir les forfaits
         </Button>
       </Link>
     </div>

@@ -184,8 +184,12 @@ export function useCreateField(tournamentId: string) {
         `/tournaments/${tournamentId}/fields/`,
         data
       ),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: fieldKeys.list(tournamentId) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: fieldKeys.list(tournamentId) });
+      qc.invalidateQueries({ queryKey: tournamentKeys.detail(tournamentId) });
+      toast.success("Terrain créé");
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, "Erreur lors de la création du terrain")),
   });
 }
 
@@ -197,8 +201,11 @@ export function useUpdateField(tournamentId: string, id: number) {
         `/tournaments/${tournamentId}/fields/${id}/`,
         data
       ),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: fieldKeys.list(tournamentId) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: fieldKeys.list(tournamentId) });
+      toast.success("Terrain mis à jour");
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, "Erreur lors de la mise à jour")),
   });
 }
 

@@ -22,6 +22,18 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
     };
   }, [open]);
 
+  // Close on Escape key
+  React.useEffect(() => {
+    if (!open) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onOpenChange(false);
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, onOpenChange]);
+
   if (!open) return null;
 
   return (

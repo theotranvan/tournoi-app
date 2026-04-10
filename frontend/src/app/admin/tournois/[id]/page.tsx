@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useEffect, useMemo } from "react";
+import { use, useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -41,7 +43,10 @@ import {
   LayoutList,
   Table2,
   Info,
+  ListTodo,
+  Layers,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useTournament } from "@/hooks/use-tournaments";
 import { useCategories } from "@/hooks/use-categories";
 import { useFields } from "@/hooks/use-fields";
@@ -68,6 +73,10 @@ import {
   useCreateGroup,
 } from "@/hooks/use-team-mutations";
 import { ClubAutocomplete } from "@/components/kickoff/club-autocomplete";
+import { TournamentChecklist } from "@/components/kickoff/tournament-checklist";
+import { TournamentStepper } from "@/components/kickoff/tournament-stepper";
+import type { StepperStep } from "@/components/kickoff/tournament-stepper";
+import { ProFeatureButton } from "@/components/ui/pro-feature-gate";
 import type {
   TournamentStatus,
   Category,
@@ -397,6 +406,33 @@ function CategoryFormDialog({
 
 // ─── Field Form Dialog ──────────────────────────────────────────────────────
 
+/** Convert backend list format [{date,start,end}] to frontend dict format {date: [{start,end}]} */
+function availListToDict(
+  list: { date: string; start: string; end: string }[] | null | undefined,
+): Record<string, { start: string; end: string }[]> | null {
+  if (!list || !Array.isArray(list) || list.length === 0) return null;
+  const dict: Record<string, { start: string; end: string }[]> = {};
+  for (const slot of list) {
+    if (!dict[slot.date]) dict[slot.date] = [];
+    dict[slot.date].push({ start: slot.start, end: slot.end });
+  }
+  return dict;
+}
+
+/** Convert frontend dict format {date: [{start,end}]} to backend list format [{date,start,end}] */
+function availDictToList(
+  dict: Record<string, { start: string; end: string }[]> | null | undefined,
+): { date: string; start: string; end: string }[] {
+  if (!dict) return [];
+  const list: { date: string; start: string; end: string }[] = [];
+  for (const [date, slots] of Object.entries(dict)) {
+    for (const slot of slots) {
+      list.push({ date, start: slot.start, end: slot.end });
+    }
+  }
+  return list.sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
+}
+
 function FieldFormDialog({
   open,
   onOpenChange,
@@ -415,12 +451,34 @@ function FieldFormDialog({
   const updateMut = useUpdateField(tournamentId, field?.id ?? 0);
   const isPending = createMut.isPending || updateMut.isPending;
 
+  // Convert backend list format to frontend dict format for the form
+  const fieldAvailDict = field?.availability
+    ? (Array.isArray(field.availability)
+        ? availListToDict(field.availability as unknown as { date: string; start: string; end: string }[])
+        : field.availability)
+    : null;
+
   const [form, setForm] = useState<FieldPayload>({
     name: field?.name ?? "",
     display_order: field?.display_order ?? 0,
     is_active: field?.is_active ?? true,
-    availability: field?.availability ?? null,
+    availability: fieldAvailDict,
   });
+
+  // Reinitialize form when field prop changes (e.g. editing a different field)
+  useEffect(() => {
+    const avail = field?.availability
+      ? (Array.isArray(field.availability)
+          ? availListToDict(field.availability as unknown as { date: string; start: string; end: string }[])
+          : field.availability)
+      : null;
+    setForm({
+      name: field?.name ?? "",
+      display_order: field?.display_order ?? 0,
+      is_active: field?.is_active ?? true,
+      availability: avail,
+    });
+  }, [field?.id, open]);
 
   // Auto-fill availability from tournament days when creating a new field
   const sortedDays = (days ?? []).slice().sort((a, b) => a.order - b.order);
@@ -496,11 +554,16 @@ function FieldFormDialog({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
-    const payload = { ...form, name: form.name.trim() };
+    // Convert frontend dict format to backend list format
+    const payload = {
+      ...form,
+      name: form.name.trim(),
+      availability: availDictToList(form.availability),
+    };
     if (isEdit) {
-      updateMut.mutate(payload, { onSuccess: () => onOpenChange(false) });
+      updateMut.mutate(payload as unknown as Partial<FieldPayload>, { onSuccess: () => onOpenChange(false) });
     } else {
-      createMut.mutate(payload, { onSuccess: () => onOpenChange(false) });
+      createMut.mutate(payload as unknown as FieldPayload, { onSuccess: () => onOpenChange(false) });
     }
   }
 
@@ -1235,11 +1298,82 @@ export default function TournamentDetail({
   const [editField, setEditField] = useState<TournamentField | undefined>();
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
   const [matchView, setMatchView] = useState<"list" | "table">("list");
+  const [activeTab, setActiveTab] = useState("categories");
+
+  const catList = categories ?? [];
+  const fieldList = fields ?? [];
+  const teams = teamsData?.results ?? [];
+  const matches = matchesData?.results ?? [];
+
+  // Build stepper steps with dependencies
+  const stepperSteps: StepperStep[] = useMemo(() => {
+    const hasCategories = catList.length > 0;
+    const hasTeams = teams.length >= 2;
+    const hasFields = fieldList.filter((f) => f.is_active).length > 0;
+    const hasMatches = matches.length > 0;
+
+    return [
+      {
+        value: "categories",
+        label: "Catégories",
+        shortLabel: "Cat.",
+        enabled: true,
+        completed: hasCategories,
+      },
+      {
+        value: "teams",
+        label: "Équipes",
+        shortLabel: "Éq.",
+        enabled: hasCategories,
+        completed: hasTeams,
+        disabledReason: !hasCategories ? "Complétez d'abord : Catégories" : undefined,
+      },
+      {
+        value: "fields",
+        label: "Terrains",
+        shortLabel: "Ter.",
+        enabled: hasCategories,
+        completed: hasFields,
+        disabledReason: !hasCategories ? "Complétez d'abord : Catégories" : undefined,
+      },
+      {
+        value: "planning",
+        label: "Planning",
+        shortLabel: "Plan.",
+        enabled: hasCategories && hasTeams && hasFields,
+        completed: hasMatches,
+        disabledReason: !hasCategories
+          ? "Complétez d'abord : Catégories"
+          : !hasTeams
+            ? "Complétez d'abord : Équipes"
+            : !hasFields
+              ? "Complétez d'abord : Terrains"
+              : undefined,
+      },
+      {
+        value: "live",
+        label: "Live",
+        shortLabel: "Live",
+        enabled: hasMatches,
+        completed: tournament?.status === "live" || tournament?.status === "finished",
+        disabledReason: !hasMatches ? "Complétez d'abord : Planning" : undefined,
+      },
+    ];
+  }, [catList.length, teams.length, fieldList, matches.length, tournament?.status]);
+
+  const handleStepClick = useCallback((value: string) => {
+    setActiveTab(value);
+  }, []);
 
   if (isLoading) {
     return (
       <div className="p-4 md:p-6 space-y-6">
         <Skeleton className="h-8 w-48" />
+        <div className="flex gap-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-9 w-24 rounded-full" />
+          ))}
+        </div>
         <Skeleton className="h-48 w-full rounded-xl" />
       </div>
     );
@@ -1248,7 +1382,19 @@ export default function TournamentDetail({
   if (!tournament) {
     return (
       <div className="p-4 md:p-6">
-        <p className="text-muted-foreground">Tournoi introuvable.</p>
+        <EmptyState
+          icon={Trophy}
+          title="Tournoi introuvable"
+          description="Ce tournoi n'existe pas ou vous n'y avez pas accès."
+          action={
+            <Link href="/admin/tournois">
+              <Button variant="outline">
+                <ArrowLeft className="size-4 mr-1" />
+                Retour aux tournois
+              </Button>
+            </Link>
+          }
+        />
       </div>
     );
   }
@@ -1256,164 +1402,127 @@ export default function TournamentDetail({
   const t = tournament;
   const isAnyMutating =
     publishMut.isPending || startMut.isPending || finishMut.isPending;
-  const catList = categories ?? [];
-  const fieldList = fields ?? [];
-  const teams = teamsData?.results ?? [];
-  const matches = matchesData?.results ?? [];
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      {/* Back */}
-      <Link
-        href="/admin/tournois"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft className="size-4" />
-        Tournois
-      </Link>
+    <div className="p-4 md:p-6 space-y-5">
+      {/* Back + Header */}
+      <div className="flex flex-col gap-4">
+        <Link
+          href="/admin/tournois"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit"
+        >
+          <ArrowLeft className="size-4" />
+          Tournois
+        </Link>
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">{t.name}</h1>
-            <Badge variant={STATUS_VARIANT[t.status]}>
-              {STATUS_LABEL[t.status]}
-            </Badge>
-          </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span className="inline-flex items-center gap-1">
-              <MapPin className="size-3.5" />
-              {t.location}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <CalendarDays className="size-3.5" />
-              {new Date(t.start_date).toLocaleDateString("fr-FR")} –{" "}
-              {new Date(t.end_date).toLocaleDateString("fr-FR")}
-            </span>
-          </div>
-          {t.public_code && (
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs text-muted-foreground">Code public :</span>
-              <code className="rounded bg-muted px-2 py-0.5 text-sm font-mono font-semibold tracking-wider">
-                {t.public_code}
-              </code>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => {
-                  navigator.clipboard.writeText(t.public_code);
-                }}
-                title="Copier le code"
-              >
-                <Copy className="size-3" />
-              </Button>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl font-bold">{t.name}</h1>
+              <Badge variant={STATUS_VARIANT[t.status]}>
+                {STATUS_LABEL[t.status]}
+              </Badge>
             </div>
-          )}
-        </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <MapPin className="size-3.5" />
+                {t.location}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <CalendarDays className="size-3.5" />
+                {new Date(t.start_date).toLocaleDateString("fr-FR")} –{" "}
+                {new Date(t.end_date).toLocaleDateString("fr-FR")}
+              </span>
+            </div>
+            {t.public_code && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Code public :</span>
+                <code className="rounded bg-muted px-2 py-0.5 text-sm font-mono font-semibold tracking-wider">
+                  {t.public_code}
+                </code>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(t.public_code);
+                    toast.success("Code copié !");
+                  }}
+                  title="Copier le code"
+                >
+                  <Copy className="size-3" />
+                </Button>
+              </div>
+            )}
+          </div>
 
-        {/* Actions */}
-        <div className="flex gap-2 shrink-0">
-          {t.status === "draft" && (
+          {/* Primary action + secondary */}
+          <div className="flex gap-2 shrink-0">
+            {t.status === "draft" && (
+              <Button
+                onClick={() => publishMut.mutate()}
+                disabled={isAnyMutating}
+              >
+                {publishMut.isPending ? (
+                  <Loader2 className="size-4 mr-1 animate-spin" />
+                ) : (
+                  <Send className="size-4 mr-1" />
+                )}
+                Publier
+              </Button>
+            )}
+            {t.status === "published" && (
+              <Button
+                onClick={() => startMut.mutate()}
+                disabled={isAnyMutating}
+              >
+                {startMut.isPending ? (
+                  <Loader2 className="size-4 mr-1 animate-spin" />
+                ) : (
+                  <Play className="size-4 mr-1" />
+                )}
+                Démarrer
+              </Button>
+            )}
+            {t.status === "live" && (
+              <Button
+                variant="secondary"
+                onClick={() => finishMut.mutate()}
+                disabled={isAnyMutating}
+              >
+                {finishMut.isPending ? (
+                  <Loader2 className="size-4 mr-1 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="size-4 mr-1" />
+                )}
+                Terminer
+              </Button>
+            )}
             <Button
-              onClick={() => publishMut.mutate()}
-              disabled={isAnyMutating}
+              variant="outline"
+              onClick={() =>
+                duplicateMut.mutate(undefined, {
+                  onSuccess: (data) => router.push(`/admin/tournois/${data.id}`),
+                })
+              }
+              disabled={duplicateMut.isPending}
             >
-              {publishMut.isPending ? (
-                <Loader2 className="size-4 mr-1 animate-spin" />
-              ) : (
-                <Send className="size-4 mr-1" />
-              )}
-              Publier
+              <Copy className="size-4 mr-1" />
+              Dupliquer
             </Button>
-          )}
-          {t.status === "published" && (
-            <Button
-              onClick={() => startMut.mutate()}
-              disabled={isAnyMutating}
-            >
-              {startMut.isPending ? (
-                <Loader2 className="size-4 mr-1 animate-spin" />
-              ) : (
-                <Play className="size-4 mr-1" />
-              )}
-              Démarrer
-            </Button>
-          )}
-          {t.status === "live" && (
-            <Button
-              variant="secondary"
-              onClick={() => finishMut.mutate()}
-              disabled={isAnyMutating}
-            >
-              {finishMut.isPending ? (
-                <Loader2 className="size-4 mr-1 animate-spin" />
-              ) : (
-                <CheckCircle2 className="size-4 mr-1" />
-              )}
-              Terminer
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            onClick={() =>
-              duplicateMut.mutate(undefined, {
-                onSuccess: (data) => router.push(`/admin/tournois/${data.id}`),
-              })
-            }
-            disabled={duplicateMut.isPending}
-          >
-            <Copy className="size-4 mr-1" />
-            Dupliquer
-          </Button>
+          </div>
         </div>
       </div>
 
-      {/* Workflow Banner */}
-      {t.status === "draft" && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3 flex items-start gap-3">
-          <Info className="size-4 text-amber-600 mt-0.5 shrink-0" />
-          <div className="flex-1 text-sm">
-            <p className="font-medium text-amber-900 dark:text-amber-200">
-              Tournoi en brouillon
-            </p>
-            <p className="text-amber-700 dark:text-amber-400 text-xs mt-0.5">
-              {catList.length === 0
-                ? "Commencez par ajouter des catégories dans l'onglet ci-dessous."
-                : teams.length === 0
-                ? "Ajoutez des équipes pour préparer votre tournoi."
-                : fieldList.length === 0
-                ? "Ajoutez des terrains pour pouvoir générer le planning."
-                : "Votre tournoi est prêt. Publiez-le pour le rendre accessible aux participants."}
-            </p>
-          </div>
-        </div>
-      )}
-      {t.status === "published" && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-3 flex items-start gap-3">
-          <Info className="size-4 text-blue-600 mt-0.5 shrink-0" />
-          <div className="flex-1 text-sm">
-            <p className="font-medium text-blue-900 dark:text-blue-200">
-              Tournoi publié - en attente de démarrage
-            </p>
-            <p className="text-blue-700 dark:text-blue-400 text-xs mt-0.5">
-              Les participants peuvent accéder au tournoi. Démarrez-le quand vous êtes prêt.
-            </p>
-          </div>
-        </div>
-      )}
-      {t.status === "live" && (
-        <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800 p-3 flex items-start gap-3">
-          <Play className="size-4 text-green-600 mt-0.5 shrink-0" />
-          <div className="flex-1 text-sm">
-            <p className="font-medium text-green-900 dark:text-green-200">
-              Tournoi en cours
-            </p>
-            <p className="text-green-700 dark:text-green-400 text-xs mt-0.5">
-              Saisissez les scores des matchs depuis le planning ou le mode speaker.
-            </p>
-          </div>
-        </div>
+      {/* Checklist */}
+      {(t.status === "draft" || t.status === "published") && (
+        <TournamentChecklist
+          tournament={t}
+          categories={catList}
+          teams={teams}
+          fields={fieldList}
+          matches={matches}
+          onNavigate={handleStepClick}
+        />
       )}
 
       {/* Stats cards */}
@@ -1470,36 +1579,41 @@ export default function TournamentDetail({
             Simulateur
           </Button>
         </Link>
-        <Link href={`/admin/tournois/${id}/insights`}>
-          <Button variant="outline" size="sm">
-            <BarChart3 className="size-4 mr-1" />
-            Insights
-          </Button>
-        </Link>
+        <ProFeatureButton variant="outline" size="sm">
+          <BarChart3 className="size-4 mr-1" />
+          Insights
+        </ProFeatureButton>
         {t.slug && (
-          <Link href={`/tournoi/${t.slug}/speaker`} target="_blank">
-            <Button variant="outline" size="sm">
-              <Mic2 className="size-4 mr-1" />
-              Mode speaker
-            </Button>
-          </Link>
+          <ProFeatureButton variant="outline" size="sm">
+            <Mic2 className="size-4 mr-1" />
+            Mode speaker
+          </ProFeatureButton>
         )}
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="categories">
-        <TabsList>
+      {/* Stepper navigation */}
+      <TournamentStepper
+        steps={stepperSteps}
+        currentStep={activeTab}
+        onStepClick={handleStepClick}
+      />
+
+      {/* Tab content */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="sr-only">
           <TabsTrigger value="categories">Catégories</TabsTrigger>
           <TabsTrigger value="teams">Équipes</TabsTrigger>
-          <TabsTrigger value="groups">Groupes</TabsTrigger>
-          <TabsTrigger value="matches">Matchs</TabsTrigger>
           <TabsTrigger value="fields">Terrains</TabsTrigger>
-          <TabsTrigger value="settings">Paramètres</TabsTrigger>
+          <TabsTrigger value="planning">Planning</TabsTrigger>
+          <TabsTrigger value="live">Live</TabsTrigger>
         </TabsList>
 
         {/* ── Categories ─────────────────────────────────────────── */}
         <TabsContent value="categories" className="mt-4 space-y-2">
-          <div className="flex justify-end mb-2">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-muted-foreground">
+              {catList.length} catégorie{catList.length !== 1 ? "s" : ""}
+            </span>
             <Button size="sm" onClick={() => {
               setEditCategory(undefined);
               setCatDialogOpen(true);
@@ -1510,7 +1624,7 @@ export default function TournamentDetail({
           </div>
           {catList.length > 0 ? (
             catList.map((cat) => (
-              <Card key={cat.id}>
+              <Card key={cat.id} className="shadow-sm">
                 <CardContent className="py-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -1521,7 +1635,7 @@ export default function TournamentDetail({
                       <span className="font-medium">{cat.name}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="text-xs text-muted-foreground mr-2">
+                      <span className="text-xs text-muted-foreground mr-2 hidden sm:inline">
                         {cat.effective_match_duration} min •{" "}
                         {cat.points_win}/{cat.points_draw}/{cat.points_loss} pts
                       </span>
@@ -1552,14 +1666,23 @@ export default function TournamentDetail({
               </Card>
             ))
           ) : (
-            <Card>
-              <CardContent className="py-6 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Aucune catégorie. Ajoutez des catégories d&apos;âge pour
-                  organiser le tournoi.
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={Layers}
+              title="Aucune catégorie"
+              description="Ajoutez des catégories d'âge pour organiser le tournoi (ex: U13, U15…)."
+              action={
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setEditCategory(undefined);
+                    setCatDialogOpen(true);
+                  }}
+                >
+                  <Plus className="size-3.5 mr-1" />
+                  Ajouter une catégorie
+                </Button>
+              }
+            />
           )}
           <CategoryFormDialog
             open={catDialogOpen}
@@ -1580,9 +1703,7 @@ export default function TournamentDetail({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() =>
-                  router.push(`/admin/equipes`)
-                }
+                onClick={() => router.push(`/admin/equipes`)}
               >
                 Gestion complète
               </Button>
@@ -1600,7 +1721,7 @@ export default function TournamentDetail({
             teams.map((team) => {
               const cat = catList.find((c) => c.id === team.category);
               return (
-                <Card key={team.id}>
+                <Card key={team.id} className="shadow-sm">
                   <CardContent className="py-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -1645,15 +1766,27 @@ export default function TournamentDetail({
               );
             })
           ) : (
-            <Card>
-              <CardContent className="py-6 text-center">
-                <p className="text-sm text-muted-foreground">
-                  {catList.length === 0
-                    ? "Créez d\u2019abord des catégories."
-                    : "Aucune équipe inscrite."}
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={Users}
+              title={catList.length === 0 ? "Catégories requises" : "Aucune équipe inscrite"}
+              description={
+                catList.length === 0
+                  ? "Créez d'abord des catégories avant d'ajouter des équipes."
+                  : "Ajoutez des équipes manuellement ou importez-les depuis un fichier CSV."
+              }
+              action={
+                catList.length > 0 ? (
+                  <Button size="sm" onClick={() => setTeamDialogOpen(true)}>
+                    <Plus className="size-3.5 mr-1" />
+                    Ajouter une équipe
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setActiveTab("categories")}>
+                    Aller aux catégories
+                  </Button>
+                )
+              }
+            />
           )}
           {catList.length > 0 && (
             <QuickTeamDialog
@@ -1665,124 +1798,12 @@ export default function TournamentDetail({
           )}
         </TabsContent>
 
-        {/* ── Groups ─────────────────────────────────────────────── */}
-        <TabsContent value="groups" className="mt-4">
-          <GroupsTabContent
-            tournamentId={id}
-            categories={catList}
-          />
-        </TabsContent>
-
-        {/* ── Matches ────────────────────────────────────────────── */}
-        <TabsContent value="matches" className="mt-4 space-y-2">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground">
-              {matches.length} match{matches.length !== 1 ? "s" : ""}
-            </span>
-            <div className="flex gap-2">
-              <div className="flex gap-0.5 bg-muted rounded-md p-0.5">
-                <Button
-                  variant={matchView === "list" ? "default" : "ghost"}
-                  size="icon-sm"
-                  onClick={() => setMatchView("list")}
-                  title="Vue liste"
-                >
-                  <LayoutList className="size-3.5" />
-                </Button>
-                <Button
-                  variant={matchView === "table" ? "default" : "ghost"}
-                  size="icon-sm"
-                  onClick={() => setMatchView("table")}
-                  title="Tableau croisé"
-                >
-                  <Table2 className="size-3.5" />
-                </Button>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push(`/admin/planning`)}
-              >
-                <CalendarDays className="size-3.5 mr-1" />
-                Planning complet
-              </Button>
-            </div>
-          </div>
-
-          {matchView === "table" ? (
-            <ScoreTable matches={matches} categories={catList} />
-          ) : matches.length > 0 ? (
-            matches.slice(0, 30).map((m) => {
-              const hasScore = m.score_home !== null && m.score_away !== null;
-              return (
-                <Link
-                  key={m.id}
-                  href={`/admin/match/${m.id}/score?t=${id}`}
-                  className="block"
-                >
-                  <Card className="transition-colors hover:border-primary/40">
-                    <CardContent className="py-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Badge
-                            variant={MATCH_STATUS_VARIANT[m.status]}
-                            className="text-[10px] shrink-0"
-                          >
-                            {MATCH_STATUS_LABEL[m.status]}
-                          </Badge>
-                          <span className="text-sm truncate">
-                            {m.display_home}{" "}
-                            {hasScore ? (
-                              <span className="font-bold">
-                                {m.score_home} - {m.score_away}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground">vs</span>
-                            )}{" "}
-                            {m.display_away}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0 text-xs text-muted-foreground">
-                          <span>{PHASE_LABEL[m.phase]}</span>
-                          {m.field_name && <span>• {m.field_name}</span>}
-                          <span>
-                            {new Date(m.start_time).toLocaleTimeString(
-                              "fr-FR",
-                              { hour: "2-digit", minute: "2-digit" }
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })
-          ) : (
-            <Card>
-              <CardContent className="py-6 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Aucun match. Générez le planning depuis l&apos;onglet Planning.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-          {matches.length > 30 && (
-            <p className="text-xs text-center text-muted-foreground">
-              Affichage limité à 30 matchs.{" "}
-              <Link
-                href="/admin/planning"
-                className="underline hover:text-foreground"
-              >
-                Voir le planning complet
-              </Link>
-            </p>
-          )}
-        </TabsContent>
-
         {/* ── Fields ─────────────────────────────────────────────── */}
         <TabsContent value="fields" className="mt-4 space-y-2">
-          <div className="flex justify-end mb-2">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-muted-foreground">
+              {fieldList.length} terrain{fieldList.length !== 1 ? "s" : ""}
+            </span>
             <Button
               size="sm"
               onClick={() => {
@@ -1796,10 +1817,13 @@ export default function TournamentDetail({
           </div>
           {fieldList.length > 0 ? (
             fieldList.map((f) => (
-              <Card key={f.id}>
+              <Card key={f.id} className="shadow-sm">
                 <CardContent className="py-3">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium">{f.name}</span>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="size-3.5 text-muted-foreground" />
+                      <span className="font-medium">{f.name}</span>
+                    </div>
                     <div className="flex items-center gap-1">
                       <Badge variant={f.is_active ? "default" : "secondary"}>
                         {f.is_active ? "Actif" : "Inactif"}
@@ -1820,13 +1844,23 @@ export default function TournamentDetail({
               </Card>
             ))
           ) : (
-            <Card>
-              <CardContent className="py-6 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Aucun terrain défini.
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={MapPin}
+              title="Aucun terrain configuré"
+              description="Ajoutez les terrains disponibles pour votre tournoi afin de pouvoir générer le planning."
+              action={
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setEditField(undefined);
+                    setFieldDialogOpen(true);
+                  }}
+                >
+                  <Plus className="size-3.5 mr-1" />
+                  Ajouter un terrain
+                </Button>
+              }
+            />
           )}
           <FieldFormDialog
             open={fieldDialogOpen}
@@ -1837,70 +1871,289 @@ export default function TournamentDetail({
           />
         </TabsContent>
 
-        {/* ── Settings ───────────────────────────────────────────── */}
-        <TabsContent value="settings" className="mt-4 space-y-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>Mode de planification</CardTitle>
+        {/* ── Planning (Matches + Groups) ────────────────────────── */}
+        <TabsContent value="planning" className="mt-4 space-y-4">
+          {/* Groups subsection */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Shuffle className="size-4" />
+                Groupes & Poules
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <Select
-                value={t.scheduling_mode}
-                onChange={(e) =>
-                  updateTournamentMut.mutate({
-                    scheduling_mode: e.target.value as "CATEGORY_BLOCK" | "INTERLEAVE",
-                  })
-                }
-                options={[
-                  {
-                    value: "CATEGORY_BLOCK",
-                    label: "Par catégorie (une catégorie après l'autre)",
-                  },
-                  {
-                    value: "INTERLEAVE",
-                    label: "Entrelacé (matchs de toutes catégories mélangés)",
-                  },
-                ]}
-                className="max-w-md"
+              <GroupsTabContent
+                tournamentId={id}
+                categories={catList}
               />
-              <p className="text-xs text-muted-foreground mt-2">
-                {t.scheduling_mode === "CATEGORY_BLOCK"
-                  ? "Les matchs sont regroupés par catégorie. Chaque catégorie termine ses matchs avant la suivante."
-                  : "Les matchs de toutes les catégories sont répartis sur les créneaux disponibles pour optimiser l'utilisation des terrains."}
-              </p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Durées par défaut</CardTitle>
+
+          {/* Matches subsection */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CalendarDays className="size-4" />
+                  Matchs
+                </CardTitle>
+                <div className="flex gap-2">
+                  <div className="flex gap-0.5 bg-muted rounded-md p-0.5">
+                    <Button
+                      variant={matchView === "list" ? "default" : "ghost"}
+                      size="icon-sm"
+                      onClick={() => setMatchView("list")}
+                      title="Vue liste"
+                    >
+                      <LayoutList className="size-3.5" />
+                    </Button>
+                    <Button
+                      variant={matchView === "table" ? "default" : "ghost"}
+                      size="icon-sm"
+                      onClick={() => setMatchView("table")}
+                      title="Tableau croisé"
+                    >
+                      <Table2 className="size-3.5" />
+                    </Button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/admin/planning`)}
+                  >
+                    Planning complet
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Match</p>
-                  <p className="font-semibold">{t.default_match_duration} min</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Transition</p>
-                  <p className="font-semibold">{t.default_transition_time} min</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Repos min</p>
-                  <p className="font-semibold">{t.default_rest_time} min</p>
-                </div>
+              <div className="space-y-2">
+                <span className="text-sm text-muted-foreground">
+                  {matches.length} match{matches.length !== 1 ? "s" : ""}
+                </span>
+                {matchView === "table" ? (
+                  <ScoreTable matches={matches} categories={catList} />
+                ) : matches.length > 0 ? (
+                  <div className="space-y-2">
+                    {matches.slice(0, 30).map((m) => {
+                      const hasScore = m.score_home !== null && m.score_away !== null;
+                      return (
+                        <Link
+                          key={m.id}
+                          href={`/admin/match/${m.id}/score?t=${id}`}
+                          className="block"
+                        >
+                          <Card className="transition-colors hover:border-primary/40 shadow-none border">
+                            <CardContent className="py-2.5">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Badge
+                                    variant={MATCH_STATUS_VARIANT[m.status]}
+                                    className="text-[10px] shrink-0"
+                                  >
+                                    {MATCH_STATUS_LABEL[m.status]}
+                                  </Badge>
+                                  <span className="text-sm truncate">
+                                    {m.display_home}{" "}
+                                    {hasScore ? (
+                                      <span className="font-bold">
+                                        {m.score_home} - {m.score_away}
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground">vs</span>
+                                    )}{" "}
+                                    {m.display_away}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0 text-xs text-muted-foreground">
+                                  <span>{PHASE_LABEL[m.phase]}</span>
+                                  {m.field_name && <span>• {m.field_name}</span>}
+                                  <span>
+                                    {new Date(m.start_time).toLocaleTimeString(
+                                      "fr-FR",
+                                      { hour: "2-digit", minute: "2-digit" }
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </Link>
+                      );
+                    })}
+                    {matches.length > 30 && (
+                      <p className="text-xs text-center text-muted-foreground pt-1">
+                        Affichage limité à 30 matchs.{" "}
+                        <Link
+                          href="/admin/planning"
+                          className="underline hover:text-foreground"
+                        >
+                          Voir le planning complet
+                        </Link>
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={CalendarDays}
+                    title="Aucun match"
+                    description="Générez le planning depuis le bouton ci-dessous ou la page planning dédiée."
+                    action={
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/admin/planning`)}
+                      >
+                        <CalendarDays className="size-3.5 mr-1" />
+                        Aller au planning
+                      </Button>
+                    }
+                  />
+                )}
               </div>
             </CardContent>
           </Card>
-          {t.description && (
-            <Card className="mt-2">
-              <CardHeader>
-                <CardTitle>Description</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm whitespace-pre-wrap">{t.description}</p>
-              </CardContent>
-            </Card>
+        </TabsContent>
+
+        {/* ── Live & Settings ────────────────────────────────────── */}
+        <TabsContent value="live" className="mt-4 space-y-4">
+          {/* Workflow Banner */}
+          {t.status === "draft" && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-4 flex items-start gap-3">
+              <Info className="size-5 text-amber-600 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="font-medium text-amber-900 dark:text-amber-200">
+                  Tournoi en brouillon
+                </p>
+                <p className="text-amber-700 dark:text-amber-400 text-sm mt-1">
+                  Complétez la configuration puis publiez le tournoi pour le rendre accessible.
+                </p>
+              </div>
+            </div>
           )}
+          {t.status === "published" && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-4 flex items-start gap-3">
+              <Info className="size-5 text-blue-600 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="font-medium text-blue-900 dark:text-blue-200">
+                  Tournoi publié — en attente de démarrage
+                </p>
+                <p className="text-blue-700 dark:text-blue-400 text-sm mt-1">
+                  Les participants peuvent accéder au tournoi. Démarrez-le quand vous êtes prêt.
+                </p>
+                <Button
+                  className="mt-2"
+                  size="sm"
+                  onClick={() => startMut.mutate()}
+                  disabled={isAnyMutating}
+                >
+                  <Play className="size-3.5 mr-1" />
+                  Démarrer maintenant
+                </Button>
+              </div>
+            </div>
+          )}
+          {t.status === "live" && (
+            <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800 p-4 flex items-start gap-3">
+              <Play className="size-5 text-green-600 mt-0.5 shrink-0 animate-pulse" />
+              <div className="flex-1">
+                <p className="font-medium text-green-900 dark:text-green-200">
+                  Tournoi en cours 🎯
+                </p>
+                <p className="text-green-700 dark:text-green-400 text-sm mt-1">
+                  Saisissez les scores des matchs depuis le planning ou le mode speaker.
+                </p>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/admin/planning`)}
+                  >
+                    <CalendarDays className="size-3.5 mr-1" />
+                    Planning
+                  </Button>
+                  {t.slug && (
+                    <Link href={`/tournoi/${t.slug}/speaker`} target="_blank">
+                      <Button variant="outline" size="sm">
+                        <Mic2 className="size-3.5 mr-1" />
+                        Mode speaker
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          {t.status === "finished" && (
+            <div className="rounded-lg border border-muted-foreground/20 bg-muted/50 p-4 flex items-start gap-3">
+              <CheckCircle2 className="size-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="font-medium">Tournoi terminé</p>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Le tournoi est clôturé. Consultez les résultats finaux et les statistiques.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Settings */}
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base">Paramètres</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium">Mode de planification</Label>
+                <Select
+                  value={t.scheduling_mode}
+                  onChange={(e) =>
+                    updateTournamentMut.mutate({
+                      scheduling_mode: e.target.value as "CATEGORY_BLOCK" | "INTERLEAVE",
+                    })
+                  }
+                  options={[
+                    {
+                      value: "CATEGORY_BLOCK",
+                      label: "Par catégorie (une catégorie après l'autre)",
+                    },
+                    {
+                      value: "INTERLEAVE",
+                      label: "Entrelacé (matchs de toutes catégories mélangés)",
+                    },
+                  ]}
+                  className="max-w-md mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  {t.scheduling_mode === "CATEGORY_BLOCK"
+                    ? "Les matchs sont regroupés par catégorie."
+                    : "Les matchs de toutes les catégories sont répartis pour optimiser l'utilisation des terrains."}
+                </p>
+              </div>
+              <div className="border-t pt-4">
+                <Label className="text-sm font-medium">Durées par défaut</Label>
+                <div className="grid grid-cols-3 gap-4 text-sm mt-2">
+                  <div className="rounded-lg bg-muted/50 p-3 text-center">
+                    <p className="text-muted-foreground text-xs">Match</p>
+                    <p className="font-bold text-lg mt-0.5">{t.default_match_duration} <span className="text-xs font-normal">min</span></p>
+                  </div>
+                  <div className="rounded-lg bg-muted/50 p-3 text-center">
+                    <p className="text-muted-foreground text-xs">Transition</p>
+                    <p className="font-bold text-lg mt-0.5">{t.default_transition_time} <span className="text-xs font-normal">min</span></p>
+                  </div>
+                  <div className="rounded-lg bg-muted/50 p-3 text-center">
+                    <p className="text-muted-foreground text-xs">Repos min</p>
+                    <p className="font-bold text-lg mt-0.5">{t.default_rest_time} <span className="text-xs font-normal">min</span></p>
+                  </div>
+                </div>
+              </div>
+              {t.description && (
+                <div className="border-t pt-4">
+                  <Label className="text-sm font-medium">Description</Label>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">{t.description}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
