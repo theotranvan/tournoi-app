@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: tournoi-app-backend
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    autoDeploy: true
+    healthCheckPath: /api/v1/public/health/
+    startCommand: daphne -b 0.0.0.0 -p $PORT kickoff.asgi:application
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: kickoff.settings.prod
+      - key: SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: REDIS_URL
+        sync: false
