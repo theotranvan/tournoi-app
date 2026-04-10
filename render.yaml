@@ -3,7 +3,7 @@ services:
     name: tournoi-app-backend
     env: docker
     dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerContext: .
     autoDeploy: true
     healthCheckPath: /api/v1/public/health/
     startCommand: daphne -b 0.0.0.0 -p $PORT kickoff.asgi:application
