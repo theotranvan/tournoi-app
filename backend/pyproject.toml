@@ -86,3 +86,8 @@ asyncio_mode = "auto"
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["kickoff*", "apps*"]
+exclude = ["tests*", "scripts*", "venv*", "build*"]
