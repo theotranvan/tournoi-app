@@ -15,10 +15,10 @@ RUN apt-get update && \
 COPY backend/pyproject.toml .
 COPY backend/apps ./apps
 COPY backend/kickoff ./kickoff
+COPY backend/manage.py ./manage.py
+COPY backend/start.sh ./start.sh
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir .
-
-COPY backend/ .
 
 # Run as non-root user
 RUN addgroup --system --gid 1001 appgroup && \
