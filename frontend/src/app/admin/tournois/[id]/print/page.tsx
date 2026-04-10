@@ -77,11 +77,15 @@ export default function PrintPage(props: { params: Promise<{ id: string }> }) {
       const { default: autoTable } = await import("jspdf-autotable");
       const QRCode = await import("qrcode");
 
-      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", putOnlyUsedFonts: true });
       const pageW = doc.internal.pageSize.getWidth();
       const pageH = doc.internal.pageSize.getHeight();
       const margin = 15;
       let isFirstPage = true;
+
+      // Helper: strip emojis that jsPDF can't render
+      const stripEmoji = (str: string) =>
+        str.replace(/[\u{1F000}-\u{1FFFF}]|[\u{2600}-\u{27BF}]|[\u{FE00}-\u{FE0F}]|[\u{200D}]|[\u{20E3}]|[\u{E0020}-\u{E007F}]/gu, "").trim();
 
       const addPage = () => {
         if (!isFirstPage) doc.addPage();
@@ -103,7 +107,7 @@ export default function PrintPage(props: { params: Promise<{ id: string }> }) {
         doc.setFontSize(12);
         const dateStr = `${formatDate(tournament.start_date)}${
           tournament.start_date !== tournament.end_date
-            ? ` — ${formatDate(tournament.end_date)}`
+            ? ` - ${formatDate(tournament.end_date)}`
             : ""
         }`;
         doc.text(dateStr, pageW / 2, 78, { align: "center" });
@@ -136,7 +140,7 @@ export default function PrintPage(props: { params: Promise<{ id: string }> }) {
         // Footer
         doc.setFontSize(9);
         doc.setTextColor(150);
-        doc.text("Généré par Footix", pageW / 2, pageH - 15, { align: "center" });
+        doc.text("G\u00e9n\u00e9r\u00e9 par Footix", pageW / 2, pageH - 15, { align: "center" });
         doc.setTextColor(0);
       }
 
@@ -200,7 +204,7 @@ export default function PrintPage(props: { params: Promise<{ id: string }> }) {
           addPage();
           doc.setFontSize(20);
           doc.setFont("helvetica", "bold");
-          doc.text(`🏟️ ${field.name}`, margin, 22);
+          doc.text(`[Terrain] ${field.name}`, margin, 22);
 
           doc.setFontSize(10);
           doc.setFont("helvetica", "normal");
@@ -261,7 +265,8 @@ export default function PrintPage(props: { params: Promise<{ id: string }> }) {
 
           // QR code (access code)
           try {
-            const qrUrl = `${window.location.origin}/coach/acces?code=${team.access_code}`;
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+            const qrUrl = `${appUrl}/coach/acces?code=${team.access_code}`;
             const qrDataUrl = await QRCode.toDataURL(qrUrl, {
               width: 200,
               margin: 1,
@@ -329,7 +334,7 @@ export default function PrintPage(props: { params: Promise<{ id: string }> }) {
           doc.setFontSize(10);
           doc.setFont("helvetica", "bold");
           doc.text(
-            `${m.category_name} — ${m.phase === "group" ? "Poules" : m.phase.toUpperCase()}`,
+            stripEmoji(`${m.category_name} - ${m.phase === "group" ? "Poules" : m.phase.toUpperCase()}`),
             margin + 4,
             y + 8,
           );
@@ -345,9 +350,9 @@ export default function PrintPage(props: { params: Promise<{ id: string }> }) {
           doc.setFontSize(14);
           doc.setFont("helvetica", "bold");
           const centerX = pageW / 2;
-          doc.text(m.display_home, centerX - 20, y + 22, { align: "right" });
-          doc.text("—", centerX, y + 22, { align: "center" });
-          doc.text(m.display_away, centerX + 20, y + 22);
+          doc.text(stripEmoji(m.display_home), centerX - 20, y + 22, { align: "right" });
+          doc.text("-", centerX, y + 22, { align: "center" });
+          doc.text(stripEmoji(m.display_away), centerX + 20, y + 22);
 
           // Score boxes
           doc.setFontSize(8);

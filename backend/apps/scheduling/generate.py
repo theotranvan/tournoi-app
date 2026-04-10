@@ -551,11 +551,27 @@ def calculate_feasibility(tournament) -> dict:
             "feasible": ps >= day_mc,
         })
 
+    feasible = len(days) > 0 and len(fields) > 0 and all(d["feasible"] for d in day_details)
+    utilization = round(total_matches / total_slots * 100) if total_slots > 0 else 0
+
+    # Compute a 0-100 feasibility score
+    if not feasible:
+        feasibility_score = max(0, min(20, 100 - utilization))
+    elif utilization <= 70:
+        feasibility_score = round(100 - (utilization / 70) * 25)
+    elif utilization <= 90:
+        feasibility_score = round(75 - ((utilization - 70) / 20) * 25)
+    elif utilization <= 100:
+        feasibility_score = round(50 - ((utilization - 90) / 10) * 25)
+    else:
+        feasibility_score = 0
+
     return {
         "total_matches": total_matches,
         "total_available_slots": total_slots,
-        "feasible": len(days) > 0 and all(d["feasible"] for d in day_details),
-        "utilization": round(total_matches / total_slots * 100) if total_slots > 0 else 0,
+        "feasible": feasible,
+        "feasibility_score": feasibility_score,
+        "utilization": utilization,
         "cat_details": [
             {"name": cd["cat"].name, "match_count": cd["match_count"]}
             for cd in cat_details
@@ -674,9 +690,6 @@ def generate_schedule(tournament) -> dict:
     if match_objects:
         Match.objects.bulk_create(match_objects)
 
-    tournament.status = "pools_generated"
-    tournament.save(update_fields=["status"])
-
     return {
         "success": True,
         "warnings": warnings,
@@ -716,18 +729,17 @@ def generate_finals(category) -> dict:
     if not groups:
         return {"success": False, "error": "Aucune poule"}
 
-    # Check all pool matches are finished
+    # Check if pool matches are finished
     pool_matches = Match.objects.filter(category=category, phase=Match.Phase.GROUP)
     incomplete = pool_matches.exclude(status=Match.Status.FINISHED).count()
-    if incomplete > 0:
-        return {"success": False, "error": f"{incomplete} match(s) non terminé(s)"}
+    pools_finished = incomplete == 0
 
     # Delete existing knockout matches for this category
     Match.objects.filter(category=category).exclude(phase=Match.Phase.GROUP).delete()
 
     dur = _round_to_5(category.effective_match_duration)
 
-    # Get rankings per pool
+    # Get rankings per pool (use current standings even if incomplete)
     rankings = []
     for grp in groups:
         standings = compute_group_standings(grp.id, bypass_cache=True)
@@ -929,6 +941,7 @@ def generate_finals(category) -> dict:
     return {
         "success": True,
         "match_count": len([m for m in created_db_matches if m is not None]),
+        "provisional": not pools_finished,
     }
 
 

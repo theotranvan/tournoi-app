@@ -5,6 +5,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { DesktopSidebar } from "@/components/layout/desktop-sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { PendingScoresBadge } from "@/components/pwa/pending-scores-badge";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { useAuthStore } from "@/stores/auth-store";
 
 const emptySubscribe = () => () => {};
@@ -42,6 +43,7 @@ export default function AdminLayout({
       <DesktopSidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <PendingScoresBadge />
+        <Breadcrumb />
         <main className="flex-1 overflow-y-auto overflow-x-hidden pb-16 md:pb-0">{children}</main>
       </div>
       <MobileNav variant="admin" />

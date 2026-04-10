@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { toast } from "sonner";
+import { api, getApiErrorMessage } from "@/lib/api";
 import type {
   TeamAdmin,
   TeamPayload,
@@ -35,8 +36,11 @@ export function useCreateTeam(tournamentId: string) {
   return useMutation({
     mutationFn: (data: TeamPayload) =>
       api.post<TeamAdmin>(`/tournaments/${tournamentId}/teams/`, teamPayloadToBody(data)),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: teamKeys.list(tournamentId) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: teamKeys.list(tournamentId) });
+      toast.success("Équipe créée");
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, "Erreur")),
   });
 }
 
@@ -57,8 +61,11 @@ export function useDeleteTeam(tournamentId: string) {
   return useMutation({
     mutationFn: (id: number) =>
       api.delete(`/tournaments/${tournamentId}/teams/${id}/`),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: teamKeys.list(tournamentId) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: teamKeys.list(tournamentId) });
+      toast.success("Équipe supprimée");
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, "Erreur")),
   });
 }
 
@@ -134,9 +141,12 @@ export function useGenerateGroups(tournamentId: string, categoryId: number) {
         `/tournaments/${tournamentId}/categories/${categoryId}/groups/generate-balanced/`,
         data
       ),
-    onSuccess: () =>
+    onSuccess: () => {
       qc.invalidateQueries({
         queryKey: groupKeys.list(tournamentId, categoryId),
-      }),
+      });
+      toast.success("Groupes générés");
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, "Erreur")),
   });
 }

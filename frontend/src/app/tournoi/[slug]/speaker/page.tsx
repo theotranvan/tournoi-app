@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import {
   Mic2,
@@ -9,6 +10,7 @@ import {
   Trophy,
   Maximize,
   Minimize,
+  ArrowLeft,
 } from "lucide-react";
 import { usePublicTournament, usePublicLive } from "@/hooks/use-public";
 import { motion, AnimatePresence } from "framer-motion";
@@ -114,6 +116,7 @@ function LiveClock() {
 
 export default function SpeakerPage(props: { params: Promise<{ slug: string }> }) {
   const { slug } = use(props.params);
+  const router = useRouter();
   const { data: tournament } = usePublicTournament(slug);
   const { data: live } = usePublicLive(slug);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -135,120 +138,167 @@ export default function SpeakerPage(props: { params: Promise<{ slug: string }> }
   }, []);
 
   const liveMatches = live?.live_matches ?? [];
-  const upcomingMatches = live?.upcoming_matches?.slice(0, 6) ?? [];
+  const upcomingMatches = live?.upcoming_matches?.slice(0, 4) ?? [];
   const recentResults = live?.recent_results?.slice(0, 4) ?? [];
 
+  // Determine next match
+  const nextMatch = upcomingMatches[0] ?? null;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white p-6 lg:p-10">
-      {/* Header */}
-      <header className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl lg:text-4xl font-black">
-            {tournament?.name ?? "Chargement…"}
+    <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white flex flex-col">
+      {/* Header - compact */}
+      <header className="flex items-center justify-between px-6 py-3 shrink-0">
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl lg:text-3xl font-black truncate">
+            {tournament?.name ?? "Chargement..."}
           </h1>
           {tournament && (
-            <p className="text-blue-200 flex items-center gap-2 mt-1">
-              <MapPin className="size-4" />
+            <span className="text-blue-200/60 text-sm flex items-center gap-1 hidden lg:flex">
+              <MapPin className="size-3" />
               {tournament.location}
-            </p>
+            </span>
           )}
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
           <LiveClock />
+          <button
+            onClick={() => router.back()}
+            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+            title="Retour"
+          >
+            <ArrowLeft className="size-5" />
+          </button>
           <button
             onClick={toggleFullscreen}
             className="p-2 rounded-lg hover:bg-white/10 transition-colors"
           >
-            {isFullscreen ? <Minimize className="size-6" /> : <Maximize className="size-6" />}
+            {isFullscreen ? <Minimize className="size-5" /> : <Maximize className="size-5" />}
           </button>
         </div>
       </header>
 
-      {/* Live matches */}
-      {liveMatches.length > 0 && (
-        <section className="mb-8">
-          <h2 className="text-xl font-bold flex items-center gap-2 mb-4">
-            <Mic2 className="size-5 text-red-400" />
+      {/* Main content grid - fills remaining space */}
+      <div className="flex-1 grid grid-cols-3 grid-rows-1 gap-4 px-6 pb-4 min-h-0">
+        {/* Left column: Live matches */}
+        <section className="flex flex-col min-h-0">
+          <h2 className="text-lg font-bold flex items-center gap-2 mb-3 shrink-0">
+            <Mic2 className="size-4 text-red-400" />
             <span className="text-red-400">EN DIRECT</span>
-            <span className="relative flex size-3 ml-1">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-              <span className="relative inline-flex rounded-full size-3 bg-red-500" />
-            </span>
+            {liveMatches.length > 0 && (
+              <span className="relative flex size-2.5 ml-1">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex rounded-full size-2.5 bg-red-500" />
+              </span>
+            )}
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            <AnimatePresence mode="popLayout">
-              {liveMatches.map((m) => (
-                <ScoreCard key={m.id} match={m} large />
-              ))}
-            </AnimatePresence>
+          <div className="flex-1 overflow-hidden space-y-3">
+            {liveMatches.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-white/30 text-sm">Aucun match en cours</p>
+              </div>
+            ) : (
+              <AnimatePresence mode="popLayout">
+                {liveMatches.slice(0, 4).map((m) => (
+                  <ScoreCard key={m.id} match={m} large />
+                ))}
+              </AnimatePresence>
+            )}
           </div>
         </section>
-      )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        {/* Upcoming */}
-        <section>
-          <h2 className="text-xl font-bold flex items-center gap-2 mb-4 text-blue-300">
-            <Clock className="size-5" />
-            À VENIR
+        {/* Center column: Next match spotlight + upcoming */}
+        <section className="flex flex-col min-h-0">
+          {nextMatch && (
+            <div className="mb-4 shrink-0">
+              <h2 className="text-lg font-bold flex items-center gap-2 mb-3 text-amber-300">
+                <Clock className="size-4" />
+                PROCHAIN MATCH
+              </h2>
+              <div className="rounded-2xl border-2 border-amber-500/50 bg-amber-950/20 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <Badge variant="secondary" className="bg-amber-600 text-white border-0">
+                    {formatTime(nextMatch.start_time)}
+                  </Badge>
+                  <span className="text-sm text-amber-200">{nextMatch.category_name}</span>
+                  {nextMatch.field_name && (
+                    <span className="text-xs text-amber-300/60 flex items-center gap-1">
+                      <MapPin className="size-3" />
+                      {nextMatch.field_name}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between text-center">
+                  <span className="text-xl font-bold flex-1 truncate text-right">
+                    {nextMatch.display_home}
+                  </span>
+                  <span className="text-2xl font-black mx-3 text-amber-300">VS</span>
+                  <span className="text-xl font-bold flex-1 truncate text-left">
+                    {nextMatch.display_away}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <h2 className="text-lg font-bold flex items-center gap-2 mb-3 text-blue-300 shrink-0">
+            <Clock className="size-4" />
+            A VENIR
           </h2>
-          {upcomingMatches.length === 0 ? (
-            <p className="text-blue-300/60">Aucun match à venir</p>
-          ) : (
-            <div className="space-y-3">
+          <div className="flex-1 overflow-hidden space-y-2">
+            {upcomingMatches.slice(nextMatch ? 1 : 0, 5).length === 0 ? (
+              <p className="text-blue-300/40 text-sm">Aucun match a venir</p>
+            ) : (
               <AnimatePresence mode="popLayout">
-                {upcomingMatches.map((m) => (
+                {upcomingMatches.slice(nextMatch ? 1 : 0, 5).map((m) => (
                   <motion.div
                     key={m.id}
                     layout
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
-                    className="flex items-center justify-between rounded-xl bg-white/5 backdrop-blur p-3"
+                    className="flex items-center justify-between rounded-xl bg-white/5 backdrop-blur px-3 py-2"
                   >
-                    <div className="flex items-center gap-3">
-                      <Badge variant="secondary" className="bg-blue-600 text-white border-0">
-                        {formatTime(m.start_time)}
-                      </Badge>
-                      <span className="text-sm text-blue-200">{m.category_name}</span>
-                    </div>
-                    <div className="text-center font-medium">
-                      {m.display_home}
-                      <span className="text-muted-foreground mx-2">vs</span>
-                      {m.display_away}
-                    </div>
+                    <Badge variant="secondary" className="bg-blue-600 text-white border-0 text-xs">
+                      {formatTime(m.start_time)}
+                    </Badge>
+                    <span className="text-xs text-blue-200">{m.category_name}</span>
+                    <span className="font-medium text-sm truncate max-w-[40%] text-center">
+                      {m.display_home} vs {m.display_away}
+                    </span>
                     <span className="text-xs text-blue-300/60">{m.field_name}</span>
                   </motion.div>
                 ))}
               </AnimatePresence>
-            </div>
-          )}
+            )}
+          </div>
         </section>
 
-        {/* Recent results */}
-        <section>
-          <h2 className="text-xl font-bold flex items-center gap-2 mb-4 text-green-300">
-            <Trophy className="size-5" />
-            DERNIERS RÉSULTATS
+        {/* Right column: Recent results */}
+        <section className="flex flex-col min-h-0">
+          <h2 className="text-lg font-bold flex items-center gap-2 mb-3 text-green-300 shrink-0">
+            <Trophy className="size-4" />
+            DERNIERS RESULTATS
           </h2>
-          {recentResults.length === 0 ? (
-            <p className="text-green-300/60">Pas encore de résultats</p>
-          ) : (
-            <div className="space-y-3">
+          <div className="flex-1 overflow-hidden space-y-3">
+            {recentResults.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-white/30 text-sm">Pas encore de resultats</p>
+              </div>
+            ) : (
               <AnimatePresence mode="popLayout">
                 {recentResults.map((m) => (
                   <ScoreCard key={m.id} match={m} />
                 ))}
               </AnimatePresence>
-            </div>
-          )}
+            )}
+          </div>
         </section>
       </div>
 
-      {/* Footer */}
-      <footer className="mt-10 text-center text-xs text-blue-300/40">
-        Propulsé par Footix · Se rafraîchit automatiquement
+      {/* Footer - minimal */}
+      <footer className="text-center text-[10px] text-blue-300/30 py-1 shrink-0">
+        Footix
       </footer>
     </div>
   );

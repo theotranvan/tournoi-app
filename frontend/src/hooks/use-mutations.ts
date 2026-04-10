@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { toast } from "sonner";
+import { api, getApiErrorMessage } from "@/lib/api";
 import type {
   TournamentDetail,
   TournamentPayload,
@@ -38,7 +39,11 @@ export function useCreateTournament() {
   return useMutation({
     mutationFn: (data: TournamentPayload) =>
       api.post<TournamentDetail>("/tournaments/", data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: tournamentKeys.lists() }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: tournamentKeys.lists() });
+      toast.success("Tournoi créé avec succès");
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, "Erreur lors de la création")),
   });
 }
 
@@ -69,7 +74,9 @@ export function usePublishTournament(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: tournamentKeys.detail(id) });
       qc.invalidateQueries({ queryKey: tournamentKeys.lists() });
+      toast.success("Tournoi publié !");
     },
+    onError: (err) => toast.error(getApiErrorMessage(err, "Impossible de publier")),
   });
 }
 
@@ -80,7 +87,9 @@ export function useStartTournament(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: tournamentKeys.detail(id) });
       qc.invalidateQueries({ queryKey: tournamentKeys.lists() });
+      toast.success("Tournoi démarré !");
     },
+    onError: (err) => toast.error(getApiErrorMessage(err, "Impossible de démarrer")),
   });
 }
 
@@ -91,7 +100,9 @@ export function useFinishTournament(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: tournamentKeys.detail(id) });
       qc.invalidateQueries({ queryKey: tournamentKeys.lists() });
+      toast.success("Tournoi terminé");
     },
+    onError: (err) => toast.error(getApiErrorMessage(err, "Impossible de terminer")),
   });
 }
 
@@ -99,7 +110,11 @@ export function useDuplicateTournament(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api.post<TournamentDetail>(`/tournaments/${id}/duplicate/`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: tournamentKeys.lists() }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: tournamentKeys.lists() });
+      toast.success("Tournoi dupliqué");
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, "Erreur lors de la duplication")),
   });
 }
 
@@ -110,8 +125,11 @@ export function useCreateCategory(tournamentId: string) {
   return useMutation({
     mutationFn: (data: CategoryPayload) =>
       api.post<Category>(`/tournaments/${tournamentId}/categories/`, data),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: categoryKeys.list(tournamentId) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: categoryKeys.list(tournamentId) });
+      toast.success("Catégorie créée");
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, "Erreur")),
   });
 }
 
@@ -135,8 +153,11 @@ export function useUpdateCategory(tournamentId: string, id: number) {
         `/tournaments/${tournamentId}/categories/${id}/`,
         data
       ),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: categoryKeys.list(tournamentId) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: categoryKeys.list(tournamentId) });
+      toast.success("Catégorie mise à jour");
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, "Erreur")),
   });
 }
 
@@ -145,8 +166,11 @@ export function useDeleteCategory(tournamentId: string) {
   return useMutation({
     mutationFn: (id: number) =>
       api.delete(`/tournaments/${tournamentId}/categories/${id}/`),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: categoryKeys.list(tournamentId) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: categoryKeys.list(tournamentId) });
+      toast.success("Catégorie supprimée");
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, "Erreur")),
   });
 }
 
@@ -192,7 +216,9 @@ export function useGenerateSchedule(tournamentId: string) {
       qc.invalidateQueries({ queryKey: scheduleKeys.list(tournamentId) });
       qc.invalidateQueries({ queryKey: scheduleKeys.feasibility(tournamentId) });
       qc.invalidateQueries({ queryKey: matchKeys.list(tournamentId) });
+      toast.success("Planning généré avec succès");
     },
+    onError: (err) => toast.error(getApiErrorMessage(err, "Erreur de génération")),
   });
 }
 

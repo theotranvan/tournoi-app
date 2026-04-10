@@ -110,12 +110,6 @@ CELERY_TIMEZONE = "Europe/Paris"
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 300  # 5 min hard limit
 CELERY_TASK_SOFT_TIME_LIMIT = 240  # 4 min soft limit
-CELERY_BEAT_SCHEDULE = {
-    "expire-licenses-daily": {
-        "task": "subscriptions.expire_licenses",
-        "schedule": 86400,  # every 24 hours
-    },
-}
 
 # ─── Auth ────────────────────────────────────────────────────────────────────
 AUTH_USER_MODEL = "accounts.User"
@@ -202,9 +196,6 @@ CORS_ALLOW_CREDENTIALS = True
 SENTRY_DSN = config("SENTRY_DSN", default="")
 if SENTRY_DSN:
     import sentry_sdk
-    from sentry_sdk.integrations.celery import CeleryIntegration
-    from sentry_sdk.integrations.django import DjangoIntegration
-    from sentry_sdk.integrations.redis import RedisIntegration
 
     _SENSITIVE_KEYS = {"access_code", "password", "token", "secret", "authorization"}
 
@@ -232,13 +223,7 @@ if SENTRY_DSN:
 
     sentry_sdk.init(
         dsn=SENTRY_DSN,
-        environment=config("SENTRY_ENVIRONMENT", default="development"),
-        integrations=[
-            DjangoIntegration(),
-            CeleryIntegration(),
-            RedisIntegration(),
-        ],
-        traces_sample_rate=config("SENTRY_TRACES_SAMPLE_RATE", default=0.2, cast=float),
+        traces_sample_rate=0.2,
         profiles_sample_rate=0.1,
         send_default_pii=False,
         before_send=_sentry_before_send,

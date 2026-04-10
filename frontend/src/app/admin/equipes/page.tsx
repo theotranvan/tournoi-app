@@ -401,6 +401,11 @@ function TeamRow({
               <Badge variant="secondary" className="text-[10px] shrink-0">
                 {team.short_name}
               </Badge>
+              {team.access_code && (
+                <span className="text-[10px] font-mono text-muted-foreground bg-muted rounded px-1.5 py-0.5 shrink-0" title="Code d'accès">
+                  {team.access_code}
+                </span>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">

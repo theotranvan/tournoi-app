@@ -13,10 +13,14 @@ import {
   Timer,
   MapPin,
   TrendingUp,
+  Lock,
+  Crown,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useTournament } from "@/hooks";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
+import Link from "next/link";
 
 interface Insight {
   key: string;
@@ -58,13 +62,38 @@ function useInsights(tournamentId: string) {
     queryKey: ["insights", tournamentId],
     queryFn: () => api.get<InsightsData>(`/tournaments/${tournamentId}/insights/`),
     enabled: !!tournamentId,
+    retry: (failureCount, error) => {
+      if (error instanceof ApiError && (error.status === 403 || error.status === 402)) return false;
+      return failureCount < 1;
+    },
   });
+}
+
+function PremiumBlock() {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4 text-center space-y-4">
+      <div className="size-20 rounded-full bg-amber-100 dark:bg-amber-950/30 flex items-center justify-center">
+        <Lock className="size-10 text-amber-600 dark:text-amber-400" />
+      </div>
+      <h2 className="text-2xl font-bold">Fonctionnalité Premium 🏆</h2>
+      <p className="text-muted-foreground max-w-md">
+        Les Insights avancés sont réservés aux abonnés Premium.
+        Accédez à des statistiques détaillées, meilleurs buteurs, utilisation des terrains et plus encore.
+      </p>
+      <Link href="/pricing">
+        <Button size="lg" className="mt-2">
+          <Crown className="size-4 mr-2" />
+          Voir les offres
+        </Button>
+      </Link>
+    </div>
+  );
 }
 
 export default function InsightsPage(props: { params: Promise<{ id: string }> }) {
   const { id } = use(props.params);
   const { data: tournament } = useTournament(id);
-  const { data: insights, isLoading } = useInsights(id);
+  const { data: insights, isLoading, error } = useInsights(id);
 
   if (isLoading || !tournament) {
     return (
@@ -72,6 +101,11 @@ export default function InsightsPage(props: { params: Promise<{ id: string }> })
         <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
     );
+  }
+
+  // Show premium gate if 403/402
+  if (error instanceof ApiError && (error.status === 403 || error.status === 402)) {
+    return <PremiumBlock />;
   }
 
   if (!insights) {

@@ -13,6 +13,8 @@ import {
   CalendarDays,
   Users,
   Trophy,
+  RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 import { useTournaments } from "@/hooks/use-tournaments";
 import type { TournamentList, TournamentStatus } from "@/types/api";
@@ -73,7 +75,7 @@ function TournamentRow({ t }: { t: TournamentList }) {
 
 export default function AdminTournois() {
   const [tab, setTab] = useState("all");
-  const { data, isLoading } = useTournaments();
+  const { data, isLoading, error, refetch } = useTournaments();
 
   const all = data?.results ?? [];
   const filtered =
@@ -117,6 +119,19 @@ export default function AdminTournois() {
           Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-20 w-full rounded-xl" />
           ))
+        ) : error ? (
+          <Card>
+            <CardContent className="py-8 text-center space-y-3">
+              <AlertTriangle className="size-10 mx-auto text-destructive/60" />
+              <p className="text-sm text-muted-foreground">
+                Impossible de charger les tournois. Vérifiez votre connexion et réessayez.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                <RefreshCw className="size-3.5 mr-1" />
+                Réessayer
+              </Button>
+            </CardContent>
+          </Card>
         ) : filtered.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center">

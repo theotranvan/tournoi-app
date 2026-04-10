@@ -1,17 +1,23 @@
 "use client";
 
 import { use, useState, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import {
   FlaskConical,
   RotateCcw,
   Trophy,
-  ArrowUpDown,
   Loader2,
   Info,
+  ChevronLeft,
+  ChevronRight,
+  ArrowLeft,
+  Minus,
+  Plus,
+  BarChart3,
+  List,
 } from "lucide-react";
 import { useCategories, useMatches, useTeams } from "@/hooks";
 import { useCategoryStandings } from "@/hooks/use-standings";
@@ -19,7 +25,6 @@ import type {
   MatchList,
   TeamStanding,
   GroupStandings,
-  CategoryStandings,
   Category,
 } from "@/types/api";
 
@@ -178,22 +183,68 @@ function StandingsTable({
   );
 }
 
+// ─── Score Button ─────────────────────────────────────────────────────────
+
+function ScoreControl({
+  value,
+  onChange,
+  label,
+}: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+  label: string;
+}) {
+  const score = value ?? 0;
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <span className="text-sm font-medium truncate max-w-[120px] text-center">
+        {label}
+      </span>
+      <div className="flex items-center gap-3">
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-12 rounded-full text-lg"
+          onClick={() => onChange(Math.max(0, score - 1))}
+          disabled={score <= 0}
+        >
+          <Minus className="size-5" />
+        </Button>
+        <span className="text-5xl font-bold tabular-nums w-16 text-center">
+          {value !== null ? value : "–"}
+        </span>
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-12 rounded-full text-lg"
+          onClick={() => onChange(score + 1)}
+        >
+          <Plus className="size-5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── View Toggle ──────────────────────────────────────────────────────────
+
+type SimView = "wizard" | "standings";
+
 export default function SimulatorPage(props: { params: Promise<{ id: string }> }) {
   const { id } = use(props.params);
+  const router = useRouter();
   const { data: categories } = useCategories(id);
   const { data: matchesData } = useMatches(id);
   const [overrides, setOverrides] = useState(new Map<string, SimScore>());
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [view, setView] = useState<SimView>("wizard");
 
   const matches = matchesData?.results ?? [];
   const activeCat = categories?.find((c) => c.id === selectedCategory) ?? categories?.[0];
 
-  // Load standings for active category
-  const { data: catStandings } = useCategoryStandings(
-    activeCat?.id ?? 0,
-  );
+  const { data: catStandings } = useCategoryStandings(activeCat?.id ?? 0);
 
-  // Unplayed group matches for this category
   const unplayedMatches = useMemo(() => {
     if (!activeCat) return [];
     return matches
@@ -214,28 +265,31 @@ export default function SimulatorPage(props: { params: Promise<{ id: string }> }
     [unplayedMatches],
   );
 
-  // Compute simulated standings
   const simStandings = useMemo(() => {
     if (!catStandings || !activeCat) return null;
     return computeStandings(matches, overrides, activeCat, catStandings.groups);
   }, [matches, overrides, activeCat, catStandings]);
 
-  const setScore = (matchId: string, side: "home" | "away", value: string) => {
-    const num = value === "" ? null : Math.max(0, parseInt(value, 10));
-    if (value !== "" && isNaN(num as number)) return;
+  const setScore = useCallback((matchId: string, side: "home" | "away", value: number | null) => {
     setOverrides((prev) => {
       const next = new Map(prev);
       const existing = next.get(matchId) ?? { home: null, away: null };
-      next.set(matchId, { ...existing, [side]: num });
+      next.set(matchId, { ...existing, [side]: value });
       return next;
     });
-  };
+  }, []);
 
-  const reset = () => setOverrides(new Map());
+  const reset = () => {
+    setOverrides(new Map());
+    setCurrentIndex(0);
+  };
 
   const modifiedCount = Array.from(overrides.values()).filter(
     (s) => s.home !== null || s.away !== null,
   ).length;
+
+  const safeIndex = Math.min(currentIndex, Math.max(0, onlyUnplayed.length - 1));
+  const currentMatch = onlyUnplayed[safeIndex];
 
   if (!categories) {
     return (
@@ -246,129 +300,198 @@ export default function SimulatorPage(props: { params: Promise<{ id: string }> }
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <FlaskConical className="size-6" />
-          Simulateur de scénarios
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Modifiez les scores des matchs pour voir l&apos;impact sur les classements en temps réel.
-        </p>
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" onClick={() => router.back()}>
+          <ArrowLeft className="size-5" />
+        </Button>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            <FlaskConical className="size-5" />
+            Simulateur
+          </h1>
+        </div>
+        {modifiedCount > 0 && (
+          <Button variant="ghost" size="sm" onClick={reset}>
+            <RotateCcw className="size-4 mr-1" />
+            Réinitialiser
+          </Button>
+        )}
       </div>
 
-      {/* Category tabs */}
+      {/* Category selector */}
       <div className="flex gap-2 flex-wrap">
         {categories.map((cat) => (
           <Button
             key={cat.id}
-            variant={(activeCat?.id === cat.id) ? "default" : "outline"}
+            variant={activeCat?.id === cat.id ? "default" : "outline"}
             size="sm"
-            onClick={() => setSelectedCategory(cat.id)}
+            onClick={() => {
+              setSelectedCategory(cat.id);
+              setCurrentIndex(0);
+            }}
           >
             {cat.name}
           </Button>
         ))}
       </div>
 
-      {modifiedCount > 0 && (
-        <div className="flex items-center gap-3">
-          <Badge variant="secondary">
-            {modifiedCount} score{modifiedCount > 1 ? "s" : ""} modifié{modifiedCount > 1 ? "s" : ""}
-          </Badge>
-          <Button variant="ghost" size="sm" onClick={reset}>
-            <RotateCcw className="size-4 mr-1" />
-            Réinitialiser
-          </Button>
-        </div>
-      )}
+      {/* View toggle */}
+      <div className="flex gap-1 bg-muted rounded-lg p-1 w-fit">
+        <Button
+          variant={view === "wizard" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setView("wizard")}
+          className="gap-1.5"
+        >
+          <List className="size-3.5" />
+          Match par match
+        </Button>
+        <Button
+          variant={view === "standings" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setView("standings")}
+          className="gap-1.5"
+        >
+          <BarChart3 className="size-3.5" />
+          Classements
+        </Button>
+      </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Left: match inputs */}
-        <div className="space-y-4">
-          <h2 className="font-semibold flex items-center gap-2">
-            <ArrowUpDown className="size-4" />
-            Matchs ({onlyUnplayed.length} non joués)
-          </h2>
+      {view === "wizard" ? (
+        <>
+          {/* Progress */}
+          {onlyUnplayed.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Match {safeIndex + 1} / {onlyUnplayed.length}</span>
+                <span>{modifiedCount} score{modifiedCount > 1 ? "s" : ""} saisi{modifiedCount > 1 ? "s" : ""}</span>
+              </div>
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary rounded-full transition-all duration-300"
+                  style={{ width: `${((safeIndex + 1) / onlyUnplayed.length) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
 
-          {onlyUnplayed.length === 0 && (
-            <Card className="p-6 text-center text-muted-foreground">
-              <p>Tous les matchs de poule ont été joués.</p>
-              <p className="text-xs mt-1">Modifiez les scores existants ci-dessous.</p>
+          {/* Current match card */}
+          {currentMatch ? (
+            <Card className="p-6">
+              <div className="text-center space-y-1 mb-6">
+                <div className="text-xs text-muted-foreground">
+                  {currentMatch.field_name ?? "Terrain non défini"} · {" "}
+                  {new Date(currentMatch.start_time).toLocaleTimeString("fr-FR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </div>
+                {currentMatch.phase === "group" && (
+                  <Badge variant="outline" className="text-xs">
+                    Poule
+                  </Badge>
+                )}
+              </div>
+
+              <div className="flex items-center justify-center gap-6 sm:gap-10">
+                <ScoreControl
+                  label={currentMatch.display_home ?? "Domicile"}
+                  value={overrides.get(currentMatch.id)?.home ?? currentMatch.score_home}
+                  onChange={(v) => setScore(currentMatch.id, "home", v)}
+                />
+                <span className="text-2xl font-bold text-muted-foreground">–</span>
+                <ScoreControl
+                  label={currentMatch.display_away ?? "Extérieur"}
+                  value={overrides.get(currentMatch.id)?.away ?? currentMatch.score_away}
+                  onChange={(v) => setScore(currentMatch.id, "away", v)}
+                />
+              </div>
+
+              {/* Navigation */}
+              <div className="flex items-center justify-between mt-8">
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
+                  disabled={safeIndex === 0}
+                >
+                  <ChevronLeft className="size-4 mr-1" />
+                  Précédent
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (safeIndex < onlyUnplayed.length - 1) {
+                      setCurrentIndex((i) => i + 1);
+                    } else {
+                      setView("standings");
+                    }
+                  }}
+                >
+                  {safeIndex < onlyUnplayed.length - 1 ? (
+                    <>
+                      Suivant
+                      <ChevronRight className="size-4 ml-1" />
+                    </>
+                  ) : (
+                    <>
+                      Voir classements
+                      <Trophy className="size-4 ml-1" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <Card className="p-8 text-center text-muted-foreground">
+              <Trophy className="size-10 mx-auto mb-3 text-muted-foreground/40" />
+              <p className="font-medium">Tous les matchs ont été joués</p>
+              <p className="text-xs mt-1">
+                Consultez les classements simulés.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4"
+                onClick={() => setView("standings")}
+              >
+                <BarChart3 className="size-4 mr-1" />
+                Voir classements
+              </Button>
             </Card>
           )}
 
-          <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
-            {unplayedMatches.map((m) => {
-              const override = overrides.get(m.id);
-              const sh = override?.home ?? m.score_home;
-              const sa = override?.away ?? m.score_away;
-              const isModified = override && (override.home !== null || override.away !== null);
-
-              return (
-                <Card
-                  key={m.id}
-                  className={`p-3 ${isModified ? "ring-2 ring-primary/40" : ""}`}
-                >
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                    <span>{m.field_name ?? "—"}</span>
-                    <span>·</span>
-                    <span>
-                      {new Date(m.start_time).toLocaleTimeString("fr-FR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                    {m.score_home !== null && (
-                      <Badge variant="outline" className="ml-auto text-xs">
-                        Joué
-                      </Badge>
-                    )}
+          {/* Mini standings preview */}
+          {simStandings && simStandings.length > 0 && (
+            <Card className="p-3 bg-muted/50">
+              <div className="flex items-center gap-2 mb-2 text-xs font-medium text-muted-foreground">
+                <Trophy className="size-3.5" />
+                Apercu classements
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {simStandings.map((group) => (
+                  <div key={group.group.id} className="text-xs space-y-0.5">
+                    <span className="font-medium">{group.group.name}</span>
+                    {group.standings.slice(0, 3).map((ts) => (
+                      <div key={ts.team_id} className="flex items-center gap-2 text-muted-foreground">
+                        <span className="font-medium w-4">{ts.rank}.</span>
+                        <span className="truncate flex-1">{ts.team_name}</span>
+                        <span className="font-bold">{ts.points} pts</span>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="flex-1 text-sm font-medium text-right truncate">
-                      {m.display_home}
-                    </span>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={99}
-                      className="w-14 text-center"
-                      value={sh ?? ""}
-                      onChange={(e) => setScore(m.id, "home", e.target.value)}
-                      placeholder="—"
-                    />
-                    <span className="text-muted-foreground">-</span>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={99}
-                      className="w-14 text-center"
-                      value={sa ?? ""}
-                      onChange={(e) => setScore(m.id, "away", e.target.value)}
-                      placeholder="—"
-                    />
-                    <span className="flex-1 text-sm font-medium truncate">
-                      {m.display_away}
-                    </span>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Right: live standings */}
+                ))}
+              </div>
+            </Card>
+          )}
+        </>
+      ) : (
+        /* Full standings view */
         <div className="space-y-4">
-          <h2 className="font-semibold flex items-center gap-2">
-            <Trophy className="size-4" />
-            Classements simulés
-          </h2>
-
           <Card className="p-3 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 text-sm flex items-start gap-2">
             <Info className="size-4 text-blue-600 mt-0.5 shrink-0" />
             <span>
-              Les classements se recalculent automatiquement quand vous saisissez des scores.
+              Classements recalculés en temps réel à partir de vos scores simulés.
               Aucune donnée n&apos;est sauvegardée.
             </span>
           </Card>
@@ -391,11 +514,11 @@ export default function SimulatorPage(props: { params: Promise<{ id: string }> }
           {!simStandings && (
             <Card className="p-8 text-center text-muted-foreground">
               <Loader2 className="size-6 animate-spin mx-auto mb-2" />
-              <p className="text-sm">Chargement des classements…</p>
+              <p className="text-sm">Chargement des classements...</p>
             </Card>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

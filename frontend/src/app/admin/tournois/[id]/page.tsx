@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,9 @@ import {
   FlaskConical,
   BarChart3,
   Mic2,
+  LayoutList,
+  Table2,
+  Info,
 } from "lucide-react";
 import { useTournament } from "@/hooks/use-tournaments";
 import { useCategories } from "@/hooks/use-categories";
@@ -51,6 +54,7 @@ import {
   useStartTournament,
   useFinishTournament,
   useDuplicateTournament,
+  useUpdateTournament,
   useCreateCategory,
   useUpdateCategory,
   useDeleteCategory,
@@ -75,6 +79,7 @@ import type {
   GroupPayload,
   MatchStatus,
   MatchPhase,
+  MatchList,
   FFFClub,
 } from "@/types/api";
 
@@ -154,6 +159,25 @@ function CategoryFormDialog({
     min_rest_matches: category?.min_rest_matches ?? undefined,
     max_consecutive_matches: category?.max_consecutive_matches ?? undefined,
   });
+
+  // Reinitialize form when category prop changes (e.g. editing a different category)
+  useEffect(() => {
+    setForm({
+      name: category?.name ?? "",
+      display_order: category?.display_order ?? 0,
+      color: category?.color ?? "#16a34a",
+      points_win: category?.points_win ?? 3,
+      points_draw: category?.points_draw ?? 1,
+      points_loss: category?.points_loss ?? 0,
+      match_duration: category?.match_duration ?? null,
+      players_per_team: category?.players_per_team ?? null,
+      day: category?.day ?? null,
+      number_of_pools: category?.number_of_pools ?? null,
+      finals_format: category?.finals_format ?? undefined,
+      min_rest_matches: category?.min_rest_matches ?? undefined,
+      max_consecutive_matches: category?.max_consecutive_matches ?? undefined,
+    });
+  }, [category?.id, open]);
 
   const set = (field: string, value: unknown) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -237,7 +261,7 @@ function CategoryFormDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Durée match (min)</Label>
+              <Label>Durée match (min) *</Label>
               <Input
                 type="number"
                 min={1}
@@ -249,7 +273,13 @@ function CategoryFormDialog({
                   )
                 }
                 placeholder="Défaut tournoi"
+                className={!form.match_duration ? "border-amber-300" : ""}
               />
+              {!form.match_duration && (
+                <p className="text-[11px] text-amber-600">
+                  Utilisera la valeur par défaut du tournoi
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Joueurs/équipe</Label>
@@ -291,11 +321,18 @@ function CategoryFormDialog({
                   set("finals_format", e.target.value || null)
                 }
                 options={[
-                  { value: "", label: "— Aucune —" },
-                  { value: "TOP2_CROSSOVER", label: "Top 2 croisé" },
-                  { value: "TOP1_FINAL", label: "Top 1 → Finale" },
+                  { value: "", label: "— Pas de finales —" },
+                  { value: "TOP2_CROSSOVER", label: "Demi-finales croisées (1er vs 2e)" },
+                  { value: "TOP1_FINAL", label: "Finale directe (1er de chaque poule)" },
                 ]}
               />
+              <p className="text-[11px] text-muted-foreground">
+                {form.finals_format === "TOP2_CROSSOVER"
+                  ? "1er Poule A vs 2e Poule B + 1er Poule B vs 2e Poule A, puis Finale et petite finale"
+                  : form.finals_format === "TOP1_FINAL"
+                  ? "Les premiers de chaque poule s'affrontent directement en finale"
+                  : ""}
+              </p>
             </div>
 
             {/* Rest / consecutive constraints */}
@@ -811,6 +848,117 @@ function QuickTeamDialog({
   );
 }
 
+// ─── Score Cross-Table ──────────────────────────────────────────────────────
+
+function ScoreTable({
+  matches,
+  categories,
+}: {
+  matches: MatchList[];
+  categories: Category[];
+}) {
+  const [selectedCat, setSelectedCat] = useState(categories[0]?.id ?? 0);
+
+  const poolMatches = useMemo(
+    () => matches.filter((m) => m.category === selectedCat && m.phase === "group"),
+    [matches, selectedCat],
+  );
+
+  // Collect unique teams from pool matches
+  const teams = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const m of poolMatches) {
+      if (m.team_home !== null) map.set(m.team_home, m.display_home ?? `#${m.team_home}`);
+      if (m.team_away !== null) map.set(m.team_away, m.display_away ?? `#${m.team_away}`);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [poolMatches]);
+
+  // Build score lookup: key = "home-away" → "score_home - score_away"
+  const scoreMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const match of poolMatches) {
+      if (match.team_home === null || match.team_away === null) continue;
+      const key = `${match.team_home}-${match.team_away}`;
+      if (match.score_home !== null && match.score_away !== null) {
+        m.set(key, `${match.score_home}-${match.score_away}`);
+      } else {
+        m.set(key, "–");
+      }
+    }
+    return m;
+  }, [poolMatches]);
+
+  if (categories.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <Select
+        value={String(selectedCat)}
+        onChange={(e) => setSelectedCat(Number(e.target.value))}
+        options={categories.map((c) => ({
+          value: String(c.id),
+          label: c.name,
+        }))}
+        className="w-48"
+      />
+      {teams.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-4">
+          Aucun match de poule pour cette catégorie.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr>
+                <th className="text-left p-1.5 border bg-muted min-w-[100px]">Équipe</th>
+                {teams.map(([tid, name]) => (
+                  <th
+                    key={tid}
+                    className="p-1.5 border bg-muted text-center min-w-[50px]"
+                    title={name}
+                  >
+                    {name.length > 5 ? name.substring(0, 5) : name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {teams.map(([rowId, rowName]) => (
+                <tr key={rowId}>
+                  <td className="p-1.5 border font-medium truncate max-w-[120px]">
+                    {rowName}
+                  </td>
+                  {teams.map(([colId]) => {
+                    if (rowId === colId) {
+                      return (
+                        <td key={colId} className="p-1.5 border bg-muted/50 text-center">
+                          ×
+                        </td>
+                      );
+                    }
+                    const score = scoreMap.get(`${rowId}-${colId}`);
+                    return (
+                      <td
+                        key={colId}
+                        className={`p-1.5 border text-center tabular-nums ${
+                          score && score !== "–" ? "font-bold" : "text-muted-foreground"
+                        }`}
+                      >
+                        {score ?? ""}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Generate Groups Dialog ─────────────────────────────────────────────────
 
 function GenerateGroupsDialog({
@@ -1076,6 +1224,7 @@ export default function TournamentDetail({
   const startMut = useStartTournament(id);
   const finishMut = useFinishTournament(id);
   const duplicateMut = useDuplicateTournament(id);
+  const updateTournamentMut = useUpdateTournament(id);
   const deleteCatMut = useDeleteCategory(id);
   const deleteTeamMut = useDeleteTeam(id);
 
@@ -1085,6 +1234,7 @@ export default function TournamentDetail({
   const [fieldDialogOpen, setFieldDialogOpen] = useState(false);
   const [editField, setEditField] = useState<TournamentField | undefined>();
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
+  const [matchView, setMatchView] = useState<"list" | "table">("list");
 
   if (isLoading) {
     return (
@@ -1142,6 +1292,24 @@ export default function TournamentDetail({
               {new Date(t.end_date).toLocaleDateString("fr-FR")}
             </span>
           </div>
+          {t.public_code && (
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs text-muted-foreground">Code public :</span>
+              <code className="rounded bg-muted px-2 py-0.5 text-sm font-mono font-semibold tracking-wider">
+                {t.public_code}
+              </code>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(t.public_code);
+                }}
+                title="Copier le code"
+              >
+                <Copy className="size-3" />
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
@@ -1200,6 +1368,53 @@ export default function TournamentDetail({
           </Button>
         </div>
       </div>
+
+      {/* Workflow Banner */}
+      {t.status === "draft" && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3 flex items-start gap-3">
+          <Info className="size-4 text-amber-600 mt-0.5 shrink-0" />
+          <div className="flex-1 text-sm">
+            <p className="font-medium text-amber-900 dark:text-amber-200">
+              Tournoi en brouillon
+            </p>
+            <p className="text-amber-700 dark:text-amber-400 text-xs mt-0.5">
+              {catList.length === 0
+                ? "Commencez par ajouter des catégories dans l'onglet ci-dessous."
+                : teams.length === 0
+                ? "Ajoutez des équipes pour préparer votre tournoi."
+                : fieldList.length === 0
+                ? "Ajoutez des terrains pour pouvoir générer le planning."
+                : "Votre tournoi est prêt. Publiez-le pour le rendre accessible aux participants."}
+            </p>
+          </div>
+        </div>
+      )}
+      {t.status === "published" && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-3 flex items-start gap-3">
+          <Info className="size-4 text-blue-600 mt-0.5 shrink-0" />
+          <div className="flex-1 text-sm">
+            <p className="font-medium text-blue-900 dark:text-blue-200">
+              Tournoi publié - en attente de démarrage
+            </p>
+            <p className="text-blue-700 dark:text-blue-400 text-xs mt-0.5">
+              Les participants peuvent accéder au tournoi. Démarrez-le quand vous êtes prêt.
+            </p>
+          </div>
+        </div>
+      )}
+      {t.status === "live" && (
+        <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800 p-3 flex items-start gap-3">
+          <Play className="size-4 text-green-600 mt-0.5 shrink-0" />
+          <div className="flex-1 text-sm">
+            <p className="font-medium text-green-900 dark:text-green-200">
+              Tournoi en cours
+            </p>
+            <p className="text-green-700 dark:text-green-400 text-xs mt-0.5">
+              Saisissez les scores des matchs depuis le planning ou le mode speaker.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1464,16 +1679,39 @@ export default function TournamentDetail({
             <span className="text-sm text-muted-foreground">
               {matches.length} match{matches.length !== 1 ? "s" : ""}
             </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push(`/admin/planning`)}
-            >
-              <CalendarDays className="size-3.5 mr-1" />
-              Planning complet
-            </Button>
+            <div className="flex gap-2">
+              <div className="flex gap-0.5 bg-muted rounded-md p-0.5">
+                <Button
+                  variant={matchView === "list" ? "default" : "ghost"}
+                  size="icon-sm"
+                  onClick={() => setMatchView("list")}
+                  title="Vue liste"
+                >
+                  <LayoutList className="size-3.5" />
+                </Button>
+                <Button
+                  variant={matchView === "table" ? "default" : "ghost"}
+                  size="icon-sm"
+                  onClick={() => setMatchView("table")}
+                  title="Tableau croisé"
+                >
+                  <Table2 className="size-3.5" />
+                </Button>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push(`/admin/planning`)}
+              >
+                <CalendarDays className="size-3.5 mr-1" />
+                Planning complet
+              </Button>
+            </div>
           </div>
-          {matches.length > 0 ? (
+
+          {matchView === "table" ? (
+            <ScoreTable matches={matches} categories={catList} />
+          ) : matches.length > 0 ? (
             matches.slice(0, 30).map((m) => {
               const hasScore = m.score_home !== null && m.score_away !== null;
               return (
@@ -1600,7 +1838,38 @@ export default function TournamentDetail({
         </TabsContent>
 
         {/* ── Settings ───────────────────────────────────────────── */}
-        <TabsContent value="settings" className="mt-4">
+        <TabsContent value="settings" className="mt-4 space-y-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>Mode de planification</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Select
+                value={t.scheduling_mode}
+                onChange={(e) =>
+                  updateTournamentMut.mutate({
+                    scheduling_mode: e.target.value as "CATEGORY_BLOCK" | "INTERLEAVE",
+                  })
+                }
+                options={[
+                  {
+                    value: "CATEGORY_BLOCK",
+                    label: "Par catégorie (une catégorie après l'autre)",
+                  },
+                  {
+                    value: "INTERLEAVE",
+                    label: "Entrelacé (matchs de toutes catégories mélangés)",
+                  },
+                ]}
+                className="max-w-md"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                {t.scheduling_mode === "CATEGORY_BLOCK"
+                  ? "Les matchs sont regroupés par catégorie. Chaque catégorie termine ses matchs avant la suivante."
+                  : "Les matchs de toutes les catégories sont répartis sur les créneaux disponibles pour optimiser l'utilisation des terrains."}
+              </p>
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle>Durées par défaut</CardTitle>
