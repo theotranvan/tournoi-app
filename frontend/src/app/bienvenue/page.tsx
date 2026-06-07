@@ -55,22 +55,41 @@ export default function BienvenuePage() {
     [currentSlide]
   );
 
+  // Marking onboarding as seen before zustand finishes rehydrating from
+  // localStorage races with rehydration and the write can be lost — the user
+  // would then see onboarding again on next launch. Wait for hydration first.
+  const markSeenWhenHydrated = useCallback(async () => {
+    const persistApi = useOnboardingStore.persist;
+    if (persistApi && !persistApi.hasHydrated()) {
+      await new Promise<void>((resolve) => {
+        const unsub = persistApi.onFinishHydration(() => {
+          unsub();
+          resolve();
+        });
+        // Guard against hydration finishing between the check and subscribe.
+        if (persistApi.hasHydrated()) {
+          unsub();
+          resolve();
+        }
+      });
+    }
+    markSeen();
+  }, [markSeen]);
+
   const handleNext = useCallback(() => {
     if (isLast) {
-      markSeen();
       triggerHaptic("medium");
-      router.push("/start");
+      void markSeenWhenHydrated().then(() => router.push("/start"));
     } else {
       setDirection(1);
       setCurrentSlide((prev) => prev + 1);
       triggerHaptic("light");
     }
-  }, [isLast, markSeen, router]);
+  }, [isLast, markSeenWhenHydrated, router]);
 
   const handleSkip = useCallback(() => {
-    markSeen();
-    router.push("/start");
-  }, [markSeen, router]);
+    void markSeenWhenHydrated().then(() => router.push("/start"));
+  }, [markSeenWhenHydrated, router]);
 
   // Keyboard navigation
   useEffect(() => {
