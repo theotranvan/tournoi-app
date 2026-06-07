@@ -26,11 +26,15 @@ class PostponeMatchView(APIView):
 
     def post(self, request, tournament_id, match_id):
         tournament = _get_tournament_for_nested(
-            {"tournament_id": tournament_id}, request.user,
+            {"tournament_id": tournament_id},
+            request.user,
         )
         try:
             match = Match.objects.select_related(
-                "field", "team_home", "team_away", "category",
+                "field",
+                "team_home",
+                "team_away",
+                "category",
             ).get(pk=match_id, tournament=tournament)
         except Match.DoesNotExist:
             return Response(
@@ -55,22 +59,32 @@ class PostponeMatchView(APIView):
             match.start_time = slot["start_time"]
             match.status = Match.Status.SCHEDULED
             match.notes = f"{match.notes}\n[Reporté] {reason}".strip()
-            match.save(update_fields=[
-                "field_id", "start_time", "status", "notes", "updated_at",
-            ])
+            match.save(
+                update_fields=[
+                    "field_id",
+                    "start_time",
+                    "status",
+                    "notes",
+                    "updated_at",
+                ]
+            )
 
-            return Response({
-                "match": MatchDetailSerializer(match).data,
-                "applied_slot": slot,
-                "reason": reason,
-            })
+            return Response(
+                {
+                    "match": MatchDetailSerializer(match).data,
+                    "applied_slot": slot,
+                    "reason": reason,
+                }
+            )
 
-        return Response({
-            "match_id": str(match.id),
-            "current_time": match.start_time.isoformat() if match.start_time else None,
-            "current_field": match.field.name if match.field else None,
-            "suggested_slots": slots,
-        })
+        return Response(
+            {
+                "match_id": str(match.id),
+                "current_time": match.start_time.isoformat() if match.start_time else None,
+                "current_field": match.field.name if match.field else None,
+                "suggested_slots": slots,
+            }
+        )
 
     def _find_slots(self, tournament, target_match):
         """Find up to 3 compatible time slots for rescheduling."""
@@ -116,12 +130,14 @@ class PostponeMatchView(APIView):
                 if gap_end - gap_start >= needed:
                     candidate = gap_start
                     if self._check_team_rest(candidate, duration, team_schedule, rest_time):
-                        slots.append({
-                            "field_id": field.id,
-                            "field_name": field.name,
-                            "start_time": candidate.isoformat(),
-                            "reason": f"Créneau libre sur {field.name}",
-                        })
+                        slots.append(
+                            {
+                                "field_id": field.id,
+                                "field_name": field.name,
+                                "start_time": candidate.isoformat(),
+                                "reason": f"Créneau libre sur {field.name}",
+                            }
+                        )
                         if len(slots) >= 3:
                             return slots
 
@@ -129,12 +145,14 @@ class PostponeMatchView(APIView):
             if field_occ:
                 after_last = field_occ[-1][1]
                 if self._check_team_rest(after_last, duration, team_schedule, rest_time):
-                    slots.append({
-                        "field_id": field.id,
-                        "field_name": field.name,
-                        "start_time": after_last.isoformat(),
-                        "reason": f"Après le dernier match sur {field.name}",
-                    })
+                    slots.append(
+                        {
+                            "field_id": field.id,
+                            "field_name": field.name,
+                            "start_time": after_last.isoformat(),
+                            "reason": f"Après le dernier match sur {field.name}",
+                        }
+                    )
                     if len(slots) >= 3:
                         return slots
 
@@ -146,7 +164,9 @@ class PostponeMatchView(APIView):
         candidate_end = candidate_start + timedelta(minutes=duration)
         for ts_start, ts_end in team_schedule:
             # Check overlap with rest buffer
-            if candidate_start < ts_end + timedelta(minutes=rest_time) and \
-               candidate_end + timedelta(minutes=rest_time) > ts_start:
+            if (
+                candidate_start < ts_end + timedelta(minutes=rest_time)
+                and candidate_end + timedelta(minutes=rest_time) > ts_start
+            ):
                 return False
         return True

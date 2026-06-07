@@ -15,27 +15,25 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from apps.core.permissions import IsOrganizer
-
-
-class ScheduleGenerateThrottle(UserRateThrottle):
-    # Admins often retry generation while adjusting categories, groups, and days.
-    # A per-hour cap of 5 is too aggressive and quickly blocks legitimate use.
-    rate = "30/hour"
 from apps.matches.models import Match
+from apps.scheduling.bracket_resolver import resolve_brackets
 from apps.scheduling.engine import SchedulingEngine
 from apps.scheduling.generate import (
     auto_generate_pools,
     calculate_feasibility,
     generate_finals,
     generate_schedule,
-    propagate_winner,
 )
-from apps.scheduling.serializers import GenerateScheduleSerializer, RecalculateSerializer
-from apps.scheduling.tasks import generate_schedule_task
-from apps.scheduling.bracket_resolver import resolve_brackets
+from apps.scheduling.serializers import RecalculateSerializer
 from apps.tournaments.views import _get_tournament_for_nested
 
 logger = logging.getLogger(__name__)
+
+
+class ScheduleGenerateThrottle(UserRateThrottle):
+    # Admins often retry generation while adjusting categories, groups, and days.
+    # A per-hour cap of 5 is too aggressive and quickly blocks legitimate use.
+    rate = "30/hour"
 
 
 class GenerateScheduleView(APIView):
@@ -49,7 +47,8 @@ class GenerateScheduleView(APIView):
 
     def post(self, request, tournament_id):
         tournament = _get_tournament_for_nested(
-            {"tournament_id": tournament_id}, request.user,
+            {"tournament_id": tournament_id},
+            request.user,
         )
 
         result = generate_schedule(tournament)
@@ -78,7 +77,8 @@ class ScheduleTaskStatusView(APIView):
 
     def get(self, request, tournament_id, task_id):
         _get_tournament_for_nested(
-            {"tournament_id": tournament_id}, request.user,
+            {"tournament_id": tournament_id},
+            request.user,
         )
 
         result = AsyncResult(task_id)
@@ -105,7 +105,8 @@ class ScheduleListView(APIView):
 
     def get(self, request, tournament_id):
         tournament = _get_tournament_for_nested(
-            {"tournament_id": tournament_id}, request.user,
+            {"tournament_id": tournament_id},
+            request.user,
         )
 
         matches = (
@@ -128,36 +129,35 @@ class ScheduleListView(APIView):
                     "matches": [],
                 }
 
-            days_dict[day][field_id]["matches"].append({
-                "id": str(m.id),
-                "tournament": str(m.tournament_id),
-                "category": m.category_id,
-                "category_name": m.category.name if m.category else "",
-                "group": m.group_id,
-                "phase": m.phase,
-                "team_home": m.team_home_id,
-                "team_away": m.team_away_id,
-                "display_home": m.display_home,
-                "display_away": m.display_away,
-                "placeholder_home": m.placeholder_home or "",
-                "placeholder_away": m.placeholder_away or "",
-                "field": field_id or None,
-                "field_name": field_name,
-                "start_time": m.start_time.isoformat() if m.start_time else None,
-                "duration_minutes": m.duration_minutes,
-                "status": m.status,
-                "score_home": m.score_home,
-                "score_away": m.score_away,
-                "penalty_score_home": m.penalty_score_home,
-                "penalty_score_away": m.penalty_score_away,
-                "is_locked": m.is_locked,
-                "slot_index": m.slot_index,
-            })
+            days_dict[day][field_id]["matches"].append(
+                {
+                    "id": str(m.id),
+                    "tournament": str(m.tournament_id),
+                    "category": m.category_id,
+                    "category_name": m.category.name if m.category else "",
+                    "group": m.group_id,
+                    "phase": m.phase,
+                    "team_home": m.team_home_id,
+                    "team_away": m.team_away_id,
+                    "display_home": m.display_home,
+                    "display_away": m.display_away,
+                    "placeholder_home": m.placeholder_home or "",
+                    "placeholder_away": m.placeholder_away or "",
+                    "field": field_id or None,
+                    "field_name": field_name,
+                    "start_time": m.start_time.isoformat() if m.start_time else None,
+                    "duration_minutes": m.duration_minutes,
+                    "status": m.status,
+                    "score_home": m.score_home,
+                    "score_away": m.score_away,
+                    "penalty_score_home": m.penalty_score_home,
+                    "penalty_score_away": m.penalty_score_away,
+                    "is_locked": m.is_locked,
+                    "slot_index": m.slot_index,
+                }
+            )
 
-        result = [
-            {"date": day, "fields": list(fields.values())}
-            for day, fields in sorted(days_dict.items())
-        ]
+        result = [{"date": day, "fields": list(fields.values())} for day, fields in sorted(days_dict.items())]
         return Response(result)
 
 
@@ -171,7 +171,8 @@ class RecalculateScheduleView(APIView):
 
     def post(self, request, tournament_id):
         tournament = _get_tournament_for_nested(
-            {"tournament_id": tournament_id}, request.user,
+            {"tournament_id": tournament_id},
+            request.user,
         )
 
         serializer = RecalculateSerializer(data=request.data)
@@ -192,7 +193,8 @@ class ScheduleConflictsView(APIView):
 
     def get(self, request, tournament_id):
         tournament = _get_tournament_for_nested(
-            {"tournament_id": tournament_id}, request.user,
+            {"tournament_id": tournament_id},
+            request.user,
         )
 
         matches = list(
@@ -216,12 +218,14 @@ class ScheduleConflictsView(APIView):
                 curr = fmatches[i]
                 prev_end = prev.start_time + timedelta(minutes=prev.duration_minutes)
                 if curr.start_time < prev_end:
-                    conflicts.append({
-                        "type": "field_overlap",
-                        "field_id": fid,
-                        "match_a": str(prev.id),
-                        "match_b": str(curr.id),
-                    })
+                    conflicts.append(
+                        {
+                            "type": "field_overlap",
+                            "field_id": fid,
+                            "match_a": str(prev.id),
+                            "match_b": str(curr.id),
+                        }
+                    )
 
         # Check team overlaps
         team_matches: dict[int, list[Match]] = defaultdict(list)
@@ -239,14 +243,16 @@ class ScheduleConflictsView(APIView):
                 gap = (curr.start_time - prev_end).total_seconds() / 60.0
                 rest_min = curr.category.effective_rest_time if curr.category else tournament.default_rest_time
                 if gap < rest_min:
-                    conflicts.append({
-                        "type": "team_rest_violation",
-                        "team_id": tid,
-                        "match_a": str(prev.id),
-                        "match_b": str(curr.id),
-                        "rest_minutes": round(gap, 1),
-                        "required_minutes": rest_min,
-                    })
+                    conflicts.append(
+                        {
+                            "type": "team_rest_violation",
+                            "team_id": tid,
+                            "match_a": str(prev.id),
+                            "match_b": str(curr.id),
+                            "rest_minutes": round(gap, 1),
+                            "required_minutes": rest_min,
+                        }
+                    )
 
         return Response({"conflicts": conflicts, "count": len(conflicts)})
 
@@ -261,7 +267,8 @@ class ScheduleFeasibilityView(APIView):
 
     def get(self, request, tournament_id):
         tournament = _get_tournament_for_nested(
-            {"tournament_id": tournament_id}, request.user,
+            {"tournament_id": tournament_id},
+            request.user,
         )
         result = calculate_feasibility(tournament)
         return Response(result)
@@ -278,7 +285,8 @@ class ResolveBracketsView(APIView):
 
     def post(self, request, tournament_id):
         tournament = _get_tournament_for_nested(
-            {"tournament_id": tournament_id}, request.user,
+            {"tournament_id": tournament_id},
+            request.user,
         )
         results = resolve_brackets(tournament)
         return Response(results, status=status.HTTP_200_OK)
@@ -295,7 +303,8 @@ class ScheduleDiagnosticsView(APIView):
 
     def get(self, request, tournament_id):
         tournament = _get_tournament_for_nested(
-            {"tournament_id": tournament_id}, request.user,
+            {"tournament_id": tournament_id},
+            request.user,
         )
         result = SchedulingEngine.diagnose_current_schedule(tournament)
         return Response(result)
@@ -312,7 +321,8 @@ class SuggestSwapView(APIView):
 
     def post(self, request, tournament_id, match_id):
         tournament = _get_tournament_for_nested(
-            {"tournament_id": tournament_id}, request.user,
+            {"tournament_id": tournament_id},
+            request.user,
         )
         suggestion = SchedulingEngine.suggest_swap(tournament, match_id)
         if not suggestion:
@@ -350,7 +360,8 @@ class AutoGeneratePoolsView(APIView):
         from apps.tournaments.models import Category
 
         _get_tournament_for_nested(
-            {"tournament_id": tournament_id}, request.user,
+            {"tournament_id": tournament_id},
+            request.user,
         )
         try:
             category = Category.objects.get(pk=category_id, tournament_id=tournament_id)
@@ -361,14 +372,13 @@ class AutoGeneratePoolsView(APIView):
             )
 
         result = auto_generate_pools(category)
-        pool_data = [
-            {"id": p.id, "name": p.name, "team_count": p.teams.count()}
-            for p in result.get("pools", [])
-        ]
-        return Response({
-            "warnings": result.get("warnings", []),
-            "pools": pool_data,
-        })
+        pool_data = [{"id": p.id, "name": p.name, "team_count": p.teams.count()} for p in result.get("pools", [])]
+        return Response(
+            {
+                "warnings": result.get("warnings", []),
+                "pools": pool_data,
+            }
+        )
 
 
 class GenerateFinalsView(APIView):
@@ -383,7 +393,8 @@ class GenerateFinalsView(APIView):
         from apps.tournaments.models import Category
 
         _get_tournament_for_nested(
-            {"tournament_id": tournament_id}, request.user,
+            {"tournament_id": tournament_id},
+            request.user,
         )
         try:
             category = Category.objects.get(pk=category_id, tournament_id=tournament_id)

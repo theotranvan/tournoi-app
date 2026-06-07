@@ -155,9 +155,7 @@ class TestField:
         assert f.name == "Terrain A"
 
     def test_valid_availability(self):
-        f = FieldFactory(
-            availability=[{"date": "2026-04-11", "start": "08:00", "end": "19:00"}]
-        )
+        f = FieldFactory(availability=[{"date": "2026-04-11", "start": "08:00", "end": "19:00"}])
         f.full_clean()  # Should not raise
 
     def test_invalid_availability_not_list(self):
@@ -171,16 +169,12 @@ class TestField:
             f.clean()
 
     def test_invalid_availability_bad_date_format(self):
-        f = FieldFactory.build(
-            availability=[{"date": "11/04/2026", "start": "08:00", "end": "19:00"}]
-        )
+        f = FieldFactory.build(availability=[{"date": "11/04/2026", "start": "08:00", "end": "19:00"}])
         with pytest.raises(ValidationError):
             f.clean()
 
     def test_invalid_availability_start_after_end(self):
-        f = FieldFactory.build(
-            availability=[{"date": "2026-04-11", "start": "19:00", "end": "08:00"}]
-        )
+        f = FieldFactory.build(availability=[{"date": "2026-04-11", "start": "19:00", "end": "08:00"}])
         with pytest.raises(ValidationError):
             f.clean()
 
@@ -321,9 +315,7 @@ class TestMatch:
         cat1 = CategoryFactory(tournament=t, name="U10")
         cat2 = CategoryFactory(tournament=t, name="U13")
         group = GroupFactory(category=cat2)
-        m = MatchFactory.build(
-            tournament=t, category=cat1, group=group, placeholder_home="A", placeholder_away="B"
-        )
+        m = MatchFactory.build(tournament=t, category=cat1, group=group, placeholder_home="A", placeholder_away="B")
         with pytest.raises(ValidationError) as exc_info:
             m.clean()
         assert "group" in exc_info.value.message_dict
@@ -334,8 +326,11 @@ class TestMatch:
         field = FieldFactory(tournament=t2)
         cat = CategoryFactory(tournament=t1)
         m = MatchFactory.build(
-            tournament=t1, category=cat, field=field,
-            placeholder_home="A", placeholder_away="B",
+            tournament=t1,
+            category=cat,
+            field=field,
+            placeholder_home="A",
+            placeholder_away="B",
         )
         with pytest.raises(ValidationError) as exc_info:
             m.clean()

@@ -85,8 +85,14 @@ class Command(BaseCommand):
 
         # ── Équipes (8 par catégorie = 24 total) ────────────────────────
         club_names = [
-            "AS Soleil", "FC Étoiles", "US Tonnerre", "RC Vague",
-            "OC Flamme", "SC Foudre", "ES Vent", "JS Tempête",
+            "AS Soleil",
+            "FC Étoiles",
+            "US Tonnerre",
+            "RC Vague",
+            "OC Flamme",
+            "SC Foudre",
+            "ES Vent",
+            "JS Tempête",
         ]
         total_teams = 0
         for cat in categories:
@@ -103,16 +109,8 @@ class Command(BaseCommand):
             # ── 2 poules par catégorie ───────────────────────────────────
             teams = list(cat.teams.all())
             mid = len(teams) // 2
-            for j, (pool_name, pool_teams) in enumerate(
-                [("Poule A", teams[:mid]), ("Poule B", teams[mid:])]
-            ):
-                group = Group.objects.create(
-                    category=cat, name=pool_name, display_order=j
-                )
+            for j, (pool_name, pool_teams) in enumerate([("Poule A", teams[:mid]), ("Poule B", teams[mid:])]):
+                group = Group.objects.create(category=cat, name=pool_name, display_order=j)
                 group.teams.set(pool_teams)
 
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Tournoi de démo créé avec {total_teams} équipes"
-            )
-        )
+        self.stdout.write(self.style.SUCCESS(f"Tournoi de démo créé avec {total_teams} équipes"))

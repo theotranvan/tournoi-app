@@ -72,11 +72,13 @@ class TournamentConsumer(AsyncJsonWebsocketConsumer):
         await self.accept()
 
         # Welcome snapshot
-        await self.send_json({
-            "event": "connected",
-            "tournament": self.slug,
-            "message": f"Connected to tournament {self.slug}",
-        })
+        await self.send_json(
+            {
+                "event": "connected",
+                "tournament": self.slug,
+                "message": f"Connected to tournament {self.slug}",
+            }
+        )
         logger.info("WS connected: tournament=%s user=%s", self.slug, user)
 
     async def disconnect(self, close_code):
@@ -135,10 +137,12 @@ class MatchConsumer(AsyncJsonWebsocketConsumer):
         await self.channel_layer.group_add(self.tournament_group, self.channel_name)
         await self.accept()
 
-        await self.send_json({
-            "event": "connected",
-            "match_id": self.match_id,
-        })
+        await self.send_json(
+            {
+                "event": "connected",
+                "match_id": self.match_id,
+            }
+        )
 
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.match_group, self.channel_name)

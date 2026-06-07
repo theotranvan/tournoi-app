@@ -47,8 +47,7 @@ class TestSmallTournamentGeneration:
         engine.commit_to_db()
 
         matches = list(
-            Match.objects.filter(tournament=small_tournament)
-            .order_by("field", "start_time"),
+            Match.objects.filter(tournament=small_tournament).order_by("field", "start_time"),
         )
         # Check no two matches on the same field overlap
         from collections import defaultdict
@@ -64,8 +63,7 @@ class TestSmallTournamentGeneration:
                     minutes=fmatches[i - 1].duration_minutes,
                 )
                 assert fmatches[i].start_time >= prev_end, (
-                    f"Overlap on field {fid}: match ends {prev_end},"
-                    f" next starts {fmatches[i].start_time}"
+                    f"Overlap on field {fid}: match ends {prev_end}, next starts {fmatches[i].start_time}"
                 )
 
     def test_rest_minimum_respected(self, small_tournament):
@@ -87,9 +85,7 @@ class TestSmallTournamentGeneration:
                     minutes=matches[i - 1].duration_minutes,
                 )
                 gap = (matches[i].start_time - prev_end).total_seconds() / 60.0
-                assert gap >= rest_required - 1, (
-                    f"Team {team.name}: {gap:.0f}min rest < {rest_required}min"
-                )
+                assert gap >= rest_required - 1, f"Team {team.name}: {gap:.0f}min rest < {rest_required}min"
 
 
 @pytest.mark.django_db

@@ -1,16 +1,14 @@
 """Comprehensive tests for the new slot-based scheduling engine.
 
-Tests tournament creation → pool generation → schedule generation → 
+Tests tournament creation → pool generation → schedule generation →
 score entry → finals generation at scales: 16, 50, 100, and 300 teams.
 """
 
 from __future__ import annotations
 
-import math
 from datetime import date, timedelta
 
 import pytest
-from django.utils import timezone
 
 from apps.matches.models import Match
 from apps.scheduling.generate import (
@@ -22,8 +20,8 @@ from apps.scheduling.generate import (
     propagate_winner,
 )
 from apps.standings.services import compute_group_standings
-from apps.teams.models import Group, Team
-from apps.tournaments.models import Category, Day, Field, Tournament
+from apps.teams.models import Group
+from apps.tournaments.models import Category, Day, Tournament
 from tests.factories import (
     CategoryFactory,
     ClubFactory,
@@ -104,8 +102,7 @@ def _create_tournament_setup(
             name=f"Terrain {chr(65 + i)}",
             display_order=i,
             availability=[
-                {"date": str(start + timedelta(days=d)), "start": "08:00", "end": "19:00"}
-                for d in range(n_days)
+                {"date": str(start + timedelta(days=d)), "start": "08:00", "end": "19:00"} for d in range(n_days)
             ],
         )
 
@@ -156,9 +153,15 @@ def _finish_all_pool_matches(tournament, *, home_score=2, away_score=1):
         match.score_away = away_score
         match.status = Match.Status.FINISHED
         match.score_validated = True
-        match.save(update_fields=[
-            "score_home", "score_away", "status", "score_validated", "updated_at",
-        ])
+        match.save(
+            update_fields=[
+                "score_home",
+                "score_away",
+                "status",
+                "score_validated",
+                "updated_at",
+            ]
+        )
 
 
 # ─── Unit Tests ──────────────────────────────────────────────────────────────
@@ -171,7 +174,10 @@ class TestRoundRobin:
         """C(4,2) = 6 matches."""
         user = UserFactory()
         t = _create_tournament_setup(
-            user, n_teams_per_cat={"U10": 4}, n_fields=2, n_days=1,
+            user,
+            n_teams_per_cat={"U10": 4},
+            n_fields=2,
+            n_days=1,
         )
         cat = Category.objects.get(tournament=t, name="U10")
         _auto_generate_all_pools(t)
@@ -184,7 +190,10 @@ class TestRoundRobin:
         """C(5,2) = 10 matches (BYE round for odd teams)."""
         user = UserFactory()
         t = _create_tournament_setup(
-            user, n_teams_per_cat={"U10": 5}, n_fields=2, n_days=1,
+            user,
+            n_teams_per_cat={"U10": 5},
+            n_fields=2,
+            n_days=1,
         )
         cat = Category.objects.get(tournament=t, name="U10")
         _auto_generate_all_pools(t)
@@ -196,7 +205,10 @@ class TestRoundRobin:
     def test_3_teams_generates_3_matches(self, db):
         user = UserFactory()
         t = _create_tournament_setup(
-            user, n_teams_per_cat={"U10": 3}, n_fields=2, n_days=1,
+            user,
+            n_teams_per_cat={"U10": 3},
+            n_fields=2,
+            n_days=1,
         )
         cat = Category.objects.get(tournament=t, name="U10")
         _auto_generate_all_pools(t)
@@ -212,7 +224,10 @@ class TestAutoGeneratePools:
     def test_4_teams_1_pool(self, db):
         user = UserFactory()
         t = _create_tournament_setup(
-            user, n_teams_per_cat={"U10": 4}, n_fields=2, n_days=1,
+            user,
+            n_teams_per_cat={"U10": 4},
+            n_fields=2,
+            n_days=1,
         )
         cat = Category.objects.get(tournament=t, name="U10")
         result = auto_generate_pools(cat)
@@ -222,7 +237,10 @@ class TestAutoGeneratePools:
     def test_8_teams_2_pools(self, db):
         user = UserFactory()
         t = _create_tournament_setup(
-            user, n_teams_per_cat={"U10": 8}, n_fields=2, n_days=1,
+            user,
+            n_teams_per_cat={"U10": 8},
+            n_fields=2,
+            n_days=1,
         )
         cat = Category.objects.get(tournament=t, name="U10")
         result = auto_generate_pools(cat)
@@ -233,7 +251,10 @@ class TestAutoGeneratePools:
     def test_16_teams_4_pools(self, db):
         user = UserFactory()
         t = _create_tournament_setup(
-            user, n_teams_per_cat={"U10": 16}, n_fields=4, n_days=1,
+            user,
+            n_teams_per_cat={"U10": 16},
+            n_fields=4,
+            n_days=1,
         )
         cat = Category.objects.get(tournament=t, name="U10")
         result = auto_generate_pools(cat)
@@ -248,7 +269,10 @@ class TestFeasibility:
     def test_feasible_small(self, db):
         user = UserFactory()
         t = _create_tournament_setup(
-            user, n_teams_per_cat={"U10": 8}, n_fields=2, n_days=1,
+            user,
+            n_teams_per_cat={"U10": 8},
+            n_fields=2,
+            n_days=1,
         )
         _auto_generate_all_pools(t)
         result = calculate_feasibility(t)
@@ -259,11 +283,18 @@ class TestFeasibility:
         """50 teams with 1 field for 1 short day should be infeasible."""
         user = UserFactory()
         t = _create_tournament_setup(
-            user, n_teams_per_cat={"U10": 50}, n_fields=1, n_days=1,
-            day_configs=[{
-                "start_time": "09:00", "end_time": "10:00",
-                "lunch_start": "", "lunch_end": "",
-            }],
+            user,
+            n_teams_per_cat={"U10": 50},
+            n_fields=1,
+            n_days=1,
+            day_configs=[
+                {
+                    "start_time": "09:00",
+                    "end_time": "10:00",
+                    "lunch_start": "",
+                    "lunch_end": "",
+                }
+            ],
             match_duration=15,
         )
         _auto_generate_all_pools(t)
@@ -284,13 +315,15 @@ class TestFullFlow16Teams:
             n_teams_per_cat={"U10": 16},
             n_fields=4,
             n_days=1,
-            day_configs=[{
-                "label": "Samedi",
-                "start_time": "08:30",
-                "end_time": "17:30",
-                "lunch_start": "12:00",
-                "lunch_end": "13:00",
-            }],
+            day_configs=[
+                {
+                    "label": "Samedi",
+                    "start_time": "08:30",
+                    "end_time": "17:30",
+                    "lunch_start": "12:00",
+                    "lunch_end": "13:00",
+                }
+            ],
             match_duration=10,
             changeover=5,
         )
@@ -351,9 +384,7 @@ class TestFullFlow16Teams:
             for tid in [m.team_home_id, m.team_away_id]:
                 if tid:
                     if tid in team_slots and slot in team_slots[tid]:
-                        raise AssertionError(
-                            f"Team {tid} plays twice in slot {slot}"
-                        )
+                        raise AssertionError(f"Team {tid} plays twice in slot {slot}")
                     team_slots.setdefault(tid, set()).add(slot)
 
 
@@ -367,13 +398,15 @@ class TestFullFlow50Teams:
             n_teams_per_cat={"U10": 25, "U12": 25},
             n_fields=4,
             n_days=1,
-            day_configs=[{
-                "label": "Samedi",
-                "start_time": "08:00",
-                "end_time": "18:00",
-                "lunch_start": "12:00",
-                "lunch_end": "13:00",
-            }],
+            day_configs=[
+                {
+                    "label": "Samedi",
+                    "start_time": "08:00",
+                    "end_time": "18:00",
+                    "lunch_start": "12:00",
+                    "lunch_end": "13:00",
+                }
+            ],
             match_duration=10,
             changeover=5,
         )
@@ -410,8 +443,7 @@ class TestFullFlow50Teams:
             key = (m.field_id, m.slot_index)
             if key in field_slots:
                 raise AssertionError(
-                    f"Field {m.field_id} has two matches in slot {m.slot_index}: "
-                    f"{field_slots[key]} and {m.id}"
+                    f"Field {m.field_id} has two matches in slot {m.slot_index}: {field_slots[key]} and {m.id}"
                 )
             field_slots[key] = m.id
 
@@ -490,8 +522,12 @@ class TestFullFlow300Teams:
         t = _create_tournament_setup(
             user,
             n_teams_per_cat={
-                "U8": 50, "U9": 50, "U10": 50,
-                "U11": 50, "U12": 50, "U13": 50,
+                "U8": 50,
+                "U9": 50,
+                "U10": 50,
+                "U11": 50,
+                "U12": 50,
+                "U13": 50,
             },
             n_fields=8,
             n_days=2,
@@ -512,8 +548,12 @@ class TestFullFlow300Teams:
                 },
             ],
             cat_day_assignments={
-                "U8": 0, "U9": 0, "U10": 0,
-                "U11": 1, "U12": 1, "U13": 1,
+                "U8": 0,
+                "U9": 0,
+                "U10": 0,
+                "U11": 1,
+                "U12": 1,
+                "U13": 1,
             },
             match_duration=10,
             changeover=5,
@@ -566,17 +606,13 @@ class TestFullFlow300Teams:
             cat = Category.objects.get(tournament=t, name=cat_name)
             cat_matches = matches.filter(category=cat)
             for m in cat_matches:
-                assert m.start_time.date() == day1_date, (
-                    f"{cat_name} match on wrong day: {m.start_time.date()}"
-                )
+                assert m.start_time.date() == day1_date, f"{cat_name} match on wrong day: {m.start_time.date()}"
 
         for cat_name in ["U11", "U12", "U13"]:
             cat = Category.objects.get(tournament=t, name=cat_name)
             cat_matches = matches.filter(category=cat)
             for m in cat_matches:
-                assert m.start_time.date() == day2_date, (
-                    f"{cat_name} match on wrong day: {m.start_time.date()}"
-                )
+                assert m.start_time.date() == day2_date, f"{cat_name} match on wrong day: {m.start_time.date()}"
 
         # 6. Check rest constraints (sample check)
         self._check_rest_constraints(t, max_violations_pct=10)
@@ -584,8 +620,7 @@ class TestFullFlow300Teams:
     def _check_rest_constraints(self, tournament, max_violations_pct=10):
         """Check that most teams respect rest constraints."""
         matches = list(
-            Match.objects.filter(tournament=tournament, phase=Match.Phase.GROUP)
-            .order_by("slot_index", "start_time")
+            Match.objects.filter(tournament=tournament, phase=Match.Phase.GROUP).order_by("slot_index", "start_time")
         )
 
         team_matches: dict[int, list] = {}
@@ -610,8 +645,7 @@ class TestFullFlow300Teams:
         if total_checks > 0:
             violation_pct = violations / total_checks * 100
             assert violation_pct <= max_violations_pct, (
-                f"Too many rest violations: {violations}/{total_checks} "
-                f"({violation_pct:.1f}%)"
+                f"Too many rest violations: {violations}/{total_checks} ({violation_pct:.1f}%)"
             )
 
 
@@ -750,15 +784,12 @@ class TestSchedulingModes:
         assert result["success"]
 
         # In interleave mode, categories should be mixed
-        matches = list(
-            Match.objects.filter(tournament=t, phase=Match.Phase.GROUP)
-            .order_by("slot_index")
-        )
+        matches = list(Match.objects.filter(tournament=t, phase=Match.Phase.GROUP).order_by("slot_index"))
         assert len(matches) > 0
 
         # Check that both categories appear in the first 10 matches
         cat_ids_in_first = set()
-        for m in matches[:min(10, len(matches))]:
+        for m in matches[: min(10, len(matches))]:
             cat_ids_in_first.add(m.category_id)
         assert len(cat_ids_in_first) == 2, "Interleave should mix categories"
 
@@ -775,10 +806,7 @@ class TestSchedulingModes:
         result = generate_schedule(t)
         assert result["success"]
 
-        matches = list(
-            Match.objects.filter(tournament=t, phase=Match.Phase.GROUP)
-            .order_by("slot_index")
-        )
+        matches = list(Match.objects.filter(tournament=t, phase=Match.Phase.GROUP).order_by("slot_index"))
         assert len(matches) > 0
 
 
@@ -800,7 +828,7 @@ class TestEdgeCases:
         club = ClubFactory(owner=user)
         t = TournamentFactory(club=club)
         DayFactory(tournament=t)
-        cat = CategoryFactory(tournament=t)
+        CategoryFactory(tournament=t)
         result = generate_schedule(t)
         assert not result["success"]
         assert "terrain" in result["error"].lower()
@@ -813,7 +841,10 @@ class TestEdgeCases:
         """
         user = UserFactory()
         t = _create_tournament_setup(
-            user, n_teams_per_cat={"U10": 4}, n_fields=2, n_days=0,
+            user,
+            n_teams_per_cat={"U10": 4},
+            n_fields=2,
+            n_days=0,
         )
         _auto_generate_all_pools(t)
         assert not Day.objects.filter(tournament=t).exists()
@@ -826,7 +857,10 @@ class TestEdgeCases:
     def test_no_pools_error(self, db):
         user = UserFactory()
         t = _create_tournament_setup(
-            user, n_teams_per_cat={"U10": 4}, n_fields=2, n_days=1,
+            user,
+            n_teams_per_cat={"U10": 4},
+            n_fields=2,
+            n_days=1,
         )
         # Don't create pools
         result = generate_schedule(t)
@@ -841,7 +875,10 @@ class TestEdgeCases:
         """
         user = UserFactory()
         t = _create_tournament_setup(
-            user, n_teams_per_cat={"U10": 4}, n_fields=2, n_days=1,
+            user,
+            n_teams_per_cat={"U10": 4},
+            n_fields=2,
+            n_days=1,
         )
         _auto_generate_all_pools(t)
         result = generate_schedule(t)
@@ -852,8 +889,4 @@ class TestEdgeCases:
         assert result["success"]
         assert result["provisional"] is True
         # Knockout matches were created despite pools being unfinished
-        assert (
-            Match.objects.filter(category=cat)
-            .exclude(phase=Match.Phase.GROUP)
-            .exists()
-        )
+        assert Match.objects.filter(category=cat).exclude(phase=Match.Phase.GROUP).exists()

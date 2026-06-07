@@ -164,12 +164,10 @@ class SchedulingEngine:
         tournament start/end dates. Each day gets a default 08:00-19:00 window
         unless categories provide tighter earliest_start/latest_end.
         """
-        from datetime import date as dt_date, timedelta as td
-        from apps.tournaments.models import Field
+        from datetime import date as dt_date
+        from datetime import timedelta as td
 
-        empty_fields = [
-            f for f in self._context.fields.values() if not f.availability
-        ]
+        empty_fields = [f for f in self._context.fields.values() if not f.availability]
         if not empty_fields:
             return
 
@@ -197,23 +195,21 @@ class SchedulingEngine:
                 latest = max(ends).strftime("%H:%M")
 
         # Build availability and save
-        avail = [
-            {"date": d.isoformat(), "start": earliest, "end": latest}
-            for d in days
-        ]
+        avail = [{"date": d.isoformat(), "start": earliest, "end": latest} for d in days]
         for f in empty_fields:
             f.availability = avail
             f.save(update_fields=["availability"])
 
         # Reload context to pick up new availability
         self.load_context()
-        self._warnings.append(SoftWarning(
-            type="auto_availability",
-            message=(
-                f"{len(empty_fields)} terrain(s) sans disponibilité — "
-                f"créneaux auto-générés ({earliest}–{latest})."
-            ),
-        ))
+        self._warnings.append(
+            SoftWarning(
+                type="auto_availability",
+                message=(
+                    f"{len(empty_fields)} terrain(s) sans disponibilité — créneaux auto-générés ({earliest}–{latest})."
+                ),
+            )
+        )
 
     def _enumerate_required_matches(self) -> None:
         matches, warnings = enumerate_tournament_matches(self.tournament)
@@ -236,13 +232,15 @@ class SchedulingEngine:
         t = self.tournament
         duration = (t.end_date - t.start_date).days
         if duration < 1:
-            self._warnings.append(SoftWarning(
-                type="phase_separation_impossible",
-                message=(
-                    "Mode 'lendemain' activé mais le tournoi ne dure qu'un jour — "
-                    "les phases finales ne seront pas séparées."
-                ),
-            ))
+            self._warnings.append(
+                SoftWarning(
+                    type="phase_separation_impossible",
+                    message=(
+                        "Mode 'lendemain' activé mais le tournoi ne dure qu'un jour — "
+                        "les phases finales ne seront pas séparées."
+                    ),
+                )
+            )
             return
 
         forced = t.end_date
@@ -278,19 +276,21 @@ class SchedulingEngine:
                 rest_needed=rest,
             )
             placement = Placement(
-                match=pm, field_id=m.field_id, start_time=m.start_time,
+                match=pm,
+                field_id=m.field_id,
+                start_time=m.start_time,
             )
             self._context.commit_placement(placement)
 
             # Remove matching provisional match (same teams + group + phase)
             self._matches = [
-                pm2 for pm2 in self._matches
+                pm2
+                for pm2 in self._matches
                 if not (
                     pm2.category_id == m.category_id
                     and pm2.group_id == m.group_id
                     and pm2.phase == m.phase
-                    and {pm2.team_home_id, pm2.team_away_id}
-                    == {m.team_home_id, m.team_away_id}
+                    and {pm2.team_home_id, pm2.team_away_id} == {m.team_home_id, m.team_away_id}
                 )
             ]
 
@@ -298,10 +298,7 @@ class SchedulingEngine:
 
     def _place_hard_constrained(self) -> None:
         """Matches with hard required_field constraints are placed first."""
-        hard_required = [
-            c for c in self._context._hard_constraints
-            if c.constraint_type == "required_field"
-        ]
+        hard_required = [c for c in self._context._hard_constraints if c.constraint_type == "required_field"]
         if not hard_required:
             return
 
@@ -310,10 +307,7 @@ class SchedulingEngine:
             placed = False
             for hc in hard_required:
                 payload = hc.payload or {}
-                if (
-                    payload.get("category_id")
-                    and payload["category_id"] != m.category_id
-                ):
+                if payload.get("category_id") and payload["category_id"] != m.category_id:
                     continue
                 if payload.get("phase") and payload["phase"] != m.phase:
                     continue
@@ -342,8 +336,12 @@ class SchedulingEngine:
         - Knockout matches keep their phase ordering and come after all groups
         """
         phase_priority = {
-            "group": 0, "r16": 1, "quarter": 2,
-            "semi": 3, "third": 4, "final": 5,
+            "group": 0,
+            "r16": 1,
+            "quarter": 2,
+            "semi": 3,
+            "third": 4,
+            "final": 5,
         }
 
         groups_by_cat: dict[int, list[ProvisionalMatch]] = defaultdict(list)
@@ -371,14 +369,13 @@ class SchedulingEngine:
             grp_matches = groups_by_cat.get(cat_id, [])
             if grp_matches:
                 optimised_groups[cat_id] = self._optimize_rest_order(
-                    grp_matches, min_rest_slots,
+                    grp_matches,
+                    min_rest_slots,
                 )
 
         # Interleave group matches across categories (round-robin)
         result: list[ProvisionalMatch] = []
-        cat_iterators = {
-            cid: iter(ms) for cid, ms in optimised_groups.items()
-        }
+        cat_iterators = {cid: iter(ms) for cid, ms in optimised_groups.items()}
         while cat_iterators:
             exhausted: list[int] = []
             for cid in list(cat_iterators):
@@ -400,7 +397,8 @@ class SchedulingEngine:
 
     @staticmethod
     def _optimize_rest_order(
-        matches: list[ProvisionalMatch], min_rest: int,
+        matches: list[ProvisionalMatch],
+        min_rest: int,
     ) -> list[ProvisionalMatch]:
         """Reorder matches so that teams get maximum rest between appearances.
 
@@ -508,16 +506,18 @@ class SchedulingEngine:
                 if best:
                     self._context.commit_placement(best)
                     placed_count += 1
-                    self._warnings.append(SoftWarning(
-                        type="reduced_rest",
-                        message=(
-                            f"Repos réduit pour "
-                            f"{m.placeholder_home or 'team'}"
-                            f" vs {m.placeholder_away or 'team'}"
-                            f" ({m.phase}) — {reduced_rest}min au lieu de {m.rest_needed}min."
-                        ),
-                        affected_match_id=m.provisional_id,
-                    ))
+                    self._warnings.append(
+                        SoftWarning(
+                            type="reduced_rest",
+                            message=(
+                                f"Repos réduit pour "
+                                f"{m.placeholder_home or 'team'}"
+                                f" vs {m.placeholder_away or 'team'}"
+                                f" ({m.phase}) — {reduced_rest}min au lieu de {m.rest_needed}min."
+                            ),
+                            affected_match_id=m.provisional_id,
+                        )
+                    )
                 else:
                     retry2.append(m)
             retry = retry2
@@ -532,34 +532,39 @@ class SchedulingEngine:
             if relaxed:
                 self._context.commit_placement(relaxed)
                 placed_count += 1
-                self._warnings.append(SoftWarning(
-                    type="constraint_relaxed",
-                    message=(
-                        f"Contrainte relaxée pour "
-                        f"{m.placeholder_home or 'team'}"
-                        f" vs {m.placeholder_away or 'team'}"
-                        f" ({m.phase}) — repos ou équilibrage non garanti."
-                    ),
-                    affected_match_id=m.provisional_id,
-                ))
+                self._warnings.append(
+                    SoftWarning(
+                        type="constraint_relaxed",
+                        message=(
+                            f"Contrainte relaxée pour "
+                            f"{m.placeholder_home or 'team'}"
+                            f" vs {m.placeholder_away or 'team'}"
+                            f" ({m.phase}) — repos ou équilibrage non garanti."
+                        ),
+                        affected_match_id=m.provisional_id,
+                    )
+                )
                 continue
 
             # Truly impossible
-            self._conflicts.append(Conflict(
-                type="no_valid_slot",
-                match_id=m.provisional_id,
-                reason=(
-                    f"Aucun créneau valide pour "
-                    f"{m.placeholder_home or 'team'}"
-                    f" vs {m.placeholder_away or 'team'}"
-                    f" ({m.phase})"
-                ),
-                severity="hard",
-            ))
+            self._conflicts.append(
+                Conflict(
+                    type="no_valid_slot",
+                    match_id=m.provisional_id,
+                    reason=(
+                        f"Aucun créneau valide pour "
+                        f"{m.placeholder_home or 'team'}"
+                        f" vs {m.placeholder_away or 'team'}"
+                        f" ({m.phase})"
+                    ),
+                    severity="hard",
+                )
+            )
             self._matches.append(m)
 
     def _find_relaxed_placement(
-        self, match: ProvisionalMatch,
+        self,
+        match: ProvisionalMatch,
     ) -> Placement | None:
         """Find a placement ignoring rest/balance constraints.
 
@@ -603,7 +608,10 @@ class SchedulingEngine:
                 if best_time is None or start < best_time:
                     best_time = start
                     best = Placement(
-                        match=match, field_id=fid, start_time=start, score=0.0,
+                        match=match,
+                        field_id=fid,
+                        start_time=start,
+                        score=0.0,
                     )
                     break  # Take first valid on this field, keep scanning fields for earlier
 
@@ -627,7 +635,10 @@ class SchedulingEngine:
                 if s is not None and s > best_score:
                     best_score = s
                     best_placement = Placement(
-                        match=match, field_id=fid, start_time=start, score=s,
+                        match=match,
+                        field_id=fid,
+                        start_time=start,
+                        score=s,
                     )
 
         return best_placement
@@ -642,18 +653,13 @@ class SchedulingEngine:
             avg = sum(counts.values()) / max(len(counts), 1)
             for fid, cnt in counts.items():
                 if avg > 0 and cnt / avg > 1.3:
-                    fname = (
-                        self._context.fields[fid].name
-                        if fid in self._context.fields
-                        else str(fid)
+                    fname = self._context.fields[fid].name if fid in self._context.fields else str(fid)
+                    self._warnings.append(
+                        SoftWarning(
+                            type="unbalanced_field",
+                            message=(f"Terrain {fname} est surchargé ({cnt} matchs, moy. {avg:.0f})."),
+                        )
                     )
-                    self._warnings.append(SoftWarning(
-                        type="unbalanced_field",
-                        message=(
-                            f"Terrain {fname} est surchargé"
-                            f" ({cnt} matchs, moy. {avg:.0f})."
-                        ),
-                    ))
 
         # Team rest times and consecutive matches
         team_matches: dict[int, list[Placement]] = {}
@@ -664,11 +670,7 @@ class SchedulingEngine:
 
         for tid, pls in team_matches.items():
             sorted_p = sorted(pls, key=lambda p: p.start_time)
-            tname = (
-                self._context.teams[tid].name
-                if tid in self._context.teams
-                else str(tid)
-            )
+            tname = self._context.teams[tid].name if tid in self._context.teams else str(tid)
 
             consecutive = 1
             for i in range(1, len(sorted_p)):
@@ -678,40 +680,39 @@ class SchedulingEngine:
                 gap = (curr.start_time - prev_end).total_seconds() / 60.0
 
                 if gap < curr.match.rest_needed:
-                    self._warnings.append(SoftWarning(
-                        type="short_rest",
-                        message=(
-                            f"Équipe {tname} a seulement {gap:.0f}min"
-                            f" de repos (min: {curr.match.rest_needed})."
-                        ),
-                        affected_team_id=tid,
-                        affected_match_id=curr.match.provisional_id,
-                    ))
+                    self._warnings.append(
+                        SoftWarning(
+                            type="short_rest",
+                            message=(
+                                f"Équipe {tname} a seulement {gap:.0f}min de repos (min: {curr.match.rest_needed})."
+                            ),
+                            affected_team_id=tid,
+                            affected_match_id=curr.match.provisional_id,
+                        )
+                    )
                 elif gap > 180 and prev.start_time.date() == curr.start_time.date():
                     # Only flag long waits within the same day (inter-day gaps are expected)
-                    self._warnings.append(SoftWarning(
-                        type="long_wait",
-                        message=(
-                            f"Équipe {tname} attend {gap:.0f}min"
-                            f" entre deux matchs."
-                        ),
-                        affected_team_id=tid,
-                        affected_match_id=curr.match.provisional_id,
-                    ))
+                    self._warnings.append(
+                        SoftWarning(
+                            type="long_wait",
+                            message=(f"Équipe {tname} attend {gap:.0f}min entre deux matchs."),
+                            affected_team_id=tid,
+                            affected_match_id=curr.match.provisional_id,
+                        )
+                    )
 
                 # Track consecutive (back-to-back within transition time)
                 if gap <= (curr.match.transition + 2):
                     consecutive += 1
                     if consecutive > 2:
-                        self._warnings.append(SoftWarning(
-                            type="too_many_consecutive",
-                            message=(
-                                f"Équipe {tname} joue {consecutive} matchs "
-                                f"consécutifs sans repos suffisant."
-                            ),
-                            affected_team_id=tid,
-                            affected_match_id=curr.match.provisional_id,
-                        ))
+                        self._warnings.append(
+                            SoftWarning(
+                                type="too_many_consecutive",
+                                message=(f"Équipe {tname} joue {consecutive} matchs consécutifs sans repos suffisant."),
+                                affected_team_id=tid,
+                                affected_match_id=curr.match.provisional_id,
+                            )
+                        )
                 else:
                     consecutive = 1
 
@@ -724,7 +725,11 @@ class SchedulingEngine:
             # Temporarily remove this placement to score it fairly
             self._context.remove_placement(p)
             result = score_placement(
-                m, p.field_id, p.start_time, self._context, explain=True,
+                m,
+                p.field_id,
+                p.start_time,
+                self._context,
+                explain=True,
             )
             self._context.commit_placement(p)
 
@@ -752,11 +757,7 @@ class SchedulingEngine:
             suffix += ")"
             display = f"{home} vs {away}{suffix}"
 
-            field_name = (
-                self._context.fields[p.field_id].name
-                if p.field_id in self._context.fields
-                else None
-            )
+            field_name = self._context.fields[p.field_id].name if p.field_id in self._context.fields else None
 
             rest_home = None
             rest_away = None
@@ -767,18 +768,20 @@ class SchedulingEngine:
                 r = self._context.time_since_last_match(m.team_away_id, p.start_time)
                 rest_away = round(r) if r != float("inf") else None
 
-            self._match_diagnostics.append(MatchDiagnostic(
-                match_id=m.provisional_id,
-                display=display,
-                placed=True,
-                field_name=field_name,
-                start_time=p.start_time,
-                score=score_val,
-                penalties=penalties,
-                rest_before_home=rest_home,
-                rest_before_away=rest_away,
-                alternatives_considered=0,
-            ))
+            self._match_diagnostics.append(
+                MatchDiagnostic(
+                    match_id=m.provisional_id,
+                    display=display,
+                    placed=True,
+                    field_name=field_name,
+                    start_time=p.start_time,
+                    score=score_val,
+                    penalties=penalties,
+                    rest_before_home=rest_home,
+                    rest_before_away=rest_away,
+                    alternatives_considered=0,
+                )
+            )
 
     @classmethod
     def diagnose_current_schedule(cls, tournament) -> dict:
@@ -827,7 +830,11 @@ class SchedulingEngine:
 
             engine._context.remove_placement(p)
             result = score_placement(
-                m, p.field_id, p.start_time, engine._context, explain=True,
+                m,
+                p.field_id,
+                p.start_time,
+                engine._context,
+                explain=True,
             )
             engine._context.commit_placement(p)
 
@@ -854,16 +861,18 @@ class SchedulingEngine:
                 r = engine._context.time_since_last_match(m.team_away_id, p.start_time)
                 rest_away = round(r) if r != float("inf") else None
 
-            diagnostics.append({
-                "match_id": str(m.provisional_id),
-                "display": f"{home} vs {away}{suffix}",
-                "score": round(score_val, 1),
-                "field_name": db_match.field.name if db_match.field else None,
-                "start_time": p.start_time.isoformat() if p.start_time else None,
-                "penalties": penalties,
-                "rest_before_home_minutes": rest_home,
-                "rest_before_away_minutes": rest_away,
-            })
+            diagnostics.append(
+                {
+                    "match_id": str(m.provisional_id),
+                    "display": f"{home} vs {away}{suffix}",
+                    "score": round(score_val, 1),
+                    "field_name": db_match.field.name if db_match.field else None,
+                    "start_time": p.start_time.isoformat() if p.start_time else None,
+                    "penalties": penalties,
+                    "rest_before_home_minutes": rest_home,
+                    "rest_before_away_minutes": rest_away,
+                }
+            )
 
         n = len(diagnostics)
         avg_score = total_score / n if n > 0 else 0
@@ -991,7 +1000,10 @@ class SchedulingEngine:
     # ─── Phase 8: Build report ───────────────────────────────────────────
 
     def _build_report(
-        self, placed: int, total: int, start_ts: float,
+        self,
+        placed: int,
+        total: int,
+        start_ts: float,
     ) -> SchedulingReport:
         score_val = 100.0
         score_val -= len(self._conflicts) * 20
@@ -1019,9 +1031,10 @@ class SchedulingEngine:
         bottleneck detection, and a composite feasibility score 0-100.
         """
         from collections import Counter, defaultdict
+
         from apps.scheduling.enumerator import enumerate_tournament_matches
+        from apps.scheduling.slots import parse_time
         from apps.tournaments.models import Category, Field
-        from apps.scheduling.slots import parse_date, parse_time
 
         categories = list(Category.objects.filter(tournament=tournament))
         fields = list(
@@ -1101,12 +1114,14 @@ class SchedulingEngine:
             day_slots = slots_per_day[day_str]
             day_demand = round(matches_per_day.get(day_str, 0))
             day_util = round(day_demand / day_slots * 100) if day_slots > 0 else 0
-            days_detail.append({
-                "date": day_str,
-                "slots": day_slots,
-                "estimated_matches": day_demand,
-                "utilization": min(day_util, 100),
-            })
+            days_detail.append(
+                {
+                    "date": day_str,
+                    "slots": day_slots,
+                    "estimated_matches": day_demand,
+                    "utilization": min(day_util, 100),
+                }
+            )
             if day_util > max_day_util:
                 max_day_util = day_util
                 day_bottleneck = day_str
@@ -1122,17 +1137,19 @@ class SchedulingEngine:
             # Slots available for this category
             cat_slots = sum(slots_per_day.get(d, 0) for d in days)
             cat_util = round(n_matches / cat_slots * 100) if cat_slots > 0 else 0
-            categories_detail.append({
-                "id": cat.id,
-                "name": cat.name,
-                "teams": n_teams,
-                "matches": n_matches,
-                "slots_available": cat_slots,
-                "utilization": min(cat_util, 100),
-                "match_duration": dur,
-                "rest_time": rest,
-                "days": days,
-            })
+            categories_detail.append(
+                {
+                    "id": cat.id,
+                    "name": cat.name,
+                    "teams": n_teams,
+                    "matches": n_matches,
+                    "slots_available": cat_slots,
+                    "utilization": min(cat_util, 100),
+                    "match_duration": dur,
+                    "rest_time": rest,
+                    "days": days,
+                }
+            )
 
         # ── Composite feasibility score (0-100) ─────────────────────────
         global_util = round(total_matches / total_slots * 100) if total_slots > 0 else 100
@@ -1151,16 +1168,16 @@ class SchedulingEngine:
         has_categories = len(categories) > 0
         has_teams = total_matches > 0
         has_availability = total_slots > 0
-        setup_score = sum([
-            25 if has_fields else 0,
-            25 if has_categories else 0,
-            25 if has_teams else 0,
-            25 if has_availability else 0,
-        ])
-
-        feasibility_score = round(
-            slot_score * 0.4 + rest_score * 0.2 + day_score * 0.2 + setup_score * 0.2
+        setup_score = sum(
+            [
+                25 if has_fields else 0,
+                25 if has_categories else 0,
+                25 if has_teams else 0,
+                25 if has_availability else 0,
+            ]
         )
+
+        feasibility_score = round(slot_score * 0.4 + rest_score * 0.2 + day_score * 0.2 + setup_score * 0.2)
         feasibility_score = max(0, min(100, feasibility_score))
 
         # ── Bottlenecks / tips ───────────────────────────────────────────
@@ -1179,9 +1196,7 @@ class SchedulingEngine:
                 f"Ajoutez des terrains ou réduisez le nombre d'équipes."
             )
         elif global_util > 75:
-            bottlenecks.append(
-                f"Utilisation élevée ({global_util}%) — le planning sera serré."
-            )
+            bottlenecks.append(f"Utilisation élevée ({global_util}%) — le planning sera serré.")
         if rest_overhead > 0.4:
             bottlenecks.append(
                 "Le temps de repos entre matchs consomme beaucoup de capacité. "
@@ -1189,8 +1204,7 @@ class SchedulingEngine:
             )
         if day_bottleneck and max_day_util > 85:
             bottlenecks.append(
-                f"Le {day_bottleneck} est surchargé ({max_day_util}%). "
-                f"Répartissez les catégories sur plusieurs jours."
+                f"Le {day_bottleneck} est surchargé ({max_day_util}%). Répartissez les catégories sur plusieurs jours."
             )
 
         # Phase separation warning
@@ -1276,7 +1290,8 @@ class SchedulingEngine:
         engine.load_context()
 
         changed = Match.objects.filter(
-            id__in=changed_match_ids, tournament=tournament,
+            id__in=changed_match_ids,
+            tournament=tournament,
         )
         affected_cats = set(changed.values_list("category_id", flat=True))
         affected_days: set = set()
@@ -1313,7 +1328,9 @@ class SchedulingEngine:
                 rest_needed=cat.effective_rest_time if cat else 20,
             )
             placement = Placement(
-                match=pm, field_id=m.field_id, start_time=m.start_time,
+                match=pm,
+                field_id=m.field_id,
+                start_time=m.start_time,
             )
             engine._context.commit_placement(placement)
 
@@ -1321,19 +1338,21 @@ class SchedulingEngine:
         to_replace = affected.filter(is_locked=False)
         for m in to_replace:
             cat = engine._context.categories.get(m.category_id)
-            engine._matches.append(ProvisionalMatch(
-                provisional_id=str(m.id),
-                category_id=m.category_id,
-                group_id=m.group_id,
-                phase=m.phase,
-                team_home_id=m.team_home_id,
-                team_away_id=m.team_away_id,
-                placeholder_home=m.placeholder_home,
-                placeholder_away=m.placeholder_away,
-                duration=m.duration_minutes,
-                transition=cat.effective_transition_time if cat else 5,
-                rest_needed=cat.effective_rest_time if cat else 20,
-            ))
+            engine._matches.append(
+                ProvisionalMatch(
+                    provisional_id=str(m.id),
+                    category_id=m.category_id,
+                    group_id=m.group_id,
+                    phase=m.phase,
+                    team_home_id=m.team_home_id,
+                    team_away_id=m.team_away_id,
+                    placeholder_home=m.placeholder_home,
+                    placeholder_away=m.placeholder_away,
+                    duration=m.duration_minutes,
+                    transition=cat.effective_transition_time if cat else 5,
+                    rest_needed=cat.effective_rest_time if cat else 20,
+                )
+            )
 
         to_replace.delete()
 

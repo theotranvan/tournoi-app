@@ -53,9 +53,7 @@ class TeamAdminSerializer(serializers.ModelSerializer):
         if request is None:
             return None
         tournament_id = obj.tournament_id
-        return request.build_absolute_uri(
-            f"/api/v1/tournaments/{tournament_id}/teams/{obj.pk}/qr-code/"
-        )
+        return request.build_absolute_uri(f"/api/v1/tournaments/{tournament_id}/teams/{obj.pk}/qr-code/")
 
 
 class TeamBriefSerializer(serializers.ModelSerializer):
@@ -104,6 +102,4 @@ class GroupDetailSerializer(serializers.ModelSerializer):
 
 class GenerateGroupsSerializer(serializers.Serializer):
     num_groups = serializers.IntegerField(min_value=1, max_value=20)
-    strategy = serializers.ChoiceField(
-        choices=["balanced"], default="balanced"
-    )
+    strategy = serializers.ChoiceField(choices=["balanced"], default="balanced")

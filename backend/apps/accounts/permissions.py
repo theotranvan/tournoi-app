@@ -36,10 +36,7 @@ class IsTournamentOwner(BasePermission):
         user = request.user
         if isinstance(user, TeamAnonymousUser):
             return False
-        return (
-            tournament.club.owner_id == user.id
-            or tournament.club.members.filter(id=user.id).exists()
-        )
+        return tournament.club.owner_id == user.id or tournament.club.members.filter(id=user.id).exists()
 
 
 class IsTeamMember(BasePermission):

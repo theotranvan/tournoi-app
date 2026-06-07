@@ -5,9 +5,8 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from tests.factories import CategoryFactory, ClubFactory, FieldFactory, TeamFactory, TournamentFactory, UserFactory
-
 from apps.subscriptions.models import Subscription
+from tests.factories import CategoryFactory, ClubFactory, FieldFactory, TeamFactory, TournamentFactory, UserFactory
 
 
 @pytest.fixture
@@ -23,6 +22,7 @@ def _no_password_validators(settings):
 @pytest.fixture(autouse=True)
 def _clear_throttle_cache():
     from django.core.cache import cache
+
     cache.clear()
 
 
@@ -34,6 +34,7 @@ def _make_user(username="org1", role="organizer"):
 
 
 # ── Clubs ────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.django_db
 class TestClubsCRUD:
@@ -77,19 +78,23 @@ class TestClubsCRUD:
 
 # ── Tournaments ──────────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestTournamentsCRUD:
     def test_create_tournament(self, api):
         user = _make_user()
         club = ClubFactory(owner=user)
         api.force_authenticate(user=user)
-        resp = api.post("/api/v1/tournaments/", {
-            "club": club.id,
-            "name": "Tournoi Printemps",
-            "location": "Stade Municipal",
-            "start_date": "2026-04-11",
-            "end_date": "2026-04-12",
-        })
+        resp = api.post(
+            "/api/v1/tournaments/",
+            {
+                "club": club.id,
+                "name": "Tournoi Printemps",
+                "location": "Stade Municipal",
+                "start_date": "2026-04-11",
+                "end_date": "2026-04-12",
+            },
+        )
         assert resp.status_code == status.HTTP_201_CREATED
         data = resp.json()
         assert data["name"] == "Tournoi Printemps"
@@ -99,13 +104,16 @@ class TestTournamentsCRUD:
         user = _make_user()
         club = ClubFactory(owner=user)
         api.force_authenticate(user=user)
-        resp = api.post("/api/v1/tournaments/", {
-            "club": club.id,
-            "name": "Bad dates",
-            "location": "X",
-            "start_date": "2026-04-12",
-            "end_date": "2026-04-11",
-        })
+        resp = api.post(
+            "/api/v1/tournaments/",
+            {
+                "club": club.id,
+                "name": "Bad dates",
+                "location": "X",
+                "start_date": "2026-04-12",
+                "end_date": "2026-04-11",
+            },
+        )
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_list_tournaments_filtered_by_club(self, api):
@@ -161,6 +169,7 @@ class TestTournamentsCRUD:
 
 # ── Tournament Actions ───────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestTournamentActions:
     def test_publish_validates_prerequisites(self, api):
@@ -195,7 +204,8 @@ class TestTournamentActions:
     def test_duplicate(self, api):
         user = _make_user()
         Subscription.objects.update_or_create(
-            user=user, defaults={"plan": "club_monthly", "status": "active"},
+            user=user,
+            defaults={"plan": "club_monthly", "status": "active"},
         )
         club = ClubFactory(owner=user)
         t = TournamentFactory(club=club)
@@ -212,6 +222,7 @@ class TestTournamentActions:
 
 # ── Categories ───────────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestCategoriesCRUD:
     def test_create_category(self, api):
@@ -219,17 +230,21 @@ class TestCategoriesCRUD:
         club = ClubFactory(owner=user)
         t = TournamentFactory(club=club)
         api.force_authenticate(user=user)
-        resp = api.post(f"/api/v1/tournaments/{t.id}/categories/", {
-            "name": "U10",
-            "display_order": 0,
-        })
+        resp = api.post(
+            f"/api/v1/tournaments/{t.id}/categories/",
+            {
+                "name": "U10",
+                "display_order": 0,
+            },
+        )
         assert resp.status_code == status.HTTP_201_CREATED
         assert resp.json()["name"] == "U10"
 
     def test_bulk_create(self, api):
         user = _make_user()
         Subscription.objects.update_or_create(
-            user=user, defaults={"plan": "club_monthly", "status": "active"},
+            user=user,
+            defaults={"plan": "club_monthly", "status": "active"},
         )
         club = ClubFactory(owner=user)
         t = TournamentFactory(club=club)
@@ -248,9 +263,12 @@ class TestCategoriesCRUD:
         t = TournamentFactory(club=club)
         CategoryFactory(tournament=t, name="U10")
         api.force_authenticate(user=user)
-        resp = api.post(f"/api/v1/tournaments/{t.id}/categories/", {
-            "name": "U10",
-        })
+        resp = api.post(
+            f"/api/v1/tournaments/{t.id}/categories/",
+            {
+                "name": "U10",
+            },
+        )
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_delete_category_with_teams_fails(self, api):
@@ -275,6 +293,7 @@ class TestCategoriesCRUD:
 
 # ── Fields ───────────────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestFieldsCRUD:
     def test_create_field(self, api):
@@ -286,9 +305,7 @@ class TestFieldsCRUD:
             f"/api/v1/tournaments/{t.id}/fields/",
             {
                 "name": "Terrain 1",
-                "availability": [
-                    {"date": str(t.start_date), "start": "08:00", "end": "19:00"}
-                ],
+                "availability": [{"date": str(t.start_date), "start": "08:00", "end": "19:00"}],
             },
             format="json",
         )
@@ -307,9 +324,7 @@ class TestFieldsCRUD:
             f"/api/v1/tournaments/{t.id}/fields/",
             {
                 "name": "Terrain Bad",
-                "availability": [
-                    {"date": "2099-12-31", "start": "08:00", "end": "19:00"}
-                ],
+                "availability": [{"date": "2099-12-31", "start": "08:00", "end": "19:00"}],
             },
             format="json",
         )
@@ -323,6 +338,7 @@ class TestFieldsCRUD:
 class TestTournamentDefaults:
     def test_tournament_has_public_code_on_create(self, api):
         from apps.tournaments.models import Tournament
+
         user = _make_user("org_def")
         api.force_authenticate(user=user)
         club = ClubFactory(owner=user)
@@ -343,6 +359,7 @@ class TestTournamentDefaults:
 
     def test_tournament_is_public_by_default(self, api):
         from apps.tournaments.models import Tournament
+
         user = _make_user("org_pub")
         api.force_authenticate(user=user)
         club = ClubFactory(owner=user)
@@ -378,6 +395,7 @@ class TestTournamentDefaults:
 class TestFreePlanLimits:
     def test_check_can_create_tournament_blocked_on_free(self):
         from apps.subscriptions.plans import check_can_create_tournament
+
         user = UserFactory()
         club = ClubFactory(owner=user)
         TournamentFactory(club=club, status="draft")
@@ -385,7 +403,8 @@ class TestFreePlanLimits:
         assert result is not None
 
     def test_check_free_limits_categories(self):
-        from apps.subscriptions.plans import check_free_limits, FREE_LIMITS
+        from apps.subscriptions.plans import FREE_LIMITS, check_free_limits
+
         user = UserFactory()
         tournament = TournamentFactory(club__owner=user)
         for _ in range(FREE_LIMITS.max_categories_per_tournament + 1):
@@ -394,7 +413,8 @@ class TestFreePlanLimits:
         assert any("catégories" in v for v in violations)
 
     def test_check_free_limits_fields(self):
-        from apps.subscriptions.plans import check_free_limits, FREE_LIMITS
+        from apps.subscriptions.plans import FREE_LIMITS, check_free_limits
+
         user = UserFactory()
         tournament = TournamentFactory(club__owner=user)
         for _ in range(FREE_LIMITS.max_fields_per_tournament + 1):
@@ -404,6 +424,7 @@ class TestFreePlanLimits:
 
     def test_club_plan_bypasses_limits(self):
         from apps.subscriptions.plans import check_free_limits
+
         user = UserFactory()
         Subscription.objects.create(
             user=user,

@@ -8,23 +8,15 @@ from apps.tournaments.models import Category, Tournament
 
 def generate_access_code(length: int = 8) -> str:
     """Génère un code alphanumérique lisible (sans 0, O, I, 1)."""
-    alphabet = "".join(
-        c for c in string.ascii_uppercase + string.digits if c not in "0O1I"
-    )
+    alphabet = "".join(c for c in string.ascii_uppercase + string.digits if c not in "0O1I")
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
 class Team(models.Model):
-    tournament = models.ForeignKey(
-        Tournament, on_delete=models.CASCADE, related_name="teams"
-    )
-    category = models.ForeignKey(
-        Category, on_delete=models.CASCADE, related_name="teams"
-    )
+    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name="teams")
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="teams")
     name = models.CharField(max_length=200)
-    short_name = models.CharField(
-        max_length=20, blank=True, help_text="Pour affichage mobile"
-    )
+    short_name = models.CharField(max_length=20, blank=True, help_text="Pour affichage mobile")
     logo = models.ImageField(upload_to="teams/", null=True, blank=True)
     coach_name = models.CharField(max_length=200, blank=True)
     coach_phone = models.CharField(max_length=20, blank=True)
@@ -51,9 +43,7 @@ class Team(models.Model):
 class Group(models.Model):
     """Poule."""
 
-    category = models.ForeignKey(
-        Category, on_delete=models.CASCADE, related_name="groups"
-    )
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="groups")
     name = models.CharField(max_length=20)
     display_order = models.PositiveIntegerField(default=0)
     teams = models.ManyToManyField(Team, related_name="groups", blank=True)

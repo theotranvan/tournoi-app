@@ -3,23 +3,17 @@
 import pytest
 from rest_framework.test import APIClient
 
-from apps.tournaments.models import Tournament
+from apps.scheduling.tests.conftest import make_tournament
 from tests.factories import (
-    CategoryFactory,
-    ClubFactory,
-    FieldFactory,
-    MatchFactory,
-    TeamFactory,
-    TournamentFactory,
     UserFactory,
 )
-from apps.scheduling.tests.conftest import make_tournament
 
 
 @pytest.fixture(autouse=True)
 def _clear_throttle_cache():
     """Reset DRF throttle cache between tests so rate limits don't leak."""
     from django.core.cache import cache
+
     cache.clear()
 
 
@@ -92,9 +86,7 @@ class TestScheduleList:
         resp = api.get(url)
         assert resp.status_code == 200
         assert isinstance(resp.data, list)
-        total_matches = sum(
-            len(f["matches"]) for day in resp.data for f in day["fields"]
-        )
+        total_matches = sum(len(f["matches"]) for day in resp.data for f in day["fields"])
         assert total_matches > 0
 
     def test_list_requires_auth(self, anon_api, ready_tournament):

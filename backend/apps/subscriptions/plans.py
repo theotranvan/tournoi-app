@@ -10,8 +10,9 @@ from typing import TYPE_CHECKING
 from django.db.models import Q
 
 if TYPE_CHECKING:
-    from apps.tournaments.models import Tournament
     from django.contrib.auth.models import AbstractUser
+
+    from apps.tournaments.models import Tournament
 
 
 # ── Feature keys ─────────────────────────────────────────────────────────────
@@ -61,8 +62,10 @@ FREE_LIMITS = FreeLimits()
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
+
 def _get_subscription(user: AbstractUser):
     from apps.subscriptions.models import Subscription
+
     try:
         return user.subscription  # type: ignore[union-attr]
     except Subscription.DoesNotExist:
@@ -71,6 +74,7 @@ def _get_subscription(user: AbstractUser):
 
 def _get_license(tournament: Tournament):
     from apps.subscriptions.models import TournamentLicense
+
     try:
         return tournament.license  # type: ignore[union-attr]
     except TournamentLicense.DoesNotExist:
@@ -141,7 +145,6 @@ def check_can_create_tournament(user: AbstractUser) -> str | None:
     """
     Return an error message if the user cannot create a new tournament, or None if OK.
     """
-    from apps.subscriptions.models import Subscription
     from apps.tournaments.models import Tournament
 
     sub = _get_subscription(user)
@@ -154,10 +157,14 @@ def check_can_create_tournament(user: AbstractUser) -> str | None:
         Tournament.Status.PUBLISHED,
         Tournament.Status.LIVE,
     ]
-    active_count = Tournament.objects.filter(
-        Q(club__owner=user) | Q(club__members=user),
-        status__in=active_statuses,
-    ).distinct().count()
+    active_count = (
+        Tournament.objects.filter(
+            Q(club__owner=user) | Q(club__members=user),
+            status__in=active_statuses,
+        )
+        .distinct()
+        .count()
+    )
 
     if active_count >= FREE_LIMITS.max_active_tournaments:
         return (

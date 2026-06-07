@@ -210,10 +210,7 @@ if SENTRY_DSN:
     def _scrub_data(data):
         """Recursively redact sensitive keys from event data."""
         if isinstance(data, dict):
-            return {
-                k: "[REDACTED]" if k.lower() in _SENSITIVE_KEYS else _scrub_data(v)
-                for k, v in data.items()
-            }
+            return {k: "[REDACTED]" if k.lower() in _SENSITIVE_KEYS else _scrub_data(v) for k, v in data.items()}
         if isinstance(data, list):
             return [_scrub_data(item) for item in data]
         return data

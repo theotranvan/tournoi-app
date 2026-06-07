@@ -9,9 +9,9 @@ import datetime
 import io
 import tempfile
 
-from PIL import Image
 from django.core.cache import cache
 from django.test import TestCase, override_settings
+from PIL import Image
 from rest_framework.test import APIClient
 
 from apps.accounts.models import User
@@ -118,7 +118,6 @@ class TestTournamentCreationFlow(TestCase):
             format="json",
         )
         self.assertIn(r.status_code, [200, 201])
-        field_id = r.data["id"]
 
         # ── Create 4 teams ───────────────────────────
         team_ids = []
@@ -191,9 +190,7 @@ class TestPublicPageAccess(TestCase):
             tournament=cls.tournament,
             name="U10",
         )
-        cls.field = Field.objects.create(
-            tournament=cls.tournament, name="Terrain 1"
-        )
+        cls.field = Field.objects.create(tournament=cls.tournament, name="Terrain 1")
         cls.team_a = Team.objects.create(
             tournament=cls.tournament,
             category=cls.category,
@@ -206,9 +203,7 @@ class TestPublicPageAccess(TestCase):
             name="Team B",
             short_name="TB",
         )
-        cls.group = Group.objects.create(
-            category=cls.category, name="Poule A"
-        )
+        cls.group = Group.objects.create(category=cls.category, name="Poule A")
         cls.group.teams.add(cls.team_a, cls.team_b)
 
         cls.match = Match.objects.create(
@@ -242,31 +237,23 @@ class TestPublicPageAccess(TestCase):
         self.assertEqual(r.data["slug"], self.tournament.slug)
 
     def test_012_public_categories(self):
-        r = self.c.get(
-            f"/api/v1/public/tournaments/{self.tournament.slug}/categories/"
-        )
+        r = self.c.get(f"/api/v1/public/tournaments/{self.tournament.slug}/categories/")
         self.assertEqual(r.status_code, 200)
         self.assertGreaterEqual(len(r.data), 1)
         self.assertEqual(r.data[0]["name"], "U10")
 
     def test_013_public_matches(self):
-        r = self.c.get(
-            f"/api/v1/public/tournaments/{self.tournament.slug}/matches/"
-        )
+        r = self.c.get(f"/api/v1/public/tournaments/{self.tournament.slug}/matches/")
         self.assertEqual(r.status_code, 200)
         self.assertGreaterEqual(r.data["count"], 1)
 
     def test_014_public_standings(self):
-        r = self.c.get(
-            f"/api/v1/public/tournaments/{self.tournament.slug}/standings/"
-        )
+        r = self.c.get(f"/api/v1/public/tournaments/{self.tournament.slug}/standings/")
         self.assertEqual(r.status_code, 200)
         self.assertIsInstance(r.data, list)
 
     def test_015_public_live_feed(self):
-        r = self.c.get(
-            f"/api/v1/public/tournaments/{self.tournament.slug}/live/"
-        )
+        r = self.c.get(f"/api/v1/public/tournaments/{self.tournament.slug}/live/")
         self.assertEqual(r.status_code, 200)
         self.assertIn("live_matches", r.data)
         self.assertIn("upcoming_matches", r.data)
@@ -275,17 +262,13 @@ class TestPublicPageAccess(TestCase):
         self.assertGreaterEqual(len(r.data["recent_results"]), 1)
 
     def test_016_public_match_detail(self):
-        r = self.c.get(
-            f"/api/v1/public/tournaments/{self.tournament.slug}/matches/{self.match.id}/"
-        )
+        r = self.c.get(f"/api/v1/public/tournaments/{self.tournament.slug}/matches/{self.match.id}/")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.data["score_home"], 3)
         self.assertEqual(r.data["score_away"], 1)
 
     def test_017_public_team_view(self):
-        r = self.c.get(
-            f"/api/v1/public/tournaments/{self.tournament.slug}/teams/{self.team_a.id}/"
-        )
+        r = self.c.get(f"/api/v1/public/tournaments/{self.tournament.slug}/teams/{self.team_a.id}/")
         self.assertEqual(r.status_code, 200)
         self.assertIn("team", r.data)
         self.assertIn("matches", r.data)
@@ -330,16 +313,10 @@ class TestLiveScoreFlow(TestCase):
             is_public=True,
             status=Tournament.Status.DRAFT,
         )
-        cat = Category.objects.create(
-            tournament=t, name="U14"
-        )
+        cat = Category.objects.create(tournament=t, name="U14")
         field = Field.objects.create(tournament=t, name="Terrain B")
-        team_home = Team.objects.create(
-            tournament=t, category=cat, name="Marseille FC", short_name="MFC"
-        )
-        team_away = Team.objects.create(
-            tournament=t, category=cat, name="Nice FC", short_name="NFC"
-        )
+        team_home = Team.objects.create(tournament=t, category=cat, name="Marseille FC", short_name="MFC")
+        team_away = Team.objects.create(tournament=t, category=cat, name="Nice FC", short_name="NFC")
         group = Group.objects.create(category=cat, name="Poule X")
         group.teams.add(team_home, team_away)
         return t, cat, field, team_home, team_away, group
@@ -393,9 +370,7 @@ class TestLiveScoreFlow(TestCase):
         self.assertEqual(r.data["score_away"], 0)
 
         # Finish match
-        r = self.c.post(
-            f"/api/v1/tournaments/{t.id}/matches/{match_id}/finish/"
-        )
+        r = self.c.post(f"/api/v1/tournaments/{t.id}/matches/{match_id}/finish/")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.data["status"], "finished")
 

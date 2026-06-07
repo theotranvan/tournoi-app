@@ -1,7 +1,6 @@
 import pytest
 from django.core.exceptions import ValidationError
 from django.utils import timezone as tz
-from rest_framework import status
 from rest_framework.test import APIClient
 
 from apps.matches.models import Match
@@ -190,9 +189,7 @@ def match_setup(db):
 class TestMatchStartAPI:
     def test_start_scheduled_match(self, match_setup):
         m = match_setup["match"]
-        resp = match_setup["client"].post(
-            f"{match_setup['url']}/{m.id}/start/"
-        )
+        resp = match_setup["client"].post(f"{match_setup['url']}/{m.id}/start/")
         assert resp.status_code == 200
         m.refresh_from_db()
         assert m.status == Match.Status.LIVE
@@ -201,9 +198,7 @@ class TestMatchStartAPI:
         m = match_setup["match"]
         m.status = Match.Status.FINISHED
         m.save()
-        resp = match_setup["client"].post(
-            f"{match_setup['url']}/{m.id}/start/"
-        )
+        resp = match_setup["client"].post(f"{match_setup['url']}/{m.id}/start/")
         assert resp.status_code == 409
 
 
@@ -271,9 +266,7 @@ class TestMatchFinishAPI:
         m.score_home = 3
         m.score_away = 1
         m.save()
-        resp = match_setup["client"].post(
-            f"{match_setup['url']}/{m.id}/finish/"
-        )
+        resp = match_setup["client"].post(f"{match_setup['url']}/{m.id}/finish/")
         assert resp.status_code == 200
         m.refresh_from_db()
         assert m.status == Match.Status.FINISHED
@@ -283,16 +276,12 @@ class TestMatchFinishAPI:
         m = match_setup["match"]
         m.status = Match.Status.LIVE
         m.save()
-        resp = match_setup["client"].post(
-            f"{match_setup['url']}/{m.id}/finish/"
-        )
+        resp = match_setup["client"].post(f"{match_setup['url']}/{m.id}/finish/")
         assert resp.status_code == 422
 
     def test_finish_scheduled_match_rejected(self, match_setup):
         m = match_setup["match"]
-        resp = match_setup["client"].post(
-            f"{match_setup['url']}/{m.id}/finish/"
-        )
+        resp = match_setup["client"].post(f"{match_setup['url']}/{m.id}/finish/")
         assert resp.status_code == 409
 
 
@@ -300,9 +289,7 @@ class TestMatchFinishAPI:
 class TestMatchLockAPI:
     def test_lock_match(self, match_setup):
         m = match_setup["match"]
-        resp = match_setup["client"].post(
-            f"{match_setup['url']}/{m.id}/lock/"
-        )
+        resp = match_setup["client"].post(f"{match_setup['url']}/{m.id}/lock/")
         assert resp.status_code == 200
         m.refresh_from_db()
         assert m.is_locked is True
@@ -311,9 +298,7 @@ class TestMatchLockAPI:
         m = match_setup["match"]
         m.is_locked = True
         m.save()
-        resp = match_setup["client"].post(
-            f"{match_setup['url']}/{m.id}/unlock/"
-        )
+        resp = match_setup["client"].post(f"{match_setup['url']}/{m.id}/unlock/")
         assert resp.status_code == 200
         m.refresh_from_db()
         assert m.is_locked is False

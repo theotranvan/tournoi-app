@@ -1,7 +1,8 @@
 """Tests for notifications app — signals, views, push, and permissions."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -318,7 +319,8 @@ class TestPushSubscription:
         PushSubscription.objects.create(
             user=organizer,
             endpoint="https://fcm.googleapis.com/fcm/send/abc",
-            p256dh_key="k", auth_key="a",
+            p256dh_key="k",
+            auth_key="a",
         )
         resp = api_organizer.delete("/api/v1/notifications/unsubscribe/")
         assert resp.status_code == 200
@@ -329,12 +331,14 @@ class TestPushSubscription:
         PushSubscription.objects.create(
             user=organizer,
             endpoint="https://fcm.googleapis.com/fcm/send/a",
-            p256dh_key="k", auth_key="a",
+            p256dh_key="k",
+            auth_key="a",
         )
         PushSubscription.objects.create(
             user=organizer,
             endpoint="https://fcm.googleapis.com/fcm/send/b",
-            p256dh_key="k", auth_key="a",
+            p256dh_key="k",
+            auth_key="a",
         )
         resp = api_organizer.delete(
             "/api/v1/notifications/unsubscribe/",
@@ -371,6 +375,7 @@ class TestSendPush:
         mock_settings.VAPID_PRIVATE_KEY = ""
         mock_settings.VAPID_ADMIN_EMAIL = "test@test.com"
         from apps.notifications.push import send_push
+
         result = send_push(organizer, "Test", "Body")
         assert result == 0
 
@@ -386,6 +391,7 @@ class TestSendPush:
         )
         with patch("pywebpush.webpush") as mock_webpush:
             from apps.notifications.push import send_push
+
             result = send_push(organizer, "Title", "Body", "/test")
             assert result == 1
             mock_webpush.assert_called_once()
@@ -397,15 +403,18 @@ class TestSendPush:
         PushSubscription.objects.create(
             user=organizer,
             endpoint="https://fcm.googleapis.com/fcm/send/expired",
-            p256dh_key="k", auth_key="a",
+            p256dh_key="k",
+            auth_key="a",
         )
 
         from pywebpush import WebPushException
+
         mock_response = MagicMock()
         mock_response.status_code = 410
 
         with patch("pywebpush.webpush", side_effect=WebPushException("Gone", response=mock_response)):
             from apps.notifications.push import send_push
+
             result = send_push(organizer, "Test", "Body")
             assert result == 0
             assert PushSubscription.objects.count() == 0
@@ -419,10 +428,12 @@ class TestSendPush:
         PushSubscription.objects.create(
             team=team,
             endpoint="https://fcm.googleapis.com/fcm/send/team1",
-            p256dh_key="k", auth_key="a",
+            p256dh_key="k",
+            auth_key="a",
         )
         with patch("pywebpush.webpush"):
             from apps.notifications.push import send_push_to_team
+
             result = send_push_to_team(team.id, "Title", "Body")
             assert result == 1
 

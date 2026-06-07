@@ -13,9 +13,7 @@ class ClubViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        return Club.objects.filter(
-            models.Q(owner=user) | models.Q(members=user)
-        ).distinct()
+        return Club.objects.filter(models.Q(owner=user) | models.Q(members=user)).distinct()
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)

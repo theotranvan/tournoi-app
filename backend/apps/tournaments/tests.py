@@ -3,13 +3,13 @@
 import datetime
 
 import pytest
-from django.core.exceptions import ValidationError
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from apps.subscriptions.models import Subscription
-from apps.tournaments.models import Category, Field, Tournament, validate_availability
+from apps.tournaments.models import Category, Tournament, validate_availability
 from tests.factories import (
     CategoryFactory,
     ClubFactory,
@@ -87,9 +87,7 @@ class TestTournamentModel:
 
 class TestCategoryModel:
     def test_effective_durations_fallback_to_tournament(self, tournament):
-        cat = Category.objects.create(
-            tournament=tournament, name="U8", match_duration=None
-        )
+        cat = Category.objects.create(tournament=tournament, name="U8", match_duration=None)
         assert cat.effective_match_duration == tournament.default_match_duration
         assert cat.effective_transition_time == tournament.default_transition_time
         assert cat.effective_rest_time == tournament.default_rest_time
@@ -189,9 +187,7 @@ class TestTournamentLifecycle:
         assert tournament.status == Tournament.Status.FINISHED
 
     def test_duplicate_tournament(self, api, org, tournament):
-        Subscription.objects.update_or_create(
-            user=org, defaults={"plan": "club_monthly", "status": "active"}
-        )
+        Subscription.objects.update_or_create(user=org, defaults={"plan": "club_monthly", "status": "active"})
         CategoryFactory(tournament=tournament, name="U10")
         FieldFactory(tournament=tournament)
         api.force_authenticate(user=org)

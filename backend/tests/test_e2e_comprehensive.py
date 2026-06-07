@@ -2,24 +2,19 @@
 Comprehensive E2E test - All API routes, admin/coach/public connections,
 QR codes, notifications, logos, and zero-error guarantee.
 """
-import io
-import os
-import json
-import tempfile
-from PIL import Image
 
-from django.test import TestCase, override_settings
+import io
+import tempfile
+
 from django.core.cache import cache
+from django.test import TestCase, override_settings
+from PIL import Image
 from rest_framework.test import APIClient
-from rest_framework import status
 
 from apps.accounts.models import User
 from apps.clubs.models import Club
-from apps.subscriptions.models import Subscription
-from apps.tournaments.models import Tournament, Category, Field
-from apps.teams.models import Team
-from apps.matches.models import Match
 from apps.notifications.models import Notification
+from apps.subscriptions.models import Subscription
 
 MEDIA_ROOT = tempfile.mkdtemp()
 
@@ -55,15 +50,13 @@ class ComprehensiveE2ETest(TestCase):
             password="CoachPass123!",
             role="organizer",
         )
-        cls.club = Club.objects.create(
-            name="E2E Club", owner=cls.admin_user
-        )
+        cls.club = Club.objects.create(name="E2E Club", owner=cls.admin_user)
 
     def setUp(self):
         self.c = APIClient()
         cache.clear()  # Reset throttle cache
 
-    # â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
 
     def _auth_admin(self):
         self.c.force_authenticate(user=self.admin_user)
@@ -74,7 +67,7 @@ class ComprehensiveE2ETest(TestCase):
     def _no_auth(self):
         self.c.force_authenticate(user=None)
 
-    # â”€â”€â”€ 1. Health checks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â”€â”€â”€ 1. Health checks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
 
     def test_001_health(self):
         r = self.c.get("/api/v1/health/")
@@ -88,7 +81,7 @@ class ComprehensiveE2ETest(TestCase):
         r = self.c.get("/api/v1/public/health/")
         self.assertEqual(r.status_code, 200)
 
-    # â”€â”€â”€ 2. Auth: register / login / refresh / me â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â”€â”€â”€ 2. Auth: register / login / refresh / me â”€â”€â”€â”€â”€â”€â”€â”
 
     def test_010_register(self):
         r = self.c.post(
@@ -140,7 +133,7 @@ class ComprehensiveE2ETest(TestCase):
         r = self.c.get("/api/v1/auth/me/")
         self.assertIn(r.status_code, [401, 403])
 
-    # â”€â”€â”€ 3. Club CRUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â”€â”€â”€ 3. Club CRUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def test_020_clubs_list(self):
         self._auth_admin()
@@ -167,7 +160,7 @@ class ComprehensiveE2ETest(TestCase):
         )
         self.assertEqual(r.status_code, 200)
 
-    # â”€â”€â”€ 4. Tournament CRUD + Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â”€â”€â”€ 4. Tournament CRUD + Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
 
     def test_030_tournament_full_lifecycle(self):
         self._auth_admin()
@@ -203,7 +196,7 @@ class ComprehensiveE2ETest(TestCase):
         )
         self.assertEqual(r.status_code, 200)
 
-        # â”€â”€â”€ Categories â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # â”€â”€â”€ Categories â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â
         r = self.c.post(
             f"/api/v1/tournaments/{tid}/categories/",
             {"name": "U12", "age_min": 11, "age_max": 12},
@@ -225,7 +218,7 @@ class ComprehensiveE2ETest(TestCase):
         )
         self.assertEqual(r.status_code, 200)
 
-        # â”€â”€â”€ Fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # â”€â”€â”€ Fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
         r = self.c.post(
             f"/api/v1/tournaments/{tid}/fields/",
             {"name": "Terrain A"},
@@ -240,7 +233,7 @@ class ComprehensiveE2ETest(TestCase):
         r = self.c.get(f"/api/v1/tournaments/{tid}/fields/{field_id}/")
         self.assertEqual(r.status_code, 200)
 
-        # â”€â”€â”€ Teams â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # â”€â”€â”€ Teams â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         r = self.c.post(
             f"/api/v1/tournaments/{tid}/teams/",
             {
@@ -284,22 +277,17 @@ class ComprehensiveE2ETest(TestCase):
         )
         self.assertEqual(r.status_code, 200)
 
-        # â”€â”€â”€ QR Code â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        r = self.c.get(
-            f"/api/v1/tournaments/{tid}/teams/{team_a_id}/qr-code/"
-        )
+        # â”€â”€â”€ QR Code â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â
+        r = self.c.get(f"/api/v1/tournaments/{tid}/teams/{team_a_id}/qr-code/")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r["Content-Type"], "image/png")
         self.assertGreater(len(r.content), 100)  # actual PNG content
 
         # â”€â”€â”€ Team code / Coach access â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        r = self.c.post(
-            f"/api/v1/tournaments/{tid}/teams/{team_a_id}/regenerate-code/"
-        )
+        r = self.c.post(f"/api/v1/tournaments/{tid}/teams/{team_a_id}/regenerate-code/")
         self.assertEqual(r.status_code, 200)
-        team_code = r.data.get("team_code") or r.data.get("access_code")
 
-        # â”€â”€â”€ Groups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # â”€â”€â”€ Groups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
         r = self.c.post(
             f"/api/v1/tournaments/{tid}/categories/{cat_id}/groups/",
             {"name": "Poule A"},
@@ -308,17 +296,13 @@ class ComprehensiveE2ETest(TestCase):
         self.assertIn(r.status_code, [200, 201])
         group_id = r.data["id"]
 
-        r = self.c.get(
-            f"/api/v1/tournaments/{tid}/categories/{cat_id}/groups/"
-        )
+        r = self.c.get(f"/api/v1/tournaments/{tid}/categories/{cat_id}/groups/")
         self.assertEqual(r.status_code, 200)
 
-        r = self.c.get(
-            f"/api/v1/tournaments/{tid}/categories/{cat_id}/groups/{group_id}/"
-        )
+        r = self.c.get(f"/api/v1/tournaments/{tid}/categories/{cat_id}/groups/{group_id}/")
         self.assertEqual(r.status_code, 200)
 
-        # â”€â”€â”€ Matches â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # â”€â”€â”€ Matches â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â
         r = self.c.post(
             f"/api/v1/tournaments/{tid}/matches/",
             {
@@ -342,9 +326,7 @@ class ComprehensiveE2ETest(TestCase):
         self.assertEqual(r.status_code, 200)
 
         # Start match
-        r = self.c.post(
-            f"/api/v1/tournaments/{tid}/matches/{match_id}/start/"
-        )
+        r = self.c.post(f"/api/v1/tournaments/{tid}/matches/{match_id}/start/")
         self.assertEqual(r.status_code, 200)
 
         # Score
@@ -356,12 +338,10 @@ class ComprehensiveE2ETest(TestCase):
         self.assertEqual(r.status_code, 200)
 
         # Finish match
-        r = self.c.post(
-            f"/api/v1/tournaments/{tid}/matches/{match_id}/finish/"
-        )
+        r = self.c.post(f"/api/v1/tournaments/{tid}/matches/{match_id}/finish/")
         self.assertEqual(r.status_code, 200)
 
-        # â”€â”€â”€ Standings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # â”€â”€â”€ Standings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
         r = self.c.get(f"/api/v1/categories/{cat_id}/standings/")
         self.assertEqual(r.status_code, 200)
 
@@ -373,7 +353,7 @@ class ComprehensiveE2ETest(TestCase):
 
         return tid, cat_id, team_a_id  # for reuse
 
-    # â”€â”€â”€ 5. Logo upload (multipart) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â”€â”€â”€ 5. Logo upload (multipart) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â
 
     def test_040_team_logo_upload(self):
         self._auth_admin()
@@ -425,7 +405,7 @@ class ComprehensiveE2ETest(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIsNotNone(r.data.get("logo"))
 
-    # â”€â”€â”€ 6. Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â”€â”€â”€ 6. Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
 
     def test_050_notifications_list(self):
         self._auth_admin()
@@ -479,7 +459,7 @@ class ComprehensiveE2ETest(TestCase):
         r = self.c.get(f"/api/v1/tournaments/{tid}/")
         self.assertIn(r.status_code, [403, 404])
 
-    # â”€â”€â”€ 8. Public API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â”€â”€â”€ 8. Public API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
 
     def test_070_public_tournament_by_slug(self):
         self._auth_admin()
@@ -594,7 +574,7 @@ class ComprehensiveE2ETest(TestCase):
         # Draft tournaments may still be accessible via public API if is_public=True
         self.assertIn(r.status_code, [200, 404])
 
-    # â”€â”€â”€ 9. Team access (coach flow) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â”€â”€â”€ 9. Team access (coach flow) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def test_080_team_access_flow(self):
         self._auth_admin()
@@ -628,9 +608,7 @@ class ComprehensiveE2ETest(TestCase):
         team_code = team_data.get("team_code") or team_data.get("access_code")
         if not team_code:
             # Regenerate if not returned
-            regen = self.c.post(
-                f"/api/v1/tournaments/{tid}/teams/{team_data['id']}/regenerate-code/"
-            )
+            regen = self.c.post(f"/api/v1/tournaments/{tid}/teams/{team_data['id']}/regenerate-code/")
             team_code = regen.data.get("team_code") or regen.data.get("access_code")
 
         if team_code:
@@ -644,7 +622,7 @@ class ComprehensiveE2ETest(TestCase):
             # Should return some kind of token or team info
             self.assertIn(r.status_code, [200, 201, 400])
 
-    # â”€â”€â”€ 10. Duplicate tournament â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â”€â”€â”€ 10. Duplicate tournament â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def test_090_duplicate_tournament(self):
         self._auth_admin()
@@ -668,7 +646,7 @@ class ComprehensiveE2ETest(TestCase):
         r = self.c.post(f"/api/v1/tournaments/{tid}/duplicate/")
         self.assertIn(r.status_code, [200, 201])
 
-    # â”€â”€â”€ 11. Constraints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â”€â”€â”€ 11. Constraints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def test_100_constraints_crud(self):
         self._auth_admin()
@@ -688,14 +666,14 @@ class ComprehensiveE2ETest(TestCase):
         r = self.c.get(f"/api/v1/tournaments/{tid}/constraints/")
         self.assertEqual(r.status_code, 200)
 
-    # â”€â”€â”€ 12. Subscription status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â”€â”€â”€ 12. Subscription status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â
 
     def test_110_subscription_status(self):
         self._auth_admin()
         r = self.c.get("/api/v1/subscriptions/status/")
         self.assertEqual(r.status_code, 200)
 
-    # â”€â”€â”€ 13. Bulk import teams (CSV) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â”€â”€â”€ 13. Bulk import teams (CSV) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def test_120_bulk_import_teams(self):
         self._auth_admin()
@@ -711,12 +689,11 @@ class ComprehensiveE2ETest(TestCase):
             format="json",
         )
         tid = t.data["id"]
-        cat = self.c.post(
+        self.c.post(
             f"/api/v1/tournaments/{tid}/categories/",
             {"name": "U11", "age_min": 10, "age_max": 11},
             format="json",
         )
-        cat_id = cat.data["id"]
 
         csv_content = "name,short_name,category,coach_name\nCSV Team,CSV,U11,Coach CSV\n"
         csv_file = io.BytesIO(csv_content.encode("utf-8"))
@@ -728,7 +705,7 @@ class ComprehensiveE2ETest(TestCase):
         )
         self.assertIn(r.status_code, [200, 201])
 
-    # â”€â”€â”€ 14. Schedule feasibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â”€â”€â”€ 14. Schedule feasibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def test_130_schedule_feasibility(self):
         self._auth_admin()
@@ -747,6 +724,3 @@ class ComprehensiveE2ETest(TestCase):
         r = self.c.get(f"/api/v1/tournaments/{tid}/schedule/feasibility/")
         # May return various codes depending on tournament config and HTTP method
         self.assertIn(r.status_code, [200, 400, 405])
-
-
-

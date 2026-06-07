@@ -10,8 +10,8 @@ class Subscription(models.Model):
 
     class Plan(models.TextChoices):
         FREE = "free", "Gratuit"
-        MONTHLY = "monthly", "Mensuel"          # kept for legacy rows
-        YEARLY = "yearly", "Annuel"             # kept for legacy rows
+        MONTHLY = "monthly", "Mensuel"  # kept for legacy rows
+        YEARLY = "yearly", "Annuel"  # kept for legacy rows
         CLUB_MONTHLY = "club_monthly", "Club Mensuel"
         CLUB_YEARLY = "club_yearly", "Club Annuel"
 

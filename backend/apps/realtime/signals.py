@@ -86,14 +86,16 @@ def _resolve_brackets_on_finish(match):
             if updated:
                 logger.info(
                     "Auto-resolved %d bracket match(es) for category %s",
-                    updated, category.name,
+                    updated,
+                    category.name,
                 )
         else:
             updated = advance_knockout_winner(match)
             if updated:
                 logger.info(
                     "Advanced %d knockout match(es) after %s finished",
-                    updated, match.id,
+                    updated,
+                    match.id,
                 )
     except Exception:
         logger.exception("Error resolving brackets after match %s", match.id)

@@ -1,6 +1,7 @@
 from django.urls import path
 
 from apps.public.views import (
+    HealthCheckView,
     PublicCategoriesView,
     PublicLiveView,
     PublicMatchDetailView,
@@ -9,7 +10,6 @@ from apps.public.views import (
     PublicTeamView,
     PublicTournamentByCodeView,
     PublicTournamentView,
-    HealthCheckView,
 )
 
 urlpatterns = [

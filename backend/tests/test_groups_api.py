@@ -4,9 +4,8 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from tests.factories import CategoryFactory, ClubFactory, GroupFactory, TeamFactory, TournamentFactory, UserFactory
-
 from apps.subscriptions.models import Subscription
+from tests.factories import CategoryFactory, ClubFactory, GroupFactory, TeamFactory, TournamentFactory, UserFactory
 
 
 @pytest.fixture
@@ -17,6 +16,7 @@ def api() -> APIClient:
 @pytest.fixture(autouse=True)
 def _clear_throttle_cache():
     from django.core.cache import cache
+
     cache.clear()
 
 
@@ -117,23 +117,28 @@ class TestGroupGeneration:
 
 # ── Happy Path E2E ──────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestHappyPathE2E:
     """Full flow: register → club → tournament → categories → fields → teams → groups → publish."""
 
     def test_full_tournament_creation_flow(self, api):
         # 1. Register user
-        resp = api.post("/api/v1/auth/register/", {
-            "username": "theo",
-            "email": "theo@test.com",
-            "password": "Secure123!",
-        })
+        resp = api.post(
+            "/api/v1/auth/register/",
+            {
+                "username": "theo",
+                "email": "theo@test.com",
+                "password": "Secure123!",
+            },
+        )
         assert resp.status_code == status.HTTP_201_CREATED
         token = resp.json()["access"]
         api.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
 
         # Give user a CLUB subscription so free-plan limits don't block
         from apps.accounts.models import User
+
         user = User.objects.get(username="theo")
         Subscription.objects.update_or_create(
             user=user,
@@ -146,13 +151,16 @@ class TestHappyPathE2E:
         club_id = resp.json()["id"]
 
         # 3. Create tournament
-        resp = api.post("/api/v1/tournaments/", {
-            "club": club_id,
-            "name": "Tournoi E2E",
-            "location": "Stade Test",
-            "start_date": "2026-06-01",
-            "end_date": "2026-06-02",
-        })
+        resp = api.post(
+            "/api/v1/tournaments/",
+            {
+                "club": club_id,
+                "name": "Tournoi E2E",
+                "location": "Stade Test",
+                "start_date": "2026-06-01",
+                "end_date": "2026-06-02",
+            },
+        )
         assert resp.status_code == status.HTTP_201_CREATED
         t_id = resp.json()["id"]
 

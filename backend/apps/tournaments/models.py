@@ -76,9 +76,7 @@ class Tournament(models.Model):
     is_public = models.BooleanField(default=True)
 
     # Paramètres de planification par défaut (surchargés par Category si besoin)
-    default_match_duration = models.PositiveIntegerField(
-        default=15, help_text="Durée d'un match en minutes"
-    )
+    default_match_duration = models.PositiveIntegerField(default=15, help_text="Durée d'un match en minutes")
     default_transition_time = models.PositiveIntegerField(
         default=5, help_text="Temps de transition entre deux matchs en minutes"
     )
@@ -130,9 +128,7 @@ class Tournament(models.Model):
     def clean(self):
         super().clean()
         if self.end_date and self.start_date and self.end_date < self.start_date:
-            raise ValidationError(
-                {"end_date": "La date de fin doit être postérieure à la date de début."}
-            )
+            raise ValidationError({"end_date": "La date de fin doit être postérieure à la date de début."})
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -162,9 +158,7 @@ class Category(models.Model):
         TOP2_CROSSOVER = "TOP2_CROSSOVER", "1er vs 2e croisé (demi-finales)"
         TOP1_FINAL = "TOP1_FINAL", "1er de chaque poule en finale directe"
 
-    tournament = models.ForeignKey(
-        Tournament, on_delete=models.CASCADE, related_name="categories"
-    )
+    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name="categories")
     name = models.CharField(max_length=50)
     display_order = models.PositiveIntegerField(default=0)
     color = models.CharField(max_length=7, default="#3b82f6")
@@ -176,17 +170,20 @@ class Category(models.Model):
 
     # Slot-based rest (from store.js approach)
     min_rest_matches = models.PositiveIntegerField(
-        null=True, blank=True,
+        null=True,
+        blank=True,
         help_text="Nombre minimum de créneaux de repos (surcharge tournoi)",
     )
     max_consecutive_matches = models.PositiveIntegerField(
-        null=True, blank=True,
+        null=True,
+        blank=True,
         help_text="Nombre maximum de matchs consécutifs (surcharge tournoi)",
     )
 
     # Pool / Finals configuration
     number_of_pools = models.PositiveIntegerField(
-        null=True, blank=True,
+        null=True,
+        blank=True,
         help_text="Nombre de poules souhaité pour l'auto-génération",
     )
     finals_format = models.CharField(
@@ -201,7 +198,10 @@ class Category(models.Model):
 
     # Day assignment (from store.js)
     day = models.ForeignKey(
-        "Day", on_delete=models.SET_NULL, null=True, blank=True,
+        "Day",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="categories",
         help_text="Jour assigné à cette catégorie (vide = répartition auto)",
     )
@@ -228,9 +228,7 @@ class Category(models.Model):
     def clean(self):
         super().clean()
         if self.earliest_start and self.latest_end and self.earliest_start >= self.latest_end:
-            raise ValidationError(
-                {"latest_end": "L'heure de fin doit être postérieure à l'heure de début."}
-            )
+            raise ValidationError({"latest_end": "L'heure de fin doit être postérieure à l'heure de début."})
 
     def __str__(self) -> str:
         return f"{self.tournament.name} - {self.name}"
@@ -251,9 +249,7 @@ class Category(models.Model):
 class Field(models.Model):
     """Terrain physique."""
 
-    tournament = models.ForeignKey(
-        Tournament, on_delete=models.CASCADE, related_name="fields"
-    )
+    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name="fields")
     name = models.CharField(max_length=50)
     display_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
@@ -284,14 +280,10 @@ class SchedulingConstraint(models.Model):
         BLOCKED_SLOT = "blocked_slot", "Créneau bloqué"
         CATEGORY_DAY = "category_day", "Catégorie sur jour précis"
 
-    tournament = models.ForeignKey(
-        Tournament, on_delete=models.CASCADE, related_name="constraints"
-    )
+    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name="constraints")
     name = models.CharField(max_length=200)
     constraint_type = models.CharField(max_length=30, choices=ConstraintType.choices)
-    payload = models.JSONField(
-        help_text="Structure dépend du type. Voir SCHEDULING_ENGINE_SPEC.md"
-    )
+    payload = models.JSONField(help_text="Structure dépend du type. Voir SCHEDULING_ENGINE_SPEC.md")
     is_hard = models.BooleanField(
         default=True,
         help_text="True = contrainte obligatoire, False = préférence",
@@ -308,25 +300,29 @@ class SchedulingConstraint(models.Model):
 class Day(models.Model):
     """Journée de tournoi avec horaires et pause déjeuner."""
 
-    tournament = models.ForeignKey(
-        Tournament, on_delete=models.CASCADE, related_name="days"
-    )
+    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name="days")
     date = models.DateField()
     label = models.CharField(max_length=100, blank=True)
     start_time = models.CharField(
-        max_length=5, default="08:30",
+        max_length=5,
+        default="08:30",
         help_text="Heure de début (HH:MM)",
     )
     end_time = models.CharField(
-        max_length=5, default="17:30",
+        max_length=5,
+        default="17:30",
         help_text="Heure de fin (HH:MM)",
     )
     lunch_start = models.CharField(
-        max_length=5, default="12:00", blank=True,
+        max_length=5,
+        default="12:00",
+        blank=True,
         help_text="Début pause déjeuner (HH:MM)",
     )
     lunch_end = models.CharField(
-        max_length=5, default="13:00", blank=True,
+        max_length=5,
+        default="13:00",
+        blank=True,
         help_text="Fin pause déjeuner (HH:MM)",
     )
     order = models.PositiveIntegerField(default=0)

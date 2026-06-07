@@ -53,6 +53,7 @@ class TeamViewSet(viewsets.ModelViewSet):
         if get_effective_plan(self.request.user, tournament) == "FREE":
             if tournament.teams.count() >= FREE_LIMITS.max_teams_per_tournament:
                 from rest_framework.exceptions import PermissionDenied
+
                 raise PermissionDenied(
                     f"Le plan gratuit est limité à {FREE_LIMITS.max_teams_per_tournament} équipes par tournoi."
                 )
@@ -124,9 +125,7 @@ class TeamViewSet(viewsets.ModelViewSet):
 
         return Response(
             {
-                "created": TeamAdminSerializer(
-                    created, many=True, context={"request": request}
-                ).data,
+                "created": TeamAdminSerializer(created, many=True, context={"request": request}).data,
                 "errors": errors,
                 "count": len(created),
             },
@@ -150,11 +149,7 @@ class TeamViewSet(viewsets.ModelViewSet):
         if search:
             qs = qs.filter(name__icontains=search)
 
-        names = (
-            qs.values_list("name", flat=True)
-            .distinct()
-            .order_by("name")[:30]
-        )
+        names = qs.values_list("name", flat=True).distinct().order_by("name")[:30]
         return Response(list(names))
 
 
@@ -185,9 +180,7 @@ class GroupViewSet(viewsets.ModelViewSet):
         category = Category.objects.get(pk=category_id)
         teams = list(category.teams.order_by("name"))
         if len(teams) < num_groups:
-            raise BusinessRuleViolation(
-                f"Pas assez d'équipes ({len(teams)}) pour {num_groups} poules."
-            )
+            raise BusinessRuleViolation(f"Pas assez d'équipes ({len(teams)}) pour {num_groups} poules.")
 
         # Delete existing groups for this category
         category.groups.all().delete()

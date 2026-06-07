@@ -25,6 +25,7 @@ def api() -> APIClient:
 @pytest.fixture(autouse=True)
 def _clear_throttle_cache():
     from django.core.cache import cache
+
     cache.clear()
 
 
@@ -54,45 +55,75 @@ def finished_tournament(db):
 
     # Match 1: Lions 3-0 Tigers (field A) — Lions best attack
     m1 = MatchFactory(
-        tournament=t, category=cat, field=field_a,
-        team_home=team1, team_away=team2,
-        score_home=3, score_away=0,
-        status="finished", start_time=now,
+        tournament=t,
+        category=cat,
+        field=field_a,
+        team_home=team1,
+        team_away=team2,
+        score_home=3,
+        score_away=0,
+        status="finished",
+        start_time=now,
     )
     # Match 2: Bears 1-0 Wolves (field B) — tight
     m2 = MatchFactory(
-        tournament=t, category=cat, field=field_b,
-        team_home=team3, team_away=team4,
-        score_home=1, score_away=0,
-        status="finished", start_time=now,
+        tournament=t,
+        category=cat,
+        field=field_b,
+        team_home=team3,
+        team_away=team4,
+        score_home=1,
+        score_away=0,
+        status="finished",
+        start_time=now,
     )
     # Match 3: Lions 2-1 Bears (field A)
     m3 = MatchFactory(
-        tournament=t, category=cat, field=field_a,
-        team_home=team1, team_away=team3,
-        score_home=2, score_away=1,
-        status="finished", start_time=now,
+        tournament=t,
+        category=cat,
+        field=field_a,
+        team_home=team1,
+        team_away=team3,
+        score_home=2,
+        score_away=1,
+        status="finished",
+        start_time=now,
     )
     # Match 4: Tigers 1-1 Wolves (field B) — tightest (draw)
     m4 = MatchFactory(
-        tournament=t, category=cat, field=field_b,
-        team_home=team2, team_away=team4,
-        score_home=1, score_away=1,
-        status="finished", start_time=now,
+        tournament=t,
+        category=cat,
+        field=field_b,
+        team_home=team2,
+        team_away=team4,
+        score_home=1,
+        score_away=1,
+        status="finished",
+        start_time=now,
     )
     # Match 5: Lions 1-0 Wolves (field A)
     m5 = MatchFactory(
-        tournament=t, category=cat, field=field_a,
-        team_home=team1, team_away=team4,
-        score_home=1, score_away=0,
-        status="finished", start_time=now,
+        tournament=t,
+        category=cat,
+        field=field_a,
+        team_home=team1,
+        team_away=team4,
+        score_home=1,
+        score_away=0,
+        status="finished",
+        start_time=now,
     )
     # Match 6: Tigers 0-2 Bears (field B)
     m6 = MatchFactory(
-        tournament=t, category=cat, field=field_b,
-        team_home=team2, team_away=team3,
-        score_home=0, score_away=2,
-        status="finished", start_time=now,
+        tournament=t,
+        category=cat,
+        field=field_b,
+        team_home=team2,
+        team_away=team3,
+        score_home=0,
+        score_away=2,
+        status="finished",
+        start_time=now,
     )
 
     # Goals for top scorer test
@@ -185,9 +216,14 @@ class TestInsightsEndpoint:
         team_a = TeamFactory(tournament=t, category=cat, name="Alpha")
         team_b = TeamFactory(tournament=t, category=cat, name="Beta")
         MatchFactory(
-            tournament=t, category=cat, field=field,
-            team_home=team_a, team_away=team_b,
-            score_home=2, score_away=1, status="finished",
+            tournament=t,
+            category=cat,
+            field=field,
+            team_home=team_a,
+            team_away=team_b,
+            score_home=2,
+            score_away=1,
+            status="finished",
         )
 
         api.force_authenticate(user=owner)

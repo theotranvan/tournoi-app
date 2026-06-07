@@ -60,12 +60,18 @@ def score_placement(
     # 3. Both teams must be free (including rest)
     if match.team_home_id:
         if context.team_has_conflict(
-            match.team_home_id, start_time, end_time, match.rest_needed,
+            match.team_home_id,
+            start_time,
+            end_time,
+            match.rest_needed,
         ):
             return None
     if match.team_away_id:
         if context.team_has_conflict(
-            match.team_away_id, start_time, end_time, match.rest_needed,
+            match.team_away_id,
+            start_time,
+            end_time,
+            match.rest_needed,
         ):
             return None
 
@@ -101,53 +107,48 @@ def score_placement(
         amount = (load_ratio - 1.15) * 80
         score -= amount
         if explain:
-            fname = (
-                context.fields[field_id].name
-                if field_id in context.fields
-                else str(field_id)
+            fname = context.fields[field_id].name if field_id in context.fields else str(field_id)
+            penalties.append(
+                {
+                    "type": "field_imbalance",
+                    "amount": round(-amount, 1),
+                    "detail": f"Terrain {fname} surchargé ({load_ratio:.0%} de la moyenne).",
+                }
             )
-            penalties.append({
-                "type": "field_imbalance",
-                "amount": round(-amount, 1),
-                "detail": f"Terrain {fname} surchargé ({load_ratio:.0%} de la moyenne).",
-            })
 
     # B. Team rest quality — penalise too-short or too-long rest
     ideal_rest = match.rest_needed * 1.5
     for team_id in (match.team_home_id, match.team_away_id):
         if team_id:
             actual_rest = context.time_since_last_match(team_id, start_time)
-            tname = (
-                context.teams[team_id].name
-                if explain and team_id in context.teams
-                else str(team_id)
-            )
+            tname = context.teams[team_id].name if explain and team_id in context.teams else str(team_id)
             if actual_rest == float("inf"):
                 pass  # First match for this team — no penalty
             elif actual_rest < ideal_rest:
                 amount = (ideal_rest - actual_rest) * 0.5
                 score -= amount
                 if explain:
-                    penalties.append({
-                        "type": "short_rest",
-                        "amount": round(-amount, 1),
-                        "detail": (
-                            f"L'équipe {tname} n'a que {actual_rest:.0f} min de repos "
-                            f"avant ce match (idéal: {ideal_rest:.0f} min)."
-                        ),
-                    })
+                    penalties.append(
+                        {
+                            "type": "short_rest",
+                            "amount": round(-amount, 1),
+                            "detail": (
+                                f"L'équipe {tname} n'a que {actual_rest:.0f} min de repos "
+                                f"avant ce match (idéal: {ideal_rest:.0f} min)."
+                            ),
+                        }
+                    )
             elif actual_rest > 180:
                 amount = (actual_rest - 180) * 0.3
                 score -= amount
                 if explain:
-                    penalties.append({
-                        "type": "long_wait",
-                        "amount": round(-amount, 1),
-                        "detail": (
-                            f"L'équipe {tname} attend {actual_rest:.0f} min "
-                            f"entre deux matchs."
-                        ),
-                    })
+                    penalties.append(
+                        {
+                            "type": "long_wait",
+                            "amount": round(-amount, 1),
+                            "detail": (f"L'équipe {tname} attend {actual_rest:.0f} min entre deux matchs."),
+                        }
+                    )
 
     # C. Category schedule compactness — penalise large gaps between category matches
     gap = context.gap_in_category_schedule(match.category_id, start_time)
@@ -155,22 +156,26 @@ def score_placement(
         amount = gap * 0.4
         score -= amount
         if explain and amount > 1:
-            penalties.append({
-                "type": "category_gap",
-                "amount": round(-amount, 1),
-                "detail": f"Écart de {gap:.0f} min dans le planning de cette catégorie.",
-            })
+            penalties.append(
+                {
+                    "type": "category_gap",
+                    "amount": round(-amount, 1),
+                    "detail": f"Écart de {gap:.0f} min dans le planning de cette catégorie.",
+                }
+            )
 
     # D. Soft constraint bonuses
     for constraint in context.soft_constraints_for_match(match):
         if context.constraint_matches_placement(constraint, field_id, start_time):
             score += 30
             if explain:
-                penalties.append({
-                    "type": "soft_constraint_bonus",
-                    "amount": 30,
-                    "detail": f"Contrainte souple satisfaite : {constraint.name}.",
-                })
+                penalties.append(
+                    {
+                        "type": "soft_constraint_bonus",
+                        "amount": 30,
+                        "detail": f"Contrainte souple satisfaite : {constraint.name}.",
+                    }
+                )
 
     # E. Finals prefer later in the day
     if match.phase == "final":
@@ -178,22 +183,26 @@ def score_placement(
         bonus = (hour - 9) * 5
         score += bonus
         if explain and bonus != 0:
-            penalties.append({
-                "type": "final_time_preference",
-                "amount": round(bonus, 1),
-                "detail": f"La finale est placée à {hour}h (bonus horaire).",
-            })
+            penalties.append(
+                {
+                    "type": "final_time_preference",
+                    "amount": round(bonus, 1),
+                    "detail": f"La finale est placée à {hour}h (bonus horaire).",
+                }
+            )
 
     # F. Youth categories prefer mornings — penalise afternoon
     if context.category_is_youth(match.category_id):
         if start_time.hour >= 14:
             score -= 50
             if explain:
-                penalties.append({
-                    "type": "youth_afternoon",
-                    "amount": -50,
-                    "detail": "Catégorie jeune placée l'après-midi (préférence matin).",
-                })
+                penalties.append(
+                    {
+                        "type": "youth_afternoon",
+                        "amount": -50,
+                        "detail": "Catégorie jeune placée l'après-midi (préférence matin).",
+                    }
+                )
 
     if explain:
         return {"score": score, "penalties": penalties}

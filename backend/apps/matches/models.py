@@ -11,6 +11,7 @@ from apps.tournaments.models import Category, Field, Tournament
 
 class Match(TrackChangesMixin, models.Model):
     _tracked_fields = ("status", "score_home", "score_away", "penalty_score_home", "penalty_score_away")
+
     class Phase(models.TextChoices):
         GROUP = "group", "Phase de poules"
         ROUND_OF_16 = "r16", "8èmes de finale"
@@ -27,12 +28,8 @@ class Match(TrackChangesMixin, models.Model):
         POSTPONED = "postponed", "Reporté"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tournament = models.ForeignKey(
-        Tournament, on_delete=models.CASCADE, related_name="matches"
-    )
-    category = models.ForeignKey(
-        Category, on_delete=models.CASCADE, related_name="matches"
-    )
+    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name="matches")
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="matches")
     group = models.ForeignKey(
         Group,
         on_delete=models.SET_NULL,
@@ -58,65 +55,71 @@ class Match(TrackChangesMixin, models.Model):
     )
 
     # Placeholders pour phases finales avant que les équipes soient connues
-    placeholder_home = models.CharField(
-        max_length=100, blank=True, help_text="ex: '1er Poule A'"
-    )
+    placeholder_home = models.CharField(max_length=100, blank=True, help_text="ex: '1er Poule A'")
     placeholder_away = models.CharField(max_length=100, blank=True)
 
     # Source match references for bracket propagation (from store.js approach)
     source_home = models.ForeignKey(
-        "self", on_delete=models.SET_NULL, null=True, blank=True,
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="next_home_matches",
         help_text="Match source pour l'équipe domicile (ex: demi-finale)",
     )
     source_away = models.ForeignKey(
-        "self", on_delete=models.SET_NULL, null=True, blank=True,
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="next_away_matches",
         help_text="Match source pour l'équipe extérieur",
     )
     source_home_type = models.CharField(
-        max_length=10, blank=True,
+        max_length=10,
+        blank=True,
         help_text="'winner' ou 'loser' du match source_home",
     )
     source_away_type = models.CharField(
-        max_length=10, blank=True,
+        max_length=10,
+        blank=True,
         help_text="'winner' ou 'loser' du match source_away",
     )
 
     # Day reference for slot-based scheduling
     day = models.ForeignKey(
-        "tournaments.Day", on_delete=models.SET_NULL, null=True, blank=True,
+        "tournaments.Day",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="matches",
     )
     slot_index = models.IntegerField(
-        null=True, blank=True,
+        null=True,
+        blank=True,
         help_text="Index du créneau global (pour tri chronologique)",
     )
 
-    field = models.ForeignKey(
-        Field, on_delete=models.SET_NULL, null=True, related_name="matches"
-    )
+    field = models.ForeignKey(Field, on_delete=models.SET_NULL, null=True, related_name="matches")
     start_time = models.DateTimeField()
     duration_minutes = models.PositiveIntegerField(default=15)
 
-    status = models.CharField(
-        max_length=20, choices=Status.choices, default=Status.SCHEDULED
-    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SCHEDULED)
     score_home = models.PositiveIntegerField(null=True, blank=True)
     score_away = models.PositiveIntegerField(null=True, blank=True)
 
     penalty_score_home = models.PositiveIntegerField(
-        null=True, blank=True,
+        null=True,
+        blank=True,
         help_text="Tirs au but domicile (phases finales uniquement)",
     )
     penalty_score_away = models.PositiveIntegerField(
-        null=True, blank=True,
+        null=True,
+        blank=True,
         help_text="Tirs au but extérieur (phases finales uniquement)",
     )
 
-    score_entered_by = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True
-    )
+    score_entered_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     score_validated = models.BooleanField(default=False)
 
     is_locked = models.BooleanField(

@@ -1,7 +1,7 @@
 """Subscription views — checkout, portal, status, webhook for Footix pricing."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import stripe
 from django.conf import settings
@@ -68,9 +68,7 @@ class SubscriptionStatusView(APIView):
 
     def get(self, request):
         sub = _get_or_create_subscription(request.user)
-        licenses = TournamentLicense.objects.filter(
-            user=request.user, is_active=True
-        ).select_related("tournament")
+        licenses = TournamentLicense.objects.filter(user=request.user, is_active=True).select_related("tournament")
         return Response(
             {
                 "subscription": SubscriptionSerializer(sub).data,
@@ -191,9 +189,7 @@ class CreateCheckoutView(APIView):
             )
 
         # Check if already licensed
-        existing = TournamentLicense.objects.filter(
-            tournament=tournament, is_active=True
-        ).first()
+        existing = TournamentLicense.objects.filter(tournament=tournament, is_active=True).first()
         if existing:
             return Response(
                 {"error": "Ce tournoi a déjà une licence active."},
@@ -335,9 +331,9 @@ class StripeWebhookView(APIView):
         period_start = stripe_sub.get("current_period_start")
         period_end = stripe_sub.get("current_period_end")
         if period_start:
-            sub.current_period_start = datetime.fromtimestamp(period_start, tz=timezone.utc)
+            sub.current_period_start = datetime.fromtimestamp(period_start, tz=UTC)
         if period_end:
-            sub.current_period_end = datetime.fromtimestamp(period_end, tz=timezone.utc)
+            sub.current_period_end = datetime.fromtimestamp(period_end, tz=UTC)
 
         sub.save()
         logger.info("Subscription updated: user=%s plan=%s status=%s", sub.user_id, sub.plan, sub.status)
@@ -418,19 +414,15 @@ class StripeWebhookView(APIView):
     def _activate_license(self, license_obj: TournamentLicense, payment_intent_id: str):
         """Set validity window: from now until 30 days after tournament end."""
         tournament = license_obj.tournament
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         license_obj.stripe_payment_intent_id = payment_intent_id
         license_obj.valid_from = now  # usable immediately after purchase
         # valid_until = end_date + 30 days (or start_date + 60 if no end_date)
         if tournament.end_date:
-            end_date = datetime.combine(
-                tournament.end_date, datetime.min.time(), tzinfo=timezone.utc
-            )
+            end_date = datetime.combine(tournament.end_date, datetime.min.time(), tzinfo=UTC)
             license_obj.valid_until = end_date + timedelta(days=30)
         else:
-            start_date = datetime.combine(
-                tournament.start_date, datetime.min.time(), tzinfo=timezone.utc
-            )
+            start_date = datetime.combine(tournament.start_date, datetime.min.time(), tzinfo=UTC)
             license_obj.valid_until = start_date + timedelta(days=60)
         license_obj.is_active = True
         license_obj.save()

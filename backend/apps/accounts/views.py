@@ -92,9 +92,7 @@ class TeamAccessView(APIView):
         serializer.is_valid(raise_exception=True)
         code = serializer.validated_data["access_code"]
         try:
-            team = Team.objects.select_related(
-                "category", "tournament"
-            ).get(access_code=code)
+            team = Team.objects.select_related("category", "tournament").get(access_code=code)
         except Team.DoesNotExist:
             return Response(
                 {

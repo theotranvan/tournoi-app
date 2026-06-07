@@ -20,9 +20,7 @@ class PublicTournamentView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, slug):
-        tournament = get_object_or_404(
-            Tournament.objects.filter(is_public=True), slug=slug
-        )
+        tournament = get_object_or_404(Tournament.objects.filter(is_public=True), slug=slug)
         categories = tournament.categories.all()
         return Response(
             {
@@ -36,10 +34,7 @@ class PublicTournamentView(APIView):
                 "description": tournament.description,
                 "status": tournament.status,
                 "cover_image": tournament.cover_image.url if tournament.cover_image else None,
-                "categories": [
-                    {"id": c.id, "name": c.name, "color": c.color}
-                    for c in categories
-                ],
+                "categories": [{"id": c.id, "name": c.name, "color": c.color} for c in categories],
             }
         )
 
@@ -56,9 +51,7 @@ class PublicTournamentByCodeView(APIView):
 
     def get(self, request, code):
         code = code.upper().strip()
-        tournament = get_object_or_404(
-            Tournament.objects.filter(is_public=True), public_code=code
-        )
+        tournament = get_object_or_404(Tournament.objects.filter(is_public=True), public_code=code)
         return Response(
             {
                 "slug": tournament.slug,
@@ -71,9 +64,7 @@ class PublicCategoriesView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, slug):
-        tournament = get_object_or_404(
-            Tournament.objects.filter(is_public=True), slug=slug
-        )
+        tournament = get_object_or_404(Tournament.objects.filter(is_public=True), slug=slug)
         categories = tournament.categories.all()
         return Response(
             [
@@ -92,9 +83,7 @@ class PublicMatchesView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, slug):
-        tournament = get_object_or_404(
-            Tournament.objects.filter(is_public=True), slug=slug
-        )
+        tournament = get_object_or_404(Tournament.objects.filter(is_public=True), slug=slug)
         qs = Match.objects.filter(tournament=tournament).select_related(
             "category", "group", "field", "team_home", "team_away"
         )
@@ -120,9 +109,7 @@ class PublicStandingsView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, slug):
-        tournament = get_object_or_404(
-            Tournament.objects.filter(is_public=True), slug=slug
-        )
+        tournament = get_object_or_404(Tournament.objects.filter(is_public=True), slug=slug)
         result = []
         for category in tournament.categories.order_by("display_order"):
             groups_data = []
@@ -147,13 +134,13 @@ class PublicTeamView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, slug, team_id):
-        tournament = get_object_or_404(
-            Tournament.objects.filter(is_public=True), slug=slug
-        )
+        tournament = get_object_or_404(Tournament.objects.filter(is_public=True), slug=slug)
         team = get_object_or_404(Team, pk=team_id, tournament=tournament)
-        matches = Match.objects.filter(
-            Q(team_home=team) | Q(team_away=team)
-        ).select_related("category", "field", "team_home", "team_away").order_by("start_time")
+        matches = (
+            Match.objects.filter(Q(team_home=team) | Q(team_away=team))
+            .select_related("category", "field", "team_home", "team_away")
+            .order_by("start_time")
+        )
 
         return Response(
             {
@@ -168,9 +155,7 @@ class PublicLiveView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, slug):
-        tournament = get_object_or_404(
-            Tournament.objects.filter(is_public=True), slug=slug
-        )
+        tournament = get_object_or_404(Tournament.objects.filter(is_public=True), slug=slug)
         base_qs = Match.objects.filter(tournament=tournament).select_related(
             "category", "group", "field", "team_home", "team_away"
         )
@@ -192,13 +177,11 @@ class PublicMatchDetailView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, slug, match_id):
-        tournament = get_object_or_404(
-            Tournament.objects.filter(is_public=True), slug=slug
-        )
+        tournament = get_object_or_404(Tournament.objects.filter(is_public=True), slug=slug)
         match = get_object_or_404(
-            Match.objects.filter(tournament=tournament).select_related(
-                "category", "group", "field", "team_home", "team_away"
-            ).prefetch_related("goals"),
+            Match.objects.filter(tournament=tournament)
+            .select_related("category", "group", "field", "team_home", "team_away")
+            .prefetch_related("goals"),
             pk=match_id,
         )
         return Response(MatchDetailSerializer(match).data)

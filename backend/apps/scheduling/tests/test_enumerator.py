@@ -20,10 +20,7 @@ class TestRoundRobin:
 
     def _make_group(self, tournament, n_teams):
         cat = CategoryFactory(tournament=tournament, name=f"U{n_teams + 10}")
-        teams = [
-            TeamFactory(tournament=tournament, category=cat, name=f"T{i}")
-            for i in range(n_teams)
-        ]
+        teams = [TeamFactory(tournament=tournament, category=cat, name=f"T{i}") for i in range(n_teams)]
         group = Group.objects.create(category=cat, name="A", display_order=0)
         group.teams.set(teams)
         return group

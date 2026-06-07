@@ -9,8 +9,6 @@ from rest_framework.response import Response
 from apps.core import BusinessRuleViolation, InvalidStateTransition
 from apps.core.permissions import IsOrganizer
 from apps.matches.models import Goal, Match
-
-logger = logging.getLogger(__name__)
 from apps.matches.serializers import (
     GoalSerializer,
     MatchDetailSerializer,
@@ -18,6 +16,8 @@ from apps.matches.serializers import (
     MatchUpdateSerializer,
     ScoreInputSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class MatchViewSet(viewsets.ModelViewSet):
@@ -33,9 +33,9 @@ class MatchViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         tournament_id = self.kwargs.get("tournament_id")
-        qs = Match.objects.select_related(
-            "category", "group", "field", "team_home", "team_away"
-        ).prefetch_related("goals")
+        qs = Match.objects.select_related("category", "group", "field", "team_home", "team_away").prefetch_related(
+            "goals"
+        )
         if tournament_id:
             qs = qs.filter(tournament_id=tournament_id)
 
@@ -63,9 +63,7 @@ class MatchViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             match = Match.objects.select_for_update().get(pk=self.get_object().pk)
             if match.status != Match.Status.SCHEDULED:
-                raise InvalidStateTransition(
-                    "Seul un match programmé peut être démarré."
-                )
+                raise InvalidStateTransition("Seul un match programmé peut être démarré.")
             match.status = Match.Status.LIVE
             match.save(update_fields=["status", "updated_at"])
         return Response(MatchDetailSerializer(match).data)
@@ -79,9 +77,7 @@ class MatchViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             match = Match.objects.select_for_update().get(pk=self.get_object().pk)
             if match.status not in (Match.Status.LIVE, Match.Status.SCHEDULED):
-                raise BusinessRuleViolation(
-                    "Le score ne peut être saisi que sur un match en cours ou programmé."
-                )
+                raise BusinessRuleViolation("Le score ne peut être saisi que sur un match en cours ou programmé.")
 
             match.score_home = data["score_home"]
             match.score_away = data["score_away"]
@@ -90,10 +86,17 @@ class MatchViewSet(viewsets.ModelViewSet):
             match.score_entered_by = request.user
             if match.status == Match.Status.SCHEDULED:
                 match.status = Match.Status.LIVE
-            match.save(update_fields=[
-                "score_home", "score_away", "penalty_score_home", "penalty_score_away",
-                "score_entered_by", "status", "updated_at"
-            ])
+            match.save(
+                update_fields=[
+                    "score_home",
+                    "score_away",
+                    "penalty_score_home",
+                    "penalty_score_away",
+                    "score_entered_by",
+                    "status",
+                    "updated_at",
+                ]
+            )
 
             # Handle goals
             if data.get("goals"):
@@ -116,13 +119,9 @@ class MatchViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             match = Match.objects.select_for_update().get(pk=self.get_object().pk)
             if match.status != Match.Status.LIVE:
-                raise InvalidStateTransition(
-                    "Seul un match en cours peut être terminé."
-                )
+                raise InvalidStateTransition("Seul un match en cours peut être terminé.")
             if match.score_home is None or match.score_away is None:
-                raise BusinessRuleViolation(
-                    "Le score doit être saisi avant de terminer un match."
-                )
+                raise BusinessRuleViolation("Le score doit être saisi avant de terminer un match.")
             match.status = Match.Status.FINISHED
             match.score_validated = True
             match.save(update_fields=["status", "score_validated", "updated_at"])
@@ -130,6 +129,7 @@ class MatchViewSet(viewsets.ModelViewSet):
             # Propagate winner for knockout matches
             if match.phase != Match.Phase.GROUP:
                 from apps.scheduling.generate import propagate_winner
+
                 propagate_winner(match)
         logger.info(
             "match.finished",
@@ -173,4 +173,5 @@ class MatchViewSet(viewsets.ModelViewSet):
 
 class GoalDeleteView:
     """Handled via match action endpoint."""
+
     pass

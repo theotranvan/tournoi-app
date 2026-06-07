@@ -21,7 +21,6 @@ def send_push(user, title: str, body: str, url: str = "/", tag: str = "footix") 
 
     Returns the number of successfully sent notifications.
     """
-    from pywebpush import webpush, WebPushException
 
     subscriptions = PushSubscription.objects.filter(user=user)
     return _send_to_subscriptions(subscriptions, title, body, url, tag)
@@ -42,19 +41,21 @@ def send_push_to_users(users, title: str, body: str, url: str = "/", tag: str = 
 
 
 def _send_to_subscriptions(subscriptions, title: str, body: str, url: str, tag: str) -> int:
-    from pywebpush import webpush, WebPushException
+    from pywebpush import WebPushException, webpush
 
     vapid_private_key = getattr(settings, "VAPID_PRIVATE_KEY", "")
     if not vapid_private_key:
         logger.warning("VAPID_PRIVATE_KEY not configured — skipping push")
         return 0
 
-    payload = json.dumps({
-        "title": title,
-        "body": body,
-        "url": url,
-        "tag": tag,
-    })
+    payload = json.dumps(
+        {
+            "title": title,
+            "body": body,
+            "url": url,
+            "tag": tag,
+        }
+    )
 
     sent = 0
     for sub in subscriptions:

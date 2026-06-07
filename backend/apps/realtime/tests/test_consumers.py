@@ -143,13 +143,16 @@ class TestTournamentConsumer:
 
         # Simulate a broadcast
         layer = get_channel_layer()
-        await layer.group_send("tournament_evt-t", {
-            "type": "match.score_updated",
-            "event": "match.score_updated",
-            "match_id": "abc-123",
-            "score_home": 2,
-            "score_away": 1,
-        })
+        await layer.group_send(
+            "tournament_evt-t",
+            {
+                "type": "match.score_updated",
+                "event": "match.score_updated",
+                "match_id": "abc-123",
+                "score_home": 2,
+                "score_away": 1,
+            },
+        )
 
         msg = await comm.receive_json_from()
         assert msg["event"] == "match.score_updated"
@@ -167,10 +170,13 @@ class TestTournamentConsumer:
         _ = await comm.receive_json_from()
 
         layer = get_channel_layer()
-        await layer.group_send("tournament_sched-t", {
-            "type": "schedule.updated",
-            "event": "schedule.updated",
-        })
+        await layer.group_send(
+            "tournament_sched-t",
+            {
+                "type": "schedule.updated",
+                "event": "schedule.updated",
+            },
+        )
 
         msg = await comm.receive_json_from()
         assert msg["event"] == "schedule.updated"
@@ -186,11 +192,14 @@ class TestTournamentConsumer:
         _ = await comm.receive_json_from()
 
         layer = get_channel_layer()
-        await layer.group_send("tournament_start-t", {
-            "type": "match.started",
-            "event": "match.started",
-            "match_id": "m-1",
-        })
+        await layer.group_send(
+            "tournament_start-t",
+            {
+                "type": "match.started",
+                "event": "match.started",
+                "match_id": "m-1",
+            },
+        )
 
         msg = await comm.receive_json_from()
         assert msg["event"] == "match.started"
@@ -207,12 +216,15 @@ class TestTournamentConsumer:
         _ = await comm.receive_json_from()
 
         layer = get_channel_layer()
-        await layer.group_send("tournament_goal-t", {
-            "type": "goal.added",
-            "event": "goal.added",
-            "match_id": "m-2",
-            "player_name": "Theo",
-        })
+        await layer.group_send(
+            "tournament_goal-t",
+            {
+                "type": "goal.added",
+                "event": "goal.added",
+                "match_id": "m-2",
+                "player_name": "Theo",
+            },
+        )
 
         msg = await comm.receive_json_from()
         assert msg["event"] == "goal.added"
@@ -263,12 +275,15 @@ class TestMatchConsumer:
         _ = await comm.receive_json_from()
 
         layer = get_channel_layer()
-        await layer.group_send(f"match_{match_id}", {
-            "type": "match.score_updated",
-            "event": "match.score_updated",
-            "score_home": 3,
-            "score_away": 0,
-        })
+        await layer.group_send(
+            f"match_{match_id}",
+            {
+                "type": "match.score_updated",
+                "event": "match.score_updated",
+                "score_home": 3,
+                "score_away": 0,
+            },
+        )
 
         msg = await comm.receive_json_from()
         assert msg["score_home"] == 3
@@ -286,12 +301,15 @@ class TestTaskProgressConsumer:
         assert connected
 
         layer = get_channel_layer()
-        await layer.group_send("task_task-abc", {
-            "type": "task.progress",
-            "event": "task.progress",
-            "percent": 50,
-            "message": "Half done",
-        })
+        await layer.group_send(
+            "task_task-abc",
+            {
+                "type": "task.progress",
+                "event": "task.progress",
+                "percent": 50,
+                "message": "Half done",
+            },
+        )
 
         msg = await comm.receive_json_from()
         assert msg["event"] == "task.progress"
@@ -305,11 +323,14 @@ class TestTaskProgressConsumer:
         assert connected
 
         layer = get_channel_layer()
-        await layer.group_send("task_task-xyz", {
-            "type": "task.completed",
-            "event": "task.completed",
-            "result": {"total_matches": 40},
-        })
+        await layer.group_send(
+            "task_task-xyz",
+            {
+                "type": "task.completed",
+                "event": "task.completed",
+                "result": {"total_matches": 40},
+            },
+        )
 
         msg = await comm.receive_json_from()
         assert msg["event"] == "task.completed"
@@ -323,11 +344,14 @@ class TestTaskProgressConsumer:
         assert connected
 
         layer = get_channel_layer()
-        await layer.group_send("task_task-fail", {
-            "type": "task.failed",
-            "event": "task.failed",
-            "error": "Timeout exceeded",
-        })
+        await layer.group_send(
+            "task_task-fail",
+            {
+                "type": "task.failed",
+                "event": "task.failed",
+                "error": "Timeout exceeded",
+            },
+        )
 
         msg = await comm.receive_json_from()
         assert msg["event"] == "task.failed"

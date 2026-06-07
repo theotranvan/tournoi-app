@@ -9,7 +9,6 @@ from rest_framework.test import APIClient
 
 from apps.teams.models import Group, Team, generate_access_code
 from apps.teams.serializers import (
-    GroupSerializer,
     TeamAdminSerializer,
     TeamBriefSerializer,
     TeamSerializer,
