@@ -99,6 +99,17 @@ class TournamentLicense(models.Model):
     def __str__(self) -> str:
         return f"License {self.tournament} — {'active' if self.is_active else 'inactive'}"
 
+    @property
+    def is_valid(self) -> bool:
+        if not self.is_active:
+            return False
+        now = timezone.now()
+        if self.valid_from and now < self.valid_from:
+            return False
+        if self.valid_until and now > self.valid_until:
+            return False
+        return True
+
 
 class StripeEvent(models.Model):
     """Tracks processed Stripe webhook events for idempotency."""
@@ -112,14 +123,3 @@ class StripeEvent(models.Model):
 
     def __str__(self) -> str:
         return f"{self.event_type} — {self.event_id}"
-
-    @property
-    def is_valid(self) -> bool:
-        if not self.is_active:
-            return False
-        now = timezone.now()
-        if self.valid_from and now < self.valid_from:
-            return False
-        if self.valid_until and now > self.valid_until:
-            return False
-        return True

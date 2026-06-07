@@ -155,7 +155,11 @@ class TestNotificationListView:
         assert "All notif" in titles
         assert "Coach notif" not in titles
 
-    def test_list_notifications_for_coach(self, api_coach, tournament):
+    def test_list_notifications_for_coach(self, api_coach, coach, tournament):
+        # Notifications are scoped to tournaments the user can access: a coach
+        # must be a member of the organising club to receive them.
+        tournament.club.members.add(coach)
+
         Notification.objects.create(
             type=Notification.Type.MATCH_STARTED,
             target=Notification.Target.ADMIN,

@@ -334,6 +334,7 @@ class TestFullFlow16Teams:
         # 8. Generate finals
         result = generate_finals(cat)
         assert result["success"]
+        assert result["provisional"] is False  # all pool matches finished
         assert result["match_count"] >= 2  # at least semi-finals
 
         finals = Match.objects.filter(tournament=t).exclude(phase=Match.Phase.GROUP)
@@ -804,15 +805,23 @@ class TestEdgeCases:
         assert not result["success"]
         assert "terrain" in result["error"].lower()
 
-    def test_no_days_error(self, db):
+    def test_no_days_falls_back_to_virtual_days(self, db):
+        """No explicit Day objects → virtual days from the tournament date range.
+
+        Scheduling succeeds (08:00–19:00 window) and surfaces a warning rather
+        than failing, so an organiser who skipped day configuration is not blocked.
+        """
         user = UserFactory()
-        club = ClubFactory(owner=user)
-        t = TournamentFactory(club=club)
-        FieldFactory(tournament=t)
-        cat = CategoryFactory(tournament=t)
+        t = _create_tournament_setup(
+            user, n_teams_per_cat={"U10": 4}, n_fields=2, n_days=0,
+        )
+        _auto_generate_all_pools(t)
+        assert not Day.objects.filter(tournament=t).exists()
+
         result = generate_schedule(t)
-        assert not result["success"]
-        assert "journée" in result["error"].lower()
+        assert result["success"]
+        assert any("journée" in w.lower() for w in result["warnings"])
+        assert Match.objects.filter(tournament=t).count() > 0
 
     def test_no_pools_error(self, db):
         user = UserFactory()
@@ -824,7 +833,12 @@ class TestEdgeCases:
         assert not result["success"]
         assert "poule" in result["error"].lower()
 
-    def test_finals_before_all_matches_finished_error(self, db):
+    def test_finals_before_pools_finished_are_provisional(self, db):
+        """Finals may be generated before pools finish, flagged ``provisional``.
+
+        The bracket is built from current (partial) standings so organisers can
+        preview the structure; it is marked provisional rather than rejected.
+        """
         user = UserFactory()
         t = _create_tournament_setup(
             user, n_teams_per_cat={"U10": 4}, n_fields=2, n_days=1,
@@ -835,5 +849,11 @@ class TestEdgeCases:
 
         cat = Category.objects.get(tournament=t, name="U10")
         result = generate_finals(cat)
-        assert not result["success"]
-        assert "non terminé" in result["error"]
+        assert result["success"]
+        assert result["provisional"] is True
+        # Knockout matches were created despite pools being unfinished
+        assert (
+            Match.objects.filter(category=cat)
+            .exclude(phase=Match.Phase.GROUP)
+            .exists()
+        )
