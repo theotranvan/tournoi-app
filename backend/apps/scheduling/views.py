@@ -335,8 +335,8 @@ class SuggestSwapView(APIView):
         if apply:
             swap_id = suggestion["swap_with_match_id"]
             with transaction.atomic():
-                m1 = Match.objects.select_for_update().get(pk=match_id)
-                m2 = Match.objects.select_for_update().get(pk=swap_id)
+                m1 = Match.objects.select_for_update().get(pk=match_id, tournament=tournament)
+                m2 = Match.objects.select_for_update().get(pk=swap_id, tournament=tournament)
                 m1.field_id, m2.field_id = m2.field_id, m1.field_id
                 m1.start_time, m2.start_time = m2.start_time, m1.start_time
                 m1.save(update_fields=["field_id", "start_time"])

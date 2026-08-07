@@ -104,11 +104,22 @@ class TeamViewSet(TournamentScopedMixin, viewsets.ModelViewSet):
         if file.size > 2 * 1024 * 1024:
             raise BusinessRuleViolation("Le fichier CSV ne doit pas dépasser 2 Mo.")
 
-        decoded = file.read().decode("utf-8-sig")
+        if not (file.name or "").lower().endswith(".csv"):
+            raise BusinessRuleViolation("Le fichier doit être au format CSV.")
+
+        try:
+            decoded = file.read().decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raise BusinessRuleViolation("Le fichier CSV doit être encodé en UTF-8.")
+
         reader = csv.DictReader(io.StringIO(decoded))
         created = []
         errors = []
+        max_rows = 1000
         for i, row in enumerate(reader, start=2):
+            if i - 1 > max_rows:
+                errors.append(f"Import limité aux {max_rows} premières lignes.")
+                break
             cat_name = row.get("category", "").strip()
             name = row.get("name", "").strip()
             if not name:

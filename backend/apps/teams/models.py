@@ -1,9 +1,13 @@
 import secrets
 import string
 
+from django.core.validators import FileExtensionValidator
 from django.db import models
 
+from apps.core.validators import validate_image_size
 from apps.tournaments.models import Category, Tournament
+
+IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp"]
 
 
 def generate_access_code(length: int = 8) -> str:
@@ -17,7 +21,12 @@ class Team(models.Model):
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="teams")
     name = models.CharField(max_length=200)
     short_name = models.CharField(max_length=20, blank=True, help_text="Pour affichage mobile")
-    logo = models.ImageField(upload_to="teams/", null=True, blank=True)
+    logo = models.ImageField(
+        upload_to="teams/",
+        null=True,
+        blank=True,
+        validators=[FileExtensionValidator(IMAGE_EXTENSIONS), validate_image_size],
+    )
     coach_name = models.CharField(max_length=200, blank=True)
     coach_phone = models.CharField(max_length=20, blank=True)
     coach_email = models.EmailField(blank=True)

@@ -4,10 +4,12 @@ import string
 import uuid
 
 from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils.text import slugify
 
 from apps.clubs.models import Club
+from apps.core.validators import validate_image_size
 
 _TIME_RE = re.compile(r"^\d{2}:\d{2}$")
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -71,7 +73,12 @@ class Tournament(models.Model):
     end_date = models.DateField()
     description = models.TextField(blank=True)
     rules = models.TextField(blank=True)
-    cover_image = models.ImageField(upload_to="tournaments/", null=True, blank=True)
+    cover_image = models.ImageField(
+        upload_to="tournaments/",
+        null=True,
+        blank=True,
+        validators=[FileExtensionValidator(["png", "jpg", "jpeg", "webp"]), validate_image_size],
+    )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     is_public = models.BooleanField(default=True)
 

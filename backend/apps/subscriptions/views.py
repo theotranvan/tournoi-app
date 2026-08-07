@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import stripe
 from django.conf import settings
+from django.db import IntegrityError, transaction
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -281,17 +282,7 @@ class StripeWebhookView(APIView):
             logger.warning("Stripe webhook signature failed: %s", e)
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
-        # Idempotency: skip already-processed events
         event_id = event.get("id", "")
-        if event_id:
-            _, created = StripeEvent.objects.get_or_create(
-                event_id=event_id,
-                defaults={"event_type": event["type"]},
-            )
-            if not created:
-                logger.info("Stripe event already processed: %s", event_id)
-                return Response({"status": "already_processed"})
-
         event_type = event["type"]
         data = event["data"]["object"]
 
@@ -304,8 +295,22 @@ class StripeWebhookView(APIView):
             "checkout.session.completed": self._handle_checkout_completed,
         }.get(event_type)
 
-        if handler:
-            handler(data)
+        # Record the idempotency marker and run the handler in one transaction, so
+        # the event is only marked processed if the handler succeeds. A duplicate
+        # delivery trips the unique constraint (already processed); a handler
+        # failure rolls back and returns 500 so Stripe retries the delivery.
+        try:
+            with transaction.atomic():
+                if event_id:
+                    StripeEvent.objects.create(event_id=event_id, event_type=event_type)
+                if handler:
+                    handler(data)
+        except IntegrityError:
+            logger.info("Stripe event already processed: %s", event_id)
+            return Response({"status": "already_processed"})
+        except Exception:
+            logger.exception("Stripe webhook handler failed: event=%s", event_id)
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({"status": "ok"})
 
