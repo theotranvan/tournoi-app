@@ -191,6 +191,8 @@ class TestTeamActionsAPI:
         assert resp.data["access_code"] != old_code
 
     def test_qr_code_returns_png(self, api, setup):
+        # qr-code is owner-only now (it encodes the team access_code): authenticate.
+        api.force_authenticate(user=setup["user"])
         t = setup["tournament"]
         team = TeamFactory(tournament=t, category=setup["category"])
         resp = api.get(f"/api/v1/tournaments/{t.id}/teams/{team.id}/qr-code/")

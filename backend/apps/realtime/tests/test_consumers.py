@@ -263,6 +263,20 @@ class TestMatchConsumer:
             assert msg["type"] == "websocket.close"
 
     @pytest.mark.asyncio
+    async def test_connect_private_match_anonymous_rejected(self):
+        """H1 — a match in a private tournament must reject anonymous subscribers."""
+        user = await _create_organizer()
+        tournament = await _create_tournament(user, slug="priv-match-t", is_public=False)
+        match = await _create_match(tournament)
+        comm = _make_communicator(f"/ws/matches/{match.id}/")  # anonymous
+        connected, code = await comm.connect()
+        if connected:
+            msg = await comm.receive_output()
+            assert msg["type"] == "websocket.close"
+        else:
+            assert code == 4003
+
+    @pytest.mark.asyncio
     async def test_receives_event_on_match_group(self):
         user = await _create_organizer()
         tournament = await _create_tournament(user, slug="match-evt-t")
@@ -296,7 +310,8 @@ class TestMatchConsumer:
 class TestTaskProgressConsumer:
     @pytest.mark.asyncio
     async def test_connect_and_receive_progress(self):
-        comm = _make_communicator("/ws/tasks/task-abc/")
+        user = await _create_organizer()
+        comm = _make_communicator("/ws/tasks/task-abc/", user=user)
         connected, _ = await comm.connect()
         assert connected
 
@@ -318,7 +333,8 @@ class TestTaskProgressConsumer:
 
     @pytest.mark.asyncio
     async def test_receive_task_completed(self):
-        comm = _make_communicator("/ws/tasks/task-xyz/")
+        user = await _create_organizer()
+        comm = _make_communicator("/ws/tasks/task-xyz/", user=user)
         connected, _ = await comm.connect()
         assert connected
 
@@ -339,7 +355,8 @@ class TestTaskProgressConsumer:
 
     @pytest.mark.asyncio
     async def test_receive_task_failed(self):
-        comm = _make_communicator("/ws/tasks/task-fail/")
+        user = await _create_organizer()
+        comm = _make_communicator("/ws/tasks/task-fail/", user=user)
         connected, _ = await comm.connect()
         assert connected
 
@@ -357,6 +374,17 @@ class TestTaskProgressConsumer:
         assert msg["event"] == "task.failed"
         assert msg["error"] == "Timeout exceeded"
         await comm.disconnect()
+
+    @pytest.mark.asyncio
+    async def test_anonymous_rejected(self):
+        """H1 — task progress must not be readable by anonymous clients."""
+        comm = _make_communicator("/ws/tasks/anon-task/")  # anonymous
+        connected, code = await comm.connect()
+        if connected:
+            msg = await comm.receive_output()
+            assert msg["type"] == "websocket.close"
+        else:
+            assert code == 4003
 
 
 # ─── JWT Middleware Tests ────────────────────────────────────────────────────
@@ -380,8 +408,11 @@ class TestJWTMiddleware:
     async def test_no_token_sets_anonymous(self):
         from channels.routing import URLRouter
 
+        user = await _create_organizer()
+        await _create_tournament(user, slug="mw-anon-pub")
         app = JWTAuthMiddleware(URLRouter(websocket_urlpatterns))
-        comm = WebsocketCommunicator(app, "/ws/tasks/t2/")
+        # No token -> AnonymousUser; a public tournament feed still accepts it.
+        comm = WebsocketCommunicator(app, "/ws/tournaments/mw-anon-pub/")
         connected, _ = await comm.connect()
         assert connected
         await comm.disconnect()
@@ -390,8 +421,10 @@ class TestJWTMiddleware:
     async def test_invalid_token_sets_anonymous(self):
         from channels.routing import URLRouter
 
+        user = await _create_organizer()
+        await _create_tournament(user, slug="mw-bad-pub")
         app = JWTAuthMiddleware(URLRouter(websocket_urlpatterns))
-        comm = WebsocketCommunicator(app, "/ws/tasks/t3/?token=bad.token.value")
+        comm = WebsocketCommunicator(app, "/ws/tournaments/mw-bad-pub/?token=bad.token.value")
         connected, _ = await comm.connect()
         assert connected
         await comm.disconnect()
@@ -425,7 +458,8 @@ class TestBroadcasterIntegration:
 
     @pytest.mark.asyncio
     async def test_broadcast_task_progress_sync(self):
-        comm = _make_communicator("/ws/tasks/bc-task/")
+        user = await _create_organizer()
+        comm = _make_communicator("/ws/tasks/bc-task/", user=user)
         connected, _ = await comm.connect()
         assert connected
 

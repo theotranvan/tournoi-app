@@ -83,10 +83,13 @@ class TournamentPlanView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, tournament_id):
+        from apps.tournaments.views import _check_tournament_access
+
         try:
-            tournament = Tournament.objects.get(pk=tournament_id)
+            tournament = Tournament.objects.select_related("club").get(pk=tournament_id)
         except Tournament.DoesNotExist:
             return Response({"error": "Tournoi introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        _check_tournament_access(request.user, tournament)
         plan = get_effective_plan(request.user, tournament)
         return Response({"plan": plan, "tournament_id": str(tournament_id)})
 
@@ -168,6 +171,8 @@ class CreateCheckoutView(APIView):
         return Response({"checkout_url": session.url})
 
     def _checkout_one_shot(self, request, customer_id: str, frontend_url: str):
+        from apps.tournaments.views import _check_tournament_access
+
         tournament_id = request.data.get("tournament_id")
         if not tournament_id:
             return Response(
@@ -175,12 +180,16 @@ class CreateCheckoutView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            tournament = Tournament.objects.get(pk=tournament_id)
+            tournament = Tournament.objects.select_related("club").get(pk=tournament_id)
         except Tournament.DoesNotExist:
             return Response(
                 {"error": "Tournoi introuvable."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        # Only the tournament's owner/member may buy a licence for it — otherwise a
+        # third party could create a pending TournamentLicense on someone else's
+        # tournament and have it activated by the payment webhook.
+        _check_tournament_access(request.user, tournament)
 
         if not PRICE_ONE_SHOT:
             return Response(

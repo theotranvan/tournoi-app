@@ -7,6 +7,21 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from apps.accounts.tokens import decode_team_token
 
 
+def _team_token_current(payload: dict) -> bool:
+    """Reject team tokens whose version no longer matches the team's.
+
+    ``regenerate_code`` bumps ``Team.token_version``, so previously issued
+    (still-unexpired) team JWTs become invalid — giving a way to actually revoke
+    a leaked/compromised access. Costs one indexed lookup per team-token request.
+    """
+    from apps.teams.models import Team
+
+    current = Team.objects.filter(id=payload.get("team_id")).values_list("token_version", flat=True).first()
+    if current is None:
+        return False  # team deleted
+    return current == payload.get("token_version", 0)
+
+
 class TeamAnonymousUser:
     """Lightweight user-like object for team token sessions."""
 
@@ -49,11 +64,12 @@ class KickoffJWTAuthentication(BaseAuthentication):
         # Try team token first (cheaper decode)
         team_payload = decode_team_token(token)
         if team_payload is not None:
+            if not _team_token_current(team_payload):
+                raise AuthenticationFailed("Accès équipe révoqué ou expiré.")
             return (TeamAnonymousUser(team_payload), team_payload)
 
-        # Fall back to standard SimpleJWT user authentication
-        try:
-            jwt_auth = JWTAuthentication()
-            return jwt_auth.authenticate(request)
-        except Exception:
-            raise AuthenticationFailed("Token invalide ou expiré.")
+        # Fall back to standard SimpleJWT user authentication. SimpleJWT raises
+        # InvalidToken (a 401) for bad/expired tokens; let unexpected errors
+        # (e.g. misconfiguration) surface instead of masking them as "invalid".
+        jwt_auth = JWTAuthentication()
+        return jwt_auth.authenticate(request)

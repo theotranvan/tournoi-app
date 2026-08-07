@@ -12,8 +12,12 @@ C3 (group generation scoped to the owned tournament's category).
 
 import pytest
 from rest_framework import status
-from rest_framework.test import APIClient
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.test import APIClient, APIRequestFactory
 
+from apps.accounts.authentication import KickoffJWTAuthentication
+from apps.accounts.tokens import generate_team_token
+from apps.teams.models import Team
 from tests.factories import (
     CategoryFactory,
     ClubFactory,
@@ -124,3 +128,32 @@ def test_owner_still_has_full_access(org_a):
     for path in ("teams", "categories", "fields", "matches"):
         resp = owner.get(f"/api/v1/tournaments/{tid}/{path}/")
         assert resp.status_code == status.HTTP_200_OK, f"owner GET {path} -> {resp.status_code}"
+
+
+def test_h4_standings_scoped_to_owner(client_b, org_a):
+    """H4 — a non-owning organizer cannot read another tournament's standings."""
+    url = f"/api/v1/categories/{org_a['category'].id}/standings/"
+    assert client_b.get(url).status_code in DENIED
+
+    owner = APIClient()
+    owner.force_authenticate(user=org_a["user"])
+    assert owner.get(url).status_code == status.HTTP_200_OK
+
+
+def test_h2_team_token_revoked_after_regenerate(db):
+    """H2 — bumping token_version invalidates previously issued team JWTs."""
+    team = TeamFactory()
+    token = generate_team_token(team)
+    auth = KickoffJWTAuthentication()
+    request = APIRequestFactory().get("/", HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    # Valid while the version matches.
+    user, _ = auth.authenticate(request)
+    assert user.team_id == team.id
+
+    # Simulate regenerate-code bumping the version.
+    Team.objects.filter(pk=team.pk).update(token_version=team.token_version + 1)
+
+    # The old token is now rejected.
+    with pytest.raises(AuthenticationFailed):
+        auth.authenticate(request)

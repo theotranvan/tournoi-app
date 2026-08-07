@@ -23,6 +23,8 @@ class Team(models.Model):
     coach_email = models.EmailField(blank=True)
 
     access_code = models.CharField(max_length=8, unique=True, db_index=True)
+    # Bumped by regenerate_code to invalidate previously issued team JWTs.
+    token_version = models.PositiveIntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

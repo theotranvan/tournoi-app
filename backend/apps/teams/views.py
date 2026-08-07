@@ -3,6 +3,7 @@ import io
 
 import qrcode
 from django.conf import settings
+from django.db.models import F
 from django.http import HttpResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -63,7 +64,10 @@ class TeamViewSet(TournamentScopedMixin, viewsets.ModelViewSet):
     def regenerate_code(self, request, tournament_id=None, pk=None):
         team = self.get_object()
         team.access_code = generate_access_code()
-        team.save(update_fields=["access_code", "updated_at"])
+        # Invalidate any previously issued team JWTs for this team.
+        team.token_version = F("token_version") + 1
+        team.save(update_fields=["access_code", "token_version", "updated_at"])
+        team.refresh_from_db(fields=["token_version"])
         return Response(TeamAdminSerializer(team, context={"request": request}).data)
 
     @action(detail=True, methods=["get"], url_path="qr-code")
