@@ -200,6 +200,13 @@ CORS_ALLOW_HEADERS = [
     "x-requested-with",
 ]
 
+# ─── Internal health probes ──────────────────────────────────────────────────
+# Shared secret required to reach the expensive Celery/full health checks (they
+# broadcast to all workers). Empty in dev = open; set it in prod so only probes
+# carrying the X-Internal-Probe header can trigger the broadcast.
+INTERNAL_HEALTH_TOKEN = config("INTERNAL_HEALTH_TOKEN", default="")
+
+
 # ─── Sentry ──────────────────────────────────────────────────────────────────
 SENTRY_DSN = config("SENTRY_DSN", default="")
 if SENTRY_DSN:
@@ -217,8 +224,15 @@ if SENTRY_DSN:
 
     def _sentry_before_send(event, hint):
         """Strip sensitive fields from Sentry events."""
-        if "request" in event and "data" in event["request"]:
-            event["request"]["data"] = _scrub_data(event["request"]["data"])
+        request = event.get("request")
+        if request:
+            if "data" in request:
+                request["data"] = _scrub_data(request["data"])
+            # Query strings and cookies can carry access codes / tokens.
+            if request.get("query_string"):
+                request["query_string"] = "[REDACTED]"
+            if request.get("cookies"):
+                request["cookies"] = "[REDACTED]"
         if "exception" in event:
             for val in event["exception"].get("values", []):
                 for frame in (val.get("stacktrace") or {}).get("frames", []):
