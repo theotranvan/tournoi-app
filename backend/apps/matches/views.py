@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.core import BusinessRuleViolation, InvalidStateTransition
+from apps.core.mixins import TournamentScopedMixin
 from apps.core.permissions import IsOrganizer
 from apps.matches.models import Goal, Match
 from apps.matches.serializers import (
@@ -20,9 +21,12 @@ from apps.matches.serializers import (
 logger = logging.getLogger(__name__)
 
 
-class MatchViewSet(viewsets.ModelViewSet):
+class MatchViewSet(TournamentScopedMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsOrganizer]
     lookup_field = "id"
+    queryset = Match.objects.select_related("category", "group", "field", "team_home", "team_away").prefetch_related(
+        "goals"
+    )
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -32,12 +36,7 @@ class MatchViewSet(viewsets.ModelViewSet):
         return MatchDetailSerializer
 
     def get_queryset(self):
-        tournament_id = self.kwargs.get("tournament_id")
-        qs = Match.objects.select_related("category", "group", "field", "team_home", "team_away").prefetch_related(
-            "goals"
-        )
-        if tournament_id:
-            qs = qs.filter(tournament_id=tournament_id)
+        qs = super().get_queryset()
 
         # Filtres
         params = self.request.query_params

@@ -6,11 +6,13 @@ from django.conf import settings
 from django.http import HttpResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import JSONParser, MultiPartParser
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.core import BusinessRuleViolation
+from apps.core.mixins import TournamentScopedMixin
 from apps.core.permissions import IsOrganizer
 from apps.subscriptions.plans import FREE_LIMITS, get_effective_plan
 from apps.teams.models import Group, Team, generate_access_code
@@ -24,9 +26,10 @@ from apps.tournaments.models import Category
 from apps.tournaments.views import _get_tournament_for_nested
 
 
-class TeamViewSet(viewsets.ModelViewSet):
+class TeamViewSet(TournamentScopedMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsOrganizer]
     parser_classes = [JSONParser, MultiPartParser]
+    queryset = Team.objects.select_related("category", "tournament")
 
     def get_serializer_class(self):
         if self.action in ("list", "retrieve", "create", "update", "partial_update"):
@@ -34,10 +37,7 @@ class TeamViewSet(viewsets.ModelViewSet):
         return TeamAdminSerializer
 
     def get_queryset(self):
-        tournament_id = self.kwargs.get("tournament_id")
-        qs = Team.objects.select_related("category", "tournament")
-        if tournament_id:
-            qs = qs.filter(tournament_id=tournament_id)
+        qs = super().get_queryset()
         # Filtres
         category = self.request.query_params.get("category")
         if category:
@@ -66,8 +66,12 @@ class TeamViewSet(viewsets.ModelViewSet):
         team.save(update_fields=["access_code", "updated_at"])
         return Response(TeamAdminSerializer(team, context={"request": request}).data)
 
-    @action(detail=True, methods=["get"], url_path="qr-code", permission_classes=[AllowAny])
+    @action(detail=True, methods=["get"], url_path="qr-code")
     def qr_code(self, request, tournament_id=None, pk=None):
+        # No AllowAny: the QR encodes the team's access_code (a shared secret).
+        # get_object() is scoped by TournamentScopedMixin, so only the owning
+        # organizer can fetch it. For unauthenticated big-screen display, expose
+        # a short-lived signed URL instead of the secret (see follow-up).
         team = self.get_object()
         frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
         slug = team.tournament.slug
@@ -153,8 +157,10 @@ class TeamViewSet(viewsets.ModelViewSet):
         return Response(list(names))
 
 
-class GroupViewSet(viewsets.ModelViewSet):
+class GroupViewSet(TournamentScopedMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsOrganizer]
+    tournament_lookup = "category__tournament"
+    queryset = Group.objects.prefetch_related("teams")
 
     def get_serializer_class(self):
         if self.action in ("list", "retrieve"):
@@ -162,14 +168,18 @@ class GroupViewSet(viewsets.ModelViewSet):
         return GroupSerializer
 
     def get_queryset(self):
+        qs = super().get_queryset()
         category_id = self.kwargs.get("category_id")
         if category_id:
-            return Group.objects.filter(category_id=category_id).prefetch_related("teams")
-        return Group.objects.none()
+            qs = qs.filter(category_id=category_id)
+        return qs
+
+    def _get_scoped_category(self):
+        """Return the URL category, enforcing it belongs to the owned tournament."""
+        return get_object_or_404(Category, pk=self.kwargs["category_id"], tournament=self.get_tournament())
 
     def perform_create(self, serializer):
-        category = Category.objects.get(pk=self.kwargs["category_id"])
-        serializer.save(category=category)
+        serializer.save(category=self._get_scoped_category())
 
     @action(detail=False, methods=["post"], url_path="generate-balanced")
     def generate_balanced(self, request, tournament_id=None, category_id=None):
@@ -177,7 +187,7 @@ class GroupViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         num_groups = serializer.validated_data["num_groups"]
 
-        category = Category.objects.get(pk=category_id)
+        category = self._get_scoped_category()
         teams = list(category.teams.order_by("name"))
         if len(teams) < num_groups:
             raise BusinessRuleViolation(f"Pas assez d'équipes ({len(teams)}) pour {num_groups} poules.")

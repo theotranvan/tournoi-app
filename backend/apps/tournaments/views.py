@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from apps.clubs.models import Club
 from apps.core import BusinessRuleViolation, InvalidStateTransition
+from apps.core.mixins import TournamentScopedMixin
 from apps.core.permissions import IsOrganizer
 from apps.subscriptions.plans import (
     FREE_LIMITS,
@@ -193,15 +194,10 @@ class TournamentViewSet(viewsets.ModelViewSet):
         return TournamentDetailSerializer(qs.first()).data
 
 
-class CategoryViewSet(viewsets.ModelViewSet):
+class CategoryViewSet(TournamentScopedMixin, viewsets.ModelViewSet):
     serializer_class = CategorySerializer
     permission_classes = [IsAuthenticated, IsOrganizer]
-
-    def get_queryset(self):
-        tournament_id = self.kwargs.get("tournament_id")
-        if tournament_id:
-            return Category.objects.filter(tournament_id=tournament_id)
-        return Category.objects.none()
+    queryset = Category.objects.all()
 
     def perform_create(self, serializer):
         tournament = _get_tournament_for_nested(self.kwargs, self.request.user)
@@ -252,15 +248,10 @@ class CategoryViewSet(viewsets.ModelViewSet):
         )
 
 
-class FieldViewSet(viewsets.ModelViewSet):
+class FieldViewSet(TournamentScopedMixin, viewsets.ModelViewSet):
     serializer_class = FieldSerializer
     permission_classes = [IsAuthenticated, IsOrganizer]
-
-    def get_queryset(self):
-        tournament_id = self.kwargs.get("tournament_id")
-        if tournament_id:
-            return Field.objects.filter(tournament_id=tournament_id)
-        return Field.objects.none()
+    queryset = Field.objects.all()
 
     def perform_create(self, serializer):
         tournament = _get_tournament_for_nested(self.kwargs, self.request.user)
@@ -293,30 +284,20 @@ class FieldViewSet(viewsets.ModelViewSet):
                     raise ValidationError({"availability": f"La date {date_str} est hors de la période du tournoi."})
 
 
-class SchedulingConstraintViewSet(viewsets.ModelViewSet):
+class SchedulingConstraintViewSet(TournamentScopedMixin, viewsets.ModelViewSet):
     serializer_class = SchedulingConstraintSerializer
     permission_classes = [IsAuthenticated, IsOrganizer]
-
-    def get_queryset(self):
-        tournament_id = self.kwargs.get("tournament_id")
-        if tournament_id:
-            return SchedulingConstraint.objects.filter(tournament_id=tournament_id)
-        return SchedulingConstraint.objects.none()
+    queryset = SchedulingConstraint.objects.all()
 
     def perform_create(self, serializer):
         tournament = _get_tournament_for_nested(self.kwargs, self.request.user)
         serializer.save(tournament=tournament)
 
 
-class DayViewSet(viewsets.ModelViewSet):
+class DayViewSet(TournamentScopedMixin, viewsets.ModelViewSet):
     serializer_class = DaySerializer
     permission_classes = [IsAuthenticated, IsOrganizer]
-
-    def get_queryset(self):
-        tournament_id = self.kwargs.get("tournament_id")
-        if tournament_id:
-            return Day.objects.filter(tournament_id=tournament_id).order_by("order", "date")
-        return Day.objects.none()
+    queryset = Day.objects.order_by("order", "date")
 
     def perform_create(self, serializer):
         tournament = _get_tournament_for_nested(self.kwargs, self.request.user)
