@@ -140,6 +140,19 @@ def test_h4_standings_scoped_to_owner(client_b, org_a):
     assert owner.get(url).status_code == status.HTTP_200_OK
 
 
+def test_h4_standings_readable_by_team_member_only(org_a):
+    """H4 — a coach (team token) reads their own tournament's standings, not others'."""
+    url = f"/api/v1/categories/{org_a['category'].id}/standings/"
+
+    own = APIClient()
+    own.credentials(HTTP_AUTHORIZATION=f"Bearer {generate_team_token(org_a['team'])}")
+    assert own.get(url).status_code == status.HTTP_200_OK
+
+    other = APIClient()
+    other.credentials(HTTP_AUTHORIZATION=f"Bearer {generate_team_token(TeamFactory())}")
+    assert other.get(url).status_code in DENIED
+
+
 def test_h2_team_token_revoked_after_regenerate(db):
     """H2 — bumping token_version invalidates previously issued team JWTs."""
     team = TeamFactory()

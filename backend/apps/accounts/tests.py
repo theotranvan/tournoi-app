@@ -8,7 +8,6 @@ from apps.accounts.authentication import KickoffJWTAuthentication, TeamAnonymous
 from apps.accounts.permissions import (
     IsClubOwnerOrMember,
     IsOrganizer,
-    IsTeamMember,
     IsTournamentOwner,
 )
 from apps.accounts.serializers import RegisterSerializer, UserSerializer
@@ -156,25 +155,6 @@ class TestPermissions:
         request = factory.get("/")
         request.user = owner
         assert IsTournamentOwner().has_object_permission(request, None, tournament) is True
-
-    def test_is_team_member_with_matching_team(self):
-        team = TeamFactory()
-        payload = decode_team_token(generate_team_token(team))
-        tau = TeamAnonymousUser(payload)
-        factory = APIRequestFactory()
-        request = factory.get("/")
-        request.user = tau
-        assert IsTeamMember().has_object_permission(request, None, team) is True
-
-    def test_is_team_member_rejects_wrong_team(self):
-        team1 = TeamFactory()
-        team2 = TeamFactory()
-        payload = decode_team_token(generate_team_token(team1))
-        tau = TeamAnonymousUser(payload)
-        factory = APIRequestFactory()
-        request = factory.get("/")
-        request.user = tau
-        assert IsTeamMember().has_object_permission(request, None, team2) is False
 
 
 # ── Serializers ──────────────────────────────────────────────────────────────

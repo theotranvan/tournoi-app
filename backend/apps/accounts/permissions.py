@@ -39,22 +39,6 @@ class IsTournamentOwner(BasePermission):
         return tournament.club.owner_id == user.id or tournament.club.members.filter(id=user.id).exists()
 
 
-class IsTeamMember(BasePermission):
-    """Token équipe valide pour la team_id de l'objet."""
-
-    def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated
-
-    def has_object_permission(self, request, view, obj):
-        user = request.user
-        if not isinstance(user, TeamAnonymousUser):
-            # Regular users with organizer role can also access
-            return user.role in ("organizer", "superadmin")
-        team = getattr(obj, "team", obj)
-        team_id = getattr(team, "id", team)
-        return user.team_id == team_id
-
-
 class IsPublicOrAuthenticated(BasePermission):
     """Toujours autorisé — pour les routes publiques."""
 
