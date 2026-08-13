@@ -14,9 +14,13 @@ def _team_token_current(payload: dict) -> bool:
     (still-unexpired) team JWTs become invalid — giving a way to actually revoke
     a leaked/compromised access. Costs one indexed lookup per team-token request.
     """
+    team_id = payload.get("team_id")
+    if team_id is None:
+        return False
+
     from apps.teams.models import Team
 
-    current = Team.objects.filter(id=payload.get("team_id")).values_list("token_version", flat=True).first()
+    current = Team.objects.filter(id=team_id).values_list("token_version", flat=True).first()
     if current is None:
         return False  # team deleted
     return current == payload.get("token_version", 0)
