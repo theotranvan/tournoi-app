@@ -128,11 +128,30 @@ class CreateCheckoutView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # For ONE_SHOT, resolve and authorize the tournament BEFORE any Stripe call,
+        # so a third party can't even create a Stripe customer against a foreign
+        # tournament (let alone a pending licence activated later by the webhook).
+        one_shot_tournament = None
+        if plan == "one_shot":
+            from apps.tournaments.views import _check_tournament_access
+
+            tournament_id = request.data.get("tournament_id")
+            if not tournament_id:
+                return Response(
+                    {"error": "tournament_id requis pour le plan one_shot."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            try:
+                one_shot_tournament = Tournament.objects.select_related("club").get(pk=tournament_id)
+            except Tournament.DoesNotExist:
+                return Response({"error": "Tournoi introuvable."}, status=status.HTTP_404_NOT_FOUND)
+            _check_tournament_access(request.user, one_shot_tournament)
+
         customer_id = _get_or_create_customer_id(request.user)
 
         # ── ONE_SHOT (payment mode) ─────────────────────────────────────
         if plan == "one_shot":
-            return self._checkout_one_shot(request, customer_id, frontend_url)
+            return self._checkout_one_shot(request, customer_id, frontend_url, one_shot_tournament)
 
         # ── CLUB (subscription mode) ────────────────────────────────────
         if plan in CLUB_PRICE_MAP:
@@ -171,27 +190,8 @@ class CreateCheckoutView(APIView):
         )
         return Response({"checkout_url": session.url})
 
-    def _checkout_one_shot(self, request, customer_id: str, frontend_url: str):
-        from apps.tournaments.views import _check_tournament_access
-
-        tournament_id = request.data.get("tournament_id")
-        if not tournament_id:
-            return Response(
-                {"error": "tournament_id requis pour le plan one_shot."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        try:
-            tournament = Tournament.objects.select_related("club").get(pk=tournament_id)
-        except Tournament.DoesNotExist:
-            return Response(
-                {"error": "Tournoi introuvable."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        # Only the tournament's owner/member may buy a licence for it — otherwise a
-        # third party could create a pending TournamentLicense on someone else's
-        # tournament and have it activated by the payment webhook.
-        _check_tournament_access(request.user, tournament)
-
+    def _checkout_one_shot(self, request, customer_id, frontend_url, tournament):
+        # Ownership was verified by the caller, before any Stripe call.
         if not PRICE_ONE_SHOT:
             return Response(
                 {"error": "Stripe price non configuré pour one_shot."},
@@ -211,12 +211,12 @@ class CreateCheckoutView(APIView):
             payment_method_types=["card"],
             mode="payment",
             line_items=[{"price": PRICE_ONE_SHOT, "quantity": 1}],
-            success_url=f"{frontend_url}/admin/tournois/{tournament_id}?license=success",
+            success_url=f"{frontend_url}/admin/tournois/{tournament.id}?license=success",
             cancel_url=f"{frontend_url}/pricing?canceled=true",
             metadata={
                 "user_id": str(request.user.id),
                 "plan": "one_shot",
-                "tournament_id": str(tournament_id),
+                "tournament_id": str(tournament.id),
             },
         )
 

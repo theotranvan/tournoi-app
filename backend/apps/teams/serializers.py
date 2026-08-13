@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.teams.models import Group, Team
+from apps.tournaments.models import Category
 
 
 class TeamSerializer(serializers.ModelSerializer):
@@ -48,6 +49,13 @@ class TeamAdminSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("id", "tournament", "access_code", "created_at", "updated_at")
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # N1: only accept a category from the request's own tournament.
+        tournament = self.context.get("tournament")
+        if tournament is not None and "category" in self.fields:
+            self.fields["category"].queryset = Category.objects.filter(tournament=tournament)
+
     def get_qr_code_url(self, obj):
         request = self.context.get("request")
         if request is None:
@@ -89,6 +97,13 @@ class GroupSerializer(serializers.ModelSerializer):
         model = Group
         fields = ("id", "category", "name", "display_order", "team_ids")
         read_only_fields = ("id", "category")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # N1: only accept teams from the request's own tournament.
+        tournament = self.context.get("tournament")
+        if tournament is not None and "team_ids" in self.fields:
+            self.fields["team_ids"].child_relation.queryset = Team.objects.filter(tournament=tournament)
 
 
 class GroupDetailSerializer(serializers.ModelSerializer):

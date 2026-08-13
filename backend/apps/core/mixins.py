@@ -30,3 +30,15 @@ class TournamentScopedMixin:
 
     def get_queryset(self):
         return super().get_queryset().filter(**{self.tournament_lookup: self.get_tournament()})
+
+    def get_serializer_context(self):
+        """Expose the scoped tournament so serializers can scope their FK fields.
+
+        Prevents cross-tenant FK injection via the request body: a serializer FK
+        that defaults to an unfiltered queryset (e.g. Category.objects.all())
+        would otherwise accept a primary key from another organizer's tournament.
+        """
+        context = super().get_serializer_context()
+        if self.kwargs.get("tournament_id"):
+            context["tournament"] = self.get_tournament()
+        return context
