@@ -3,8 +3,6 @@ Security tests — ensure all protected endpoints require authentication
 and that unauthenticated requests are rejected.
 """
 
-import uuid
-
 import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -74,12 +72,11 @@ def test_anon_gets_401_or_403(anon_client, method, url, payload, db):
     assert resp.status_code in (
         status.HTTP_401_UNAUTHORIZED,
         status.HTTP_403_FORBIDDEN,
-    ), (
-        f"{method.upper()} {url} returned {resp.status_code}, expected 401 or 403"
-    )
+    ), f"{method.upper()} {url} returned {resp.status_code}, expected 401 or 403"
 
 
 # ─── Parametrized: Tournament-nested endpoints need auth ────────────────────
+
 
 def _nested_endpoints(tid, cid, mid, team_pk, fid):
     """Return list of (method, url, payload) for nested tournament endpoints."""
@@ -129,9 +126,7 @@ def test_nested_endpoints_require_auth(anon_client, setup_data):
         assert resp.status_code in (
             status.HTTP_401_UNAUTHORIZED,
             status.HTTP_403_FORBIDDEN,
-        ), (
-            f"{method.upper()} {url} returned {resp.status_code}, expected 401 or 403"
-        )
+        ), f"{method.upper()} {url} returned {resp.status_code}, expected 401 or 403"
 
 
 # ─── Public endpoints should remain accessible ─────────────────────────────
@@ -158,6 +153,7 @@ def test_public_endpoints_dont_require_auth(anon_client, method, url, db):
 
 # ─── Access code not leaked in serializers ──────────────────────────────────
 
+
 def test_access_code_not_in_public_tournament(anon_client, setup_data):
     """Public tournament endpoint must NOT expose team access codes."""
     tournament = setup_data["tournament"]
@@ -182,6 +178,7 @@ def _assert_no_access_code(data):
 
 
 # ─── Rate limiting smoke test ───────────────────────────────────────────────
+
 
 def test_team_access_rate_limit(anon_client, db):
     """TeamAccessView should be throttled (returns 429 after many requests)."""

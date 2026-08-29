@@ -13,6 +13,14 @@ logger = logging.getLogger(__name__)
 _DEPLOYED_SHA = os.environ.get("IMAGE_TAG", "dev")
 
 
+def _internal_probe_allowed(request) -> bool:
+    """Gate the broadcast-heavy health checks behind a shared secret in prod."""
+    token = getattr(settings, "INTERNAL_HEALTH_TOKEN", "")
+    if not token:
+        return True  # not configured (dev) — leave open
+    return request.META.get("HTTP_X_INTERNAL_PROBE", "") == token
+
+
 class HealthView(APIView):
     permission_classes = [AllowAny]
 
@@ -78,6 +86,8 @@ class HealthCeleryView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        if not _internal_probe_allowed(request):
+            return Response({"detail": "Non autorisé."}, status=403)
         ok = False
         try:
             from kickoff.celery import app as celery_app
@@ -104,6 +114,8 @@ class HealthFullView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        if not _internal_probe_allowed(request):
+            return Response({"detail": "Non autorisé."}, status=403)
         checks = {
             "database": False,
             "redis": False,

@@ -1,10 +1,11 @@
 """Subscription views — checkout, portal, status, webhook for Footix pricing."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import stripe
 from django.conf import settings
+from django.db import IntegrityError, transaction
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -68,9 +69,7 @@ class SubscriptionStatusView(APIView):
 
     def get(self, request):
         sub = _get_or_create_subscription(request.user)
-        licenses = TournamentLicense.objects.filter(
-            user=request.user, is_active=True
-        ).select_related("tournament")
+        licenses = TournamentLicense.objects.filter(user=request.user, is_active=True).select_related("tournament")
         return Response(
             {
                 "subscription": SubscriptionSerializer(sub).data,
@@ -85,10 +84,13 @@ class TournamentPlanView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, tournament_id):
+        from apps.tournaments.views import _check_tournament_access
+
         try:
-            tournament = Tournament.objects.get(pk=tournament_id)
+            tournament = Tournament.objects.select_related("club").get(pk=tournament_id)
         except Tournament.DoesNotExist:
             return Response({"error": "Tournoi introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        _check_tournament_access(request.user, tournament)
         plan = get_effective_plan(request.user, tournament)
         return Response({"plan": plan, "tournament_id": str(tournament_id)})
 
@@ -126,11 +128,30 @@ class CreateCheckoutView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # For ONE_SHOT, resolve and authorize the tournament BEFORE any Stripe call,
+        # so a third party can't even create a Stripe customer against a foreign
+        # tournament (let alone a pending licence activated later by the webhook).
+        one_shot_tournament = None
+        if plan == "one_shot":
+            from apps.tournaments.views import _check_tournament_access
+
+            tournament_id = request.data.get("tournament_id")
+            if not tournament_id:
+                return Response(
+                    {"error": "tournament_id requis pour le plan one_shot."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            try:
+                one_shot_tournament = Tournament.objects.select_related("club").get(pk=tournament_id)
+            except Tournament.DoesNotExist:
+                return Response({"error": "Tournoi introuvable."}, status=status.HTTP_404_NOT_FOUND)
+            _check_tournament_access(request.user, one_shot_tournament)
+
         customer_id = _get_or_create_customer_id(request.user)
 
         # ── ONE_SHOT (payment mode) ─────────────────────────────────────
         if plan == "one_shot":
-            return self._checkout_one_shot(request, customer_id, frontend_url)
+            return self._checkout_one_shot(request, customer_id, frontend_url, one_shot_tournament)
 
         # ── CLUB (subscription mode) ────────────────────────────────────
         if plan in CLUB_PRICE_MAP:
@@ -169,21 +190,8 @@ class CreateCheckoutView(APIView):
         )
         return Response({"checkout_url": session.url})
 
-    def _checkout_one_shot(self, request, customer_id: str, frontend_url: str):
-        tournament_id = request.data.get("tournament_id")
-        if not tournament_id:
-            return Response(
-                {"error": "tournament_id requis pour le plan one_shot."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        try:
-            tournament = Tournament.objects.get(pk=tournament_id)
-        except Tournament.DoesNotExist:
-            return Response(
-                {"error": "Tournoi introuvable."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
+    def _checkout_one_shot(self, request, customer_id, frontend_url, tournament):
+        # Ownership was verified by the caller, before any Stripe call.
         if not PRICE_ONE_SHOT:
             return Response(
                 {"error": "Stripe price non configuré pour one_shot."},
@@ -191,9 +199,7 @@ class CreateCheckoutView(APIView):
             )
 
         # Check if already licensed
-        existing = TournamentLicense.objects.filter(
-            tournament=tournament, is_active=True
-        ).first()
+        existing = TournamentLicense.objects.filter(tournament=tournament, is_active=True).first()
         if existing:
             return Response(
                 {"error": "Ce tournoi a déjà une licence active."},
@@ -205,12 +211,12 @@ class CreateCheckoutView(APIView):
             payment_method_types=["card"],
             mode="payment",
             line_items=[{"price": PRICE_ONE_SHOT, "quantity": 1}],
-            success_url=f"{frontend_url}/admin/tournois/{tournament_id}?license=success",
+            success_url=f"{frontend_url}/admin/tournois/{tournament.id}?license=success",
             cancel_url=f"{frontend_url}/pricing?canceled=true",
             metadata={
                 "user_id": str(request.user.id),
                 "plan": "one_shot",
-                "tournament_id": str(tournament_id),
+                "tournament_id": str(tournament.id),
             },
         )
 
@@ -276,17 +282,7 @@ class StripeWebhookView(APIView):
             logger.warning("Stripe webhook signature failed: %s", e)
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
-        # Idempotency: skip already-processed events
         event_id = event.get("id", "")
-        if event_id:
-            _, created = StripeEvent.objects.get_or_create(
-                event_id=event_id,
-                defaults={"event_type": event["type"]},
-            )
-            if not created:
-                logger.info("Stripe event already processed: %s", event_id)
-                return Response({"status": "already_processed"})
-
         event_type = event["type"]
         data = event["data"]["object"]
 
@@ -299,8 +295,22 @@ class StripeWebhookView(APIView):
             "checkout.session.completed": self._handle_checkout_completed,
         }.get(event_type)
 
-        if handler:
-            handler(data)
+        # Record the idempotency marker and run the handler in one transaction, so
+        # the event is only marked processed if the handler succeeds. A duplicate
+        # delivery trips the unique constraint (already processed); a handler
+        # failure rolls back and returns 500 so Stripe retries the delivery.
+        try:
+            with transaction.atomic():
+                if event_id:
+                    StripeEvent.objects.create(event_id=event_id, event_type=event_type)
+                if handler:
+                    handler(data)
+        except IntegrityError:
+            logger.info("Stripe event already processed: %s", event_id)
+            return Response({"status": "already_processed"})
+        except Exception:
+            logger.exception("Stripe webhook handler failed: event=%s", event_id)
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({"status": "ok"})
 
@@ -335,9 +345,9 @@ class StripeWebhookView(APIView):
         period_start = stripe_sub.get("current_period_start")
         period_end = stripe_sub.get("current_period_end")
         if period_start:
-            sub.current_period_start = datetime.fromtimestamp(period_start, tz=timezone.utc)
+            sub.current_period_start = datetime.fromtimestamp(period_start, tz=UTC)
         if period_end:
-            sub.current_period_end = datetime.fromtimestamp(period_end, tz=timezone.utc)
+            sub.current_period_end = datetime.fromtimestamp(period_end, tz=UTC)
 
         sub.save()
         logger.info("Subscription updated: user=%s plan=%s status=%s", sub.user_id, sub.plan, sub.status)
@@ -418,19 +428,15 @@ class StripeWebhookView(APIView):
     def _activate_license(self, license_obj: TournamentLicense, payment_intent_id: str):
         """Set validity window: from now until 30 days after tournament end."""
         tournament = license_obj.tournament
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         license_obj.stripe_payment_intent_id = payment_intent_id
         license_obj.valid_from = now  # usable immediately after purchase
         # valid_until = end_date + 30 days (or start_date + 60 if no end_date)
         if tournament.end_date:
-            end_date = datetime.combine(
-                tournament.end_date, datetime.min.time(), tzinfo=timezone.utc
-            )
+            end_date = datetime.combine(tournament.end_date, datetime.min.time(), tzinfo=UTC)
             license_obj.valid_until = end_date + timedelta(days=30)
         else:
-            start_date = datetime.combine(
-                tournament.start_date, datetime.min.time(), tzinfo=timezone.utc
-            )
+            start_date = datetime.combine(tournament.start_date, datetime.min.time(), tzinfo=UTC)
             license_obj.valid_until = start_date + timedelta(days=60)
         license_obj.is_active = True
         license_obj.save()

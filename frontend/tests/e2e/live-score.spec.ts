@@ -266,7 +266,7 @@ test.describe("Live score entry and display", () => {
         },
         {
           path: `/public/tournaments/${SLUG}/matches/`,
-          body: [MOCK_MATCH_LIVE, MOCK_MATCH_SCHEDULED, MOCK_MATCH_FINISHED],
+          body: { count: 3, next: null, previous: null, results: [MOCK_MATCH_LIVE, MOCK_MATCH_SCHEDULED, MOCK_MATCH_FINISHED] },
         },
         {
           path: `/public/tournaments/${SLUG}/standings/`,
@@ -297,7 +297,7 @@ test.describe("Live score entry and display", () => {
         },
         {
           path: `/public/tournaments/${SLUG}/matches/`,
-          body: [MOCK_MATCH_FINISHED],
+          body: { count: 1, next: null, previous: null, results: [MOCK_MATCH_FINISHED] },
         },
         {
           path: `/public/tournaments/${SLUG}/standings/`,
@@ -324,7 +324,7 @@ test.describe("Live score entry and display", () => {
         },
         {
           path: `/public/tournaments/${SLUG}/matches/`,
-          body: [MOCK_MATCH_LIVE, MOCK_MATCH_SCHEDULED, MOCK_MATCH_FINISHED],
+          body: { count: 3, next: null, previous: null, results: [MOCK_MATCH_LIVE, MOCK_MATCH_SCHEDULED, MOCK_MATCH_FINISHED] },
         },
         {
           path: `/public/tournaments/${SLUG}/standings/`,
@@ -358,7 +358,7 @@ test.describe("Live score entry and display", () => {
         },
         {
           path: `/public/tournaments/${SLUG}/matches/`,
-          body: [updatedMatch, MOCK_MATCH_SCHEDULED, MOCK_MATCH_FINISHED],
+          body: { count: 3, next: null, previous: null, results: [updatedMatch, MOCK_MATCH_SCHEDULED, MOCK_MATCH_FINISHED] },
         },
         {
           path: `/public/tournaments/${SLUG}/standings/`,
@@ -391,7 +391,7 @@ test.describe("Live score entry and display", () => {
         },
         {
           path: `/public/tournaments/${SLUG}/matches/`,
-          body: [MOCK_MATCH_LIVE, MOCK_MATCH_SCHEDULED, MOCK_MATCH_FINISHED],
+          body: { count: 3, next: null, previous: null, results: [MOCK_MATCH_LIVE, MOCK_MATCH_SCHEDULED, MOCK_MATCH_FINISHED] },
         },
         {
           path: `/public/tournaments/${SLUG}/standings/`,

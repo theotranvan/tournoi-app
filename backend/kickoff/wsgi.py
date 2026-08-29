@@ -11,6 +11,7 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'kickoff.settings.dev')
+# Fail safe to production settings; local dev sets this explicitly.
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "kickoff.settings.prod")
 
 application = get_wsgi_application()

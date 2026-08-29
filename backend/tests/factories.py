@@ -38,9 +38,7 @@ class TournamentFactory(factory.django.DjangoModelFactory):
     slug = factory.LazyAttribute(lambda o: o.name.lower().replace(" ", "-"))
     location = "Stade Municipal"
     start_date = factory.LazyFunction(lambda: timezone.now().date())
-    end_date = factory.LazyFunction(
-        lambda: (timezone.now() + timezone.timedelta(days=1)).date()
-    )
+    end_date = factory.LazyFunction(lambda: (timezone.now() + timezone.timedelta(days=1)).date())
     status = Tournament.Status.DRAFT
 
 
@@ -80,9 +78,7 @@ class TeamFactory(factory.django.DjangoModelFactory):
         model = Team
 
     tournament = factory.SubFactory(TournamentFactory)
-    category = factory.SubFactory(
-        CategoryFactory, tournament=factory.SelfAttribute("..tournament")
-    )
+    category = factory.SubFactory(CategoryFactory, tournament=factory.SelfAttribute("..tournament"))
     name = factory.Sequence(lambda n: f"Equipe {n}")
     coach_name = factory.Faker("name")
     coach_email = factory.Faker("email")
@@ -116,9 +112,7 @@ class MatchFactory(factory.django.DjangoModelFactory):
         model = Match
 
     tournament = factory.SubFactory(TournamentFactory)
-    category = factory.SubFactory(
-        CategoryFactory, tournament=factory.SelfAttribute("..tournament")
-    )
+    category = factory.SubFactory(CategoryFactory, tournament=factory.SelfAttribute("..tournament"))
     phase = Match.Phase.GROUP
     start_time = factory.LazyFunction(timezone.now)
     duration_minutes = 15

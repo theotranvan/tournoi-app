@@ -23,7 +23,7 @@ async def one_client(url: str, i: int) -> tuple[int, int]:
             while time.time() - start < 60:
                 await asyncio.wait_for(ws.recv(), timeout=2)
                 count += 1
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass
         return i, count
 

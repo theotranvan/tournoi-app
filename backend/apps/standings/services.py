@@ -137,7 +137,10 @@ def compute_group_standings(group_id: int, *, bypass_cache: bool = False) -> lis
             h2h[key] = {}
         rec = h2h[key]
         # Store points for each side
-        for tid, sc_for, sc_ag in [(hid, match.score_home, match.score_away), (aid, match.score_away, match.score_home)]:
+        for tid, sc_for, sc_ag in [
+            (hid, match.score_home, match.score_away),
+            (aid, match.score_away, match.score_home),
+        ]:
             rec.setdefault(f"pts_{tid}", 0)
             rec.setdefault(f"gd_{tid}", 0)
             if sc_for > sc_ag:
@@ -151,9 +154,7 @@ def compute_group_standings(group_id: int, *, bypass_cache: bool = False) -> lis
     # ── Compute derived fields ───────────────────────────────────────────
     for s in stats.values():
         s["points"] = (
-            s["won"] * category.points_win
-            + s["drawn"] * category.points_draw
-            + s["lost"] * category.points_loss
+            s["won"] * category.points_win + s["drawn"] * category.points_draw + s["lost"] * category.points_loss
         )
         s["goal_difference"] = s["goals_for"] - s["goals_against"]
         s["form"] = s.pop("_results")[-5:]  # last 5 results

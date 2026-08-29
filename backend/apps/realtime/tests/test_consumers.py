@@ -143,13 +143,16 @@ class TestTournamentConsumer:
 
         # Simulate a broadcast
         layer = get_channel_layer()
-        await layer.group_send("tournament_evt-t", {
-            "type": "match.score_updated",
-            "event": "match.score_updated",
-            "match_id": "abc-123",
-            "score_home": 2,
-            "score_away": 1,
-        })
+        await layer.group_send(
+            "tournament_evt-t",
+            {
+                "type": "match.score_updated",
+                "event": "match.score_updated",
+                "match_id": "abc-123",
+                "score_home": 2,
+                "score_away": 1,
+            },
+        )
 
         msg = await comm.receive_json_from()
         assert msg["event"] == "match.score_updated"
@@ -167,10 +170,13 @@ class TestTournamentConsumer:
         _ = await comm.receive_json_from()
 
         layer = get_channel_layer()
-        await layer.group_send("tournament_sched-t", {
-            "type": "schedule.updated",
-            "event": "schedule.updated",
-        })
+        await layer.group_send(
+            "tournament_sched-t",
+            {
+                "type": "schedule.updated",
+                "event": "schedule.updated",
+            },
+        )
 
         msg = await comm.receive_json_from()
         assert msg["event"] == "schedule.updated"
@@ -186,11 +192,14 @@ class TestTournamentConsumer:
         _ = await comm.receive_json_from()
 
         layer = get_channel_layer()
-        await layer.group_send("tournament_start-t", {
-            "type": "match.started",
-            "event": "match.started",
-            "match_id": "m-1",
-        })
+        await layer.group_send(
+            "tournament_start-t",
+            {
+                "type": "match.started",
+                "event": "match.started",
+                "match_id": "m-1",
+            },
+        )
 
         msg = await comm.receive_json_from()
         assert msg["event"] == "match.started"
@@ -207,12 +216,15 @@ class TestTournamentConsumer:
         _ = await comm.receive_json_from()
 
         layer = get_channel_layer()
-        await layer.group_send("tournament_goal-t", {
-            "type": "goal.added",
-            "event": "goal.added",
-            "match_id": "m-2",
-            "player_name": "Theo",
-        })
+        await layer.group_send(
+            "tournament_goal-t",
+            {
+                "type": "goal.added",
+                "event": "goal.added",
+                "match_id": "m-2",
+                "player_name": "Theo",
+            },
+        )
 
         msg = await comm.receive_json_from()
         assert msg["event"] == "goal.added"
@@ -251,6 +263,20 @@ class TestMatchConsumer:
             assert msg["type"] == "websocket.close"
 
     @pytest.mark.asyncio
+    async def test_connect_private_match_anonymous_rejected(self):
+        """H1 — a match in a private tournament must reject anonymous subscribers."""
+        user = await _create_organizer()
+        tournament = await _create_tournament(user, slug="priv-match-t", is_public=False)
+        match = await _create_match(tournament)
+        comm = _make_communicator(f"/ws/matches/{match.id}/")  # anonymous
+        connected, code = await comm.connect()
+        if connected:
+            msg = await comm.receive_output()
+            assert msg["type"] == "websocket.close"
+        else:
+            assert code == 4003
+
+    @pytest.mark.asyncio
     async def test_receives_event_on_match_group(self):
         user = await _create_organizer()
         tournament = await _create_tournament(user, slug="match-evt-t")
@@ -263,12 +289,15 @@ class TestMatchConsumer:
         _ = await comm.receive_json_from()
 
         layer = get_channel_layer()
-        await layer.group_send(f"match_{match_id}", {
-            "type": "match.score_updated",
-            "event": "match.score_updated",
-            "score_home": 3,
-            "score_away": 0,
-        })
+        await layer.group_send(
+            f"match_{match_id}",
+            {
+                "type": "match.score_updated",
+                "event": "match.score_updated",
+                "score_home": 3,
+                "score_away": 0,
+            },
+        )
 
         msg = await comm.receive_json_from()
         assert msg["score_home"] == 3
@@ -281,17 +310,21 @@ class TestMatchConsumer:
 class TestTaskProgressConsumer:
     @pytest.mark.asyncio
     async def test_connect_and_receive_progress(self):
-        comm = _make_communicator("/ws/tasks/task-abc/")
+        user = await _create_organizer()
+        comm = _make_communicator("/ws/tasks/task-abc/", user=user)
         connected, _ = await comm.connect()
         assert connected
 
         layer = get_channel_layer()
-        await layer.group_send("task_task-abc", {
-            "type": "task.progress",
-            "event": "task.progress",
-            "percent": 50,
-            "message": "Half done",
-        })
+        await layer.group_send(
+            "task_task-abc",
+            {
+                "type": "task.progress",
+                "event": "task.progress",
+                "percent": 50,
+                "message": "Half done",
+            },
+        )
 
         msg = await comm.receive_json_from()
         assert msg["event"] == "task.progress"
@@ -300,16 +333,20 @@ class TestTaskProgressConsumer:
 
     @pytest.mark.asyncio
     async def test_receive_task_completed(self):
-        comm = _make_communicator("/ws/tasks/task-xyz/")
+        user = await _create_organizer()
+        comm = _make_communicator("/ws/tasks/task-xyz/", user=user)
         connected, _ = await comm.connect()
         assert connected
 
         layer = get_channel_layer()
-        await layer.group_send("task_task-xyz", {
-            "type": "task.completed",
-            "event": "task.completed",
-            "result": {"total_matches": 40},
-        })
+        await layer.group_send(
+            "task_task-xyz",
+            {
+                "type": "task.completed",
+                "event": "task.completed",
+                "result": {"total_matches": 40},
+            },
+        )
 
         msg = await comm.receive_json_from()
         assert msg["event"] == "task.completed"
@@ -318,21 +355,36 @@ class TestTaskProgressConsumer:
 
     @pytest.mark.asyncio
     async def test_receive_task_failed(self):
-        comm = _make_communicator("/ws/tasks/task-fail/")
+        user = await _create_organizer()
+        comm = _make_communicator("/ws/tasks/task-fail/", user=user)
         connected, _ = await comm.connect()
         assert connected
 
         layer = get_channel_layer()
-        await layer.group_send("task_task-fail", {
-            "type": "task.failed",
-            "event": "task.failed",
-            "error": "Timeout exceeded",
-        })
+        await layer.group_send(
+            "task_task-fail",
+            {
+                "type": "task.failed",
+                "event": "task.failed",
+                "error": "Timeout exceeded",
+            },
+        )
 
         msg = await comm.receive_json_from()
         assert msg["event"] == "task.failed"
         assert msg["error"] == "Timeout exceeded"
         await comm.disconnect()
+
+    @pytest.mark.asyncio
+    async def test_anonymous_rejected(self):
+        """H1 — task progress must not be readable by anonymous clients."""
+        comm = _make_communicator("/ws/tasks/anon-task/")  # anonymous
+        connected, code = await comm.connect()
+        if connected:
+            msg = await comm.receive_output()
+            assert msg["type"] == "websocket.close"
+        else:
+            assert code == 4003
 
 
 # ─── JWT Middleware Tests ────────────────────────────────────────────────────
@@ -356,8 +408,11 @@ class TestJWTMiddleware:
     async def test_no_token_sets_anonymous(self):
         from channels.routing import URLRouter
 
+        user = await _create_organizer()
+        await _create_tournament(user, slug="mw-anon-pub")
         app = JWTAuthMiddleware(URLRouter(websocket_urlpatterns))
-        comm = WebsocketCommunicator(app, "/ws/tasks/t2/")
+        # No token -> AnonymousUser; a public tournament feed still accepts it.
+        comm = WebsocketCommunicator(app, "/ws/tournaments/mw-anon-pub/")
         connected, _ = await comm.connect()
         assert connected
         await comm.disconnect()
@@ -366,8 +421,10 @@ class TestJWTMiddleware:
     async def test_invalid_token_sets_anonymous(self):
         from channels.routing import URLRouter
 
+        user = await _create_organizer()
+        await _create_tournament(user, slug="mw-bad-pub")
         app = JWTAuthMiddleware(URLRouter(websocket_urlpatterns))
-        comm = WebsocketCommunicator(app, "/ws/tasks/t3/?token=bad.token.value")
+        comm = WebsocketCommunicator(app, "/ws/tournaments/mw-bad-pub/?token=bad.token.value")
         connected, _ = await comm.connect()
         assert connected
         await comm.disconnect()
@@ -401,7 +458,8 @@ class TestBroadcasterIntegration:
 
     @pytest.mark.asyncio
     async def test_broadcast_task_progress_sync(self):
-        comm = _make_communicator("/ws/tasks/bc-task/")
+        user = await _create_organizer()
+        comm = _make_communicator("/ws/tasks/bc-task/", user=user)
         connected, _ = await comm.connect()
         assert connected
 

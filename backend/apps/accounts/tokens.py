@@ -16,6 +16,7 @@ def generate_team_token(team) -> str:
         "tournament_id": str(team.tournament_id),
         "category_id": team.category_id,
         "team_name": team.name,
+        "token_version": team.token_version,
         "iat": now,
         "exp": now + timedelta(hours=24),
     }

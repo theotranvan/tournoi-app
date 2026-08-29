@@ -24,16 +24,12 @@ class RegisterSerializer(serializers.ModelSerializer):
         if not value:
             raise serializers.ValidationError("L'adresse email est obligatoire.")
         if User.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError(
-                "Un compte existe déjà avec cette adresse email."
-            )
+            raise serializers.ValidationError("Un compte existe déjà avec cette adresse email.")
         return value
 
     def validate_username(self, value: str) -> str:
         if User.objects.filter(username__iexact=value).exists():
-            raise serializers.ValidationError(
-                "Ce nom d'utilisateur est déjà pris."
-            )
+            raise serializers.ValidationError("Ce nom d'utilisateur est déjà pris.")
         return value
 
     def validate_password(self, value: str) -> str:

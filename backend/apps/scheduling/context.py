@@ -35,15 +35,11 @@ class SchedulingContext:
             self._field_windows[f.id] = windows
 
         # Track placed matches: field_id -> sorted list of (start, end)
-        self._field_schedule: dict[int, list[tuple[datetime, datetime]]] = {
-            f.id: [] for f in fields
-        }
+        self._field_schedule: dict[int, list[tuple[datetime, datetime]]] = {f.id: [] for f in fields}
         # Track placed matches: team_id -> sorted list of (start, end)
         self._team_schedule: dict[int, list[tuple[datetime, datetime]]] = {}
         # Track placed matches: category_id -> sorted list of (start, end)
-        self._category_schedule: dict[int, list[tuple[datetime, datetime]]] = {
-            c.id: [] for c in categories
-        }
+        self._category_schedule: dict[int, list[tuple[datetime, datetime]]] = {c.id: [] for c in categories}
         # Total match count per field (for load balancing)
         self._field_match_count: dict[int, int] = {f.id: 0 for f in fields}
         self._total_placed = 0
@@ -85,7 +81,11 @@ class SchedulingContext:
         return False
 
     def field_is_busy(
-        self, field_id: int, start: datetime, end: datetime, include_transition: bool = True,
+        self,
+        field_id: int,
+        start: datetime,
+        end: datetime,
+        include_transition: bool = True,
     ) -> bool:
         """Check if the field has an overlapping match (with optional transition buffer)."""
         for ms, me in self._field_schedule.get(field_id, []):
@@ -97,7 +97,11 @@ class SchedulingContext:
     # ─── Team conflicts ──────────────────────────────────────────────────
 
     def team_has_conflict(
-        self, team_id: int, start: datetime, end: datetime, rest_needed: int,
+        self,
+        team_id: int,
+        start: datetime,
+        end: datetime,
+        rest_needed: int,
     ) -> bool:
         """Check if a team has an overlapping match or insufficient rest."""
         rest = timedelta(minutes=rest_needed)
@@ -109,7 +113,10 @@ class SchedulingContext:
     # ─── Category time windows ───────────────────────────────────────────
 
     def category_time_window_ok(
-        self, category_id: int, start: datetime, end: datetime,
+        self,
+        category_id: int,
+        start: datetime,
+        end: datetime,
     ) -> bool:
         cat = self.categories.get(category_id)
         if not cat:
@@ -189,7 +196,10 @@ class SchedulingContext:
         return result
 
     def constraint_matches_placement(
-        self, constraint, field_id: int, start: datetime,
+        self,
+        constraint,
+        field_id: int,
+        start: datetime,
     ) -> bool:
         """Check if a soft constraint is satisfied by this placement."""
         payload = constraint.payload or {}
@@ -209,7 +219,10 @@ class SchedulingContext:
     # ─── Hard constraint checking ────────────────────────────────────────
 
     def check_hard_constraints(
-        self, match: ProvisionalMatch, field_id: int, start: datetime,
+        self,
+        match: ProvisionalMatch,
+        field_id: int,
+        start: datetime,
     ) -> bool:
         """Return True if all hard constraints are satisfied."""
         for hc in self._hard_constraints:
@@ -265,9 +278,7 @@ class SchedulingContext:
         end_with_transition = end + timedelta(minutes=m.transition)
 
         self._field_schedule[placement.field_id].append((start, end_with_transition))
-        self._field_match_count[placement.field_id] = (
-            self._field_match_count.get(placement.field_id, 0) + 1
-        )
+        self._field_match_count[placement.field_id] = self._field_match_count.get(placement.field_id, 0) + 1
         self._total_placed += 1
 
         for tid in (m.team_home_id, m.team_away_id):
@@ -290,7 +301,8 @@ class SchedulingContext:
         except ValueError:
             pass
         self._field_match_count[placement.field_id] = max(
-            0, self._field_match_count.get(placement.field_id, 1) - 1,
+            0,
+            self._field_match_count.get(placement.field_id, 1) - 1,
         )
         self._total_placed = max(0, self._total_placed - 1)
 

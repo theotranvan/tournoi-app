@@ -1,8 +1,8 @@
 """Production / Docker settings."""
 
-from .base import *  # noqa: F401, F403
-
 import dj_database_url
+
+from .base import *  # noqa: F401, F403
 
 DEBUG = False
 
@@ -21,11 +21,7 @@ if _admin_email:
 # ─── Database ────────────────────────────────────────────────────────────────
 DATABASE_URL = config("DATABASE_URL")
 
-DATABASES = {
-    "default": dj_database_url.parse(
-        DATABASE_URL, conn_max_age=600, conn_health_checks=True
-    )
-}
+DATABASES = {"default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, conn_health_checks=True)}
 
 # ─── Cache ───────────────────────────────────────────────────────────────────
 if REDIS_URL and REDIS_URL != "redis://localhost:6379/0":
@@ -107,7 +103,11 @@ if USE_S3_MEDIA:
     AWS_S3_CUSTOM_DOMAIN = config("AWS_S3_CUSTOM_DOMAIN", default="")
     AWS_DEFAULT_ACL = None  # Use bucket policy, don't set public-read on each object
     AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
-    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/" if AWS_S3_CUSTOM_DOMAIN else f"https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/"
+    MEDIA_URL = (
+        f"https://{AWS_S3_CUSTOM_DOMAIN}/"
+        if AWS_S3_CUSTOM_DOMAIN
+        else f"https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/"
+    )
 
 # ─── Logging ─────────────────────────────────────────────────────────────────
 _LOG_LEVEL = config("LOG_LEVEL", default="INFO")

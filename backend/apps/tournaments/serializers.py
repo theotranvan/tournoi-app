@@ -73,7 +73,9 @@ class TournamentDetailSerializer(serializers.ModelSerializer):
 
 
 class TournamentCreateSerializer(serializers.ModelSerializer):
-    club = serializers.PrimaryKeyRelatedField(required=False, queryset=Tournament.club.field.related_model.objects.all())
+    club = serializers.PrimaryKeyRelatedField(
+        required=False, queryset=Tournament.club.field.related_model.objects.all()
+    )
 
     class Meta:
         model = Tournament
@@ -147,9 +149,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class BulkCategorySerializer(serializers.Serializer):
-    categories = serializers.ListField(
-        child=serializers.DictField(), min_length=1, max_length=20
-    )
+    categories = serializers.ListField(child=serializers.DictField(), min_length=1, max_length=20)
 
 
 class FieldSerializer(serializers.ModelSerializer):

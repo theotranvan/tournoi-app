@@ -2,7 +2,6 @@
 
 import pytest
 from django.utils import timezone
-
 from rest_framework.test import APIClient
 
 from apps.matches.models import Match
@@ -28,6 +27,7 @@ def api():
 def _clear_throttle_cache():
     """Reset DRF throttle cache between tests so rate limits don't leak."""
     from django.core.cache import cache
+
     cache.clear()
 
 

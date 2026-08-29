@@ -1,6 +1,5 @@
 """Phase 03 – Teams API integration tests (CSV import, QR code, regenerate-code)."""
 
-
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
@@ -17,6 +16,7 @@ def api() -> APIClient:
 @pytest.fixture(autouse=True)
 def _clear_throttle_cache():
     from django.core.cache import cache
+
     cache.clear()
 
 
@@ -70,9 +70,7 @@ class TestTeamsCRUD:
         team = TeamFactory(tournament=t, category=cat)
         old_code = team.access_code
         api.force_authenticate(user=user)
-        resp = api.post(
-            f"/api/v1/tournaments/{t.id}/teams/{team.id}/regenerate-code/"
-        )
+        resp = api.post(f"/api/v1/tournaments/{t.id}/teams/{team.id}/regenerate-code/")
         assert resp.status_code == status.HTTP_200_OK
         assert resp.json()["access_code"] != old_code
 

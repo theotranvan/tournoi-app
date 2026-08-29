@@ -29,17 +29,19 @@ def enumerate_group_matches(group) -> list[ProvisionalMatch]:
     matches: list[ProvisionalMatch] = []
 
     for home_id, away_id in combinations(team_ids, 2):
-        matches.append(ProvisionalMatch(
-            provisional_id=str(uuid.uuid4()),
-            category_id=cat.id,
-            group_id=group.id,
-            phase="group",
-            team_home_id=home_id,
-            team_away_id=away_id,
-            duration=duration,
-            transition=transition,
-            rest_needed=rest,
-        ))
+        matches.append(
+            ProvisionalMatch(
+                provisional_id=str(uuid.uuid4()),
+                category_id=cat.id,
+                group_id=group.id,
+                phase="group",
+                team_home_id=home_id,
+                team_away_id=away_id,
+                duration=duration,
+                transition=transition,
+                rest_needed=rest,
+            )
+        )
 
     return matches
 
@@ -103,7 +105,7 @@ def enumerate_bracket_matches(
         for h, a in qf_list[:4]:
             matches.append(_ph("quarter", h, a))
         for i in range(2):
-            matches.append(_ph("semi", f"Vainqueur QF{2*i+1}", f"Vainqueur QF{2*i+2}"))
+            matches.append(_ph("semi", f"Vainqueur QF{2 * i + 1}", f"Vainqueur QF{2 * i + 2}"))
         matches.append(_ph("third", "Perdant D1", "Perdant D2"))
         matches.append(_ph("final", "Vainqueur D1", "Vainqueur D2"))
 
@@ -115,15 +117,17 @@ def enumerate_bracket_matches(
             rank = "1er" if i < num_groups else "2e"
             opp_gi = (num_groups - 1 - i) % num_groups
             opp_rank = "2e" if i < num_groups else "1er"
-            matches.append(_ph(
-                "r16",
-                f"{rank} {group_names[gi]}",
-                f"{opp_rank} {group_names[opp_gi]}",
-            ))
+            matches.append(
+                _ph(
+                    "r16",
+                    f"{rank} {group_names[gi]}",
+                    f"{opp_rank} {group_names[opp_gi]}",
+                )
+            )
         for i in range(4):
-            matches.append(_ph("quarter", f"Vainqueur R16-{2*i+1}", f"Vainqueur R16-{2*i+2}"))
+            matches.append(_ph("quarter", f"Vainqueur R16-{2 * i + 1}", f"Vainqueur R16-{2 * i + 2}"))
         for i in range(2):
-            matches.append(_ph("semi", f"Vainqueur QF{2*i+1}", f"Vainqueur QF{2*i+2}"))
+            matches.append(_ph("semi", f"Vainqueur QF{2 * i + 1}", f"Vainqueur QF{2 * i + 2}"))
         matches.append(_ph("third", "Perdant D1", "Perdant D2"))
         matches.append(_ph("final", "Vainqueur D1", "Vainqueur D2"))
 
@@ -137,11 +141,7 @@ def enumerate_tournament_matches(tournament) -> tuple[list[ProvisionalMatch], li
     """
     from apps.teams.models import Group
 
-    groups = (
-        Group.objects.filter(category__tournament=tournament)
-        .prefetch_related("teams")
-        .select_related("category")
-    )
+    groups = Group.objects.filter(category__tournament=tournament).prefetch_related("teams").select_related("category")
 
     matches: list[ProvisionalMatch] = []
     warnings: list[SoftWarning] = []
@@ -152,11 +152,13 @@ def enumerate_tournament_matches(tournament) -> tuple[list[ProvisionalMatch], li
 
         if len(team_ids) < 2:
             if len(team_ids) == 1:
-                warnings.append(SoftWarning(
-                    type="single_team_group",
-                    message=f"Poule {group.name} de {group.category.name} n'a qu'une seule équipe.",
-                    affected_team_id=team_ids[0],
-                ))
+                warnings.append(
+                    SoftWarning(
+                        type="single_team_group",
+                        message=f"Poule {group.name} de {group.category.name} n'a qu'une seule équipe.",
+                        affected_team_id=team_ids[0],
+                    )
+                )
             continue
 
         categories_with_groups.setdefault(group.category_id, []).append(group)
@@ -171,10 +173,7 @@ def enumerate_tournament_matches(tournament) -> tuple[list[ProvisionalMatch], li
         # Apply knockout rest multiplier if mode is 'same_day_rest'
         if getattr(tournament, "phase_separation_mode", "none") == "same_day_rest":
             multiplier = getattr(tournament, "knockout_rest_multiplier", 3)
-            bracket_matches = [
-                dc_replace(m, rest_needed=m.rest_needed * multiplier)
-                for m in bracket_matches
-            ]
+            bracket_matches = [dc_replace(m, rest_needed=m.rest_needed * multiplier) for m in bracket_matches]
 
         matches.extend(bracket_matches)
 

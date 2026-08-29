@@ -197,11 +197,18 @@ jobs:
               cp .deployed_sha .deployed_sha.prev
             fi
 
-            # Pre-deploy backup
+            # Pre-deploy backup — must succeed before we touch the running stack.
+            # pipefail so a pg_dump failure isn't hidden by gzip's exit code.
             mkdir -p backups
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T postgres \
+            BACKUP_FILE="backups/pre_deploy_$(date +%Y%m%d_%H%M%S).sql.gz"
+            if ! ( set -o pipefail; docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T postgres \
               pg_dump -U ${POSTGRES_USER:-kickoff} ${POSTGRES_DB:-kickoff} --no-owner --no-acl \
-              | gzip > backups/pre_deploy_$(date +%Y%m%d_%H%M%S).sql.gz || true
+              | gzip > "$BACKUP_FILE" ); then
+              echo "✗ Pre-deploy backup failed — aborting deploy"
+              exit 1
+            fi
+            # SECURITY TODO: this dump is plaintext in the deploy dir. Encrypt it
+            # (age/gpg) and push it off-VPS with rotation before relying on it.
 
             # Pull SHA-pinned images
             docker compose -f docker-compose.yml -f docker-compose.prod.yml pull backend frontend

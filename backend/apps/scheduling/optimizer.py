@@ -70,10 +70,16 @@ def two_opt_optimization(
                     continue
                 old_score = p1.score + p2.score
                 new_s1 = score_placement(
-                    p1.match, p2.field_id, p2.start_time, context,
+                    p1.match,
+                    p2.field_id,
+                    p2.start_time,
+                    context,
                 )
                 new_s2 = score_placement(
-                    p2.match, p1.field_id, p1.start_time, context,
+                    p2.match,
+                    p1.field_id,
+                    p1.start_time,
+                    context,
                 )
                 if new_s1 is not None and new_s2 is not None:
                     new_score = new_s1 + new_s2

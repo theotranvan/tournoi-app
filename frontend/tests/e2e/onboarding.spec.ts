@@ -2,8 +2,11 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Onboarding flow", () => {
   test.beforeEach(async ({ context }) => {
+    // Each test already gets an isolated context with empty storage. Do NOT
+    // register an init script that clears localStorage on *every* navigation:
+    // it wipes persisted onboarding state on revisits (e.g. the
+    // "revisit goes directly to /start" test), making that test impossible.
     await context.clearCookies();
-    await context.addInitScript(() => localStorage.clear());
   });
 
   test("first visit redirects to /bienvenue and shows slide 1", async ({

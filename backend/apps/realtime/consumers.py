@@ -23,14 +23,25 @@ def _get_tournament(slug):
 
 
 @database_sync_to_async
-def _tournament_slug_for_match(match_id):
-    """Return the tournament slug for a given match id."""
+def _tournament_for_match(match_id):
+    """Return the Tournament for a given match id (or None)."""
     from apps.matches.models import Match
 
     try:
-        return Match.objects.select_related("tournament").get(id=match_id).tournament.slug
+        return Match.objects.select_related("tournament__club").get(id=match_id).tournament
     except Match.DoesNotExist:
         return None
+
+
+@database_sync_to_async
+def _can_access_tournament(tournament, user):
+    """Public tournaments are open; private ones require an owner/member."""
+    if tournament.is_public:
+        return True
+    if isinstance(user, AnonymousUser) or not getattr(user, "is_authenticated", False):
+        return False
+    club = tournament.club
+    return club.owner_id == user.id or club.members.filter(id=user.id).exists()
 
 
 # ─── Tournament Consumer ────────────────────────────────────────────────────
@@ -62,21 +73,22 @@ class TournamentConsumer(AsyncJsonWebsocketConsumer):
 
         user = self.scope.get("user", AnonymousUser())
 
-        # Public tournaments are open; private ones require an authenticated owner/member.
-        if not tournament.is_public:
-            if isinstance(user, AnonymousUser) or not user.is_authenticated:
-                await self.close(code=4003)
-                return
+        # Public tournaments are open; private ones require an owner/member.
+        if not await _can_access_tournament(tournament, user):
+            await self.close(code=4003)
+            return
 
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
 
         # Welcome snapshot
-        await self.send_json({
-            "event": "connected",
-            "tournament": self.slug,
-            "message": f"Connected to tournament {self.slug}",
-        })
+        await self.send_json(
+            {
+                "event": "connected",
+                "tournament": self.slug,
+                "message": f"Connected to tournament {self.slug}",
+            }
+        )
         logger.info("WS connected: tournament=%s user=%s", self.slug, user)
 
     async def disconnect(self, close_code):
@@ -124,21 +136,28 @@ class MatchConsumer(AsyncJsonWebsocketConsumer):
         self.match_id = self.scope["url_route"]["kwargs"]["match_id"]
         self.match_group = f"match_{self.match_id}"
 
-        slug = await _tournament_slug_for_match(self.match_id)
-        if slug is None:
+        tournament = await _tournament_for_match(self.match_id)
+        if tournament is None:
             await self.close(code=4004)
             return
 
-        self.tournament_group = f"tournament_{slug}"
+        user = self.scope.get("user", AnonymousUser())
+        if not await _can_access_tournament(tournament, user):
+            await self.close(code=4003)
+            return
+
+        self.tournament_group = f"tournament_{tournament.slug}"
 
         await self.channel_layer.group_add(self.match_group, self.channel_name)
         await self.channel_layer.group_add(self.tournament_group, self.channel_name)
         await self.accept()
 
-        await self.send_json({
-            "event": "connected",
-            "match_id": self.match_id,
-        })
+        await self.send_json(
+            {
+                "event": "connected",
+                "match_id": self.match_id,
+            }
+        )
 
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.match_group, self.channel_name)
@@ -187,6 +206,13 @@ class TaskProgressConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         self.task_id = self.scope["url_route"]["kwargs"]["task_id"]
         self.group_name = f"task_{self.task_id}"
+
+        # Task progress can reveal generation internals; require authentication.
+        # (Owner-level scoping needs a task->user registry — see follow-up.)
+        user = self.scope.get("user", AnonymousUser())
+        if isinstance(user, AnonymousUser) or not user.is_authenticated:
+            await self.close(code=4003)
+            return
 
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()

@@ -23,7 +23,8 @@ logger = logging.getLogger(__name__)
 def _all_group_matches_finished(category) -> bool:
     """Check if all group-phase matches for a category are finished."""
     group_matches = Match.objects.filter(
-        category=category, phase=Match.Phase.GROUP,
+        category=category,
+        phase=Match.Phase.GROUP,
     )
     if not group_matches.exists():
         return False
@@ -44,6 +45,7 @@ def _get_group_team_by_rank(category, group_name: str, rank: int):
     for entry in standings:
         if entry["rank"] == rank:
             from apps.teams.models import Team
+
             try:
                 return Team.objects.get(pk=entry["team_id"])
             except Team.DoesNotExist:
@@ -100,7 +102,8 @@ def _resolve_semi_result(category, semi_index: int, role: str):
     """Resolve winner/loser of semi-final #semi_index."""
     semis = list(
         Match.objects.filter(
-            category=category, phase=Match.Phase.SEMI,
+            category=category,
+            phase=Match.Phase.SEMI,
         ).order_by("start_time", "created_at")
     )
     if semi_index < 1 or semi_index > len(semis):
@@ -113,7 +116,8 @@ def _resolve_phase_result(category, phase: str, index: int, role: str):
     """Resolve winner/loser of a specific phase match by index."""
     matches = list(
         Match.objects.filter(
-            category=category, phase=phase,
+            category=category,
+            phase=phase,
         ).order_by("start_time", "created_at")
     )
     if index < 1 or index > len(matches):
@@ -156,10 +160,14 @@ def resolve_group_to_knockout(category) -> int:
         return 0
 
     # Find knockout matches with unresolved placeholders
-    knockout_matches = Match.objects.filter(
-        category=category,
-        team_home__isnull=True,
-    ).exclude(phase=Match.Phase.GROUP).select_for_update()
+    knockout_matches = (
+        Match.objects.filter(
+            category=category,
+            team_home__isnull=True,
+        )
+        .exclude(phase=Match.Phase.GROUP)
+        .select_for_update()
+    )
 
     updated = 0
     for match in knockout_matches:
@@ -182,7 +190,9 @@ def resolve_group_to_knockout(category) -> int:
             updated += 1
             logger.info(
                 "Bracket resolved: %s → %s vs %s",
-                match.id, match.display_home, match.display_away,
+                match.id,
+                match.display_home,
+                match.display_away,
             )
 
     return updated
@@ -237,7 +247,9 @@ def advance_knockout_winner(finished_match) -> int:
             updated += 1
             logger.info(
                 "Knockout advanced: %s → %s vs %s",
-                match.id, match.display_home, match.display_away,
+                match.id,
+                match.display_home,
+                match.display_away,
             )
 
     return updated

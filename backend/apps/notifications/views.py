@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.mixins import ListModelMixin
@@ -5,9 +7,6 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
-
-from django.conf import settings
-from django.db.models import Q
 
 from .models import Notification, PushSubscription
 from .serializers import NotificationSerializer, PushSubscriptionSerializer
@@ -38,9 +37,7 @@ class NotificationViewSet(ListModelMixin, GenericViewSet):
             qs = qs.filter(target__in=["admin", "all"])
         # Scope to tournaments the user has access to (via club ownership or membership)
         qs = qs.filter(
-            Q(tournament__club__owner=user)
-            | Q(tournament__club__members=user)
-            | Q(tournament__isnull=True)
+            Q(tournament__club__owner=user) | Q(tournament__club__members=user) | Q(tournament__isnull=True)
         ).distinct()
         # Optional tournament filter
         tournament_id = self.request.query_params.get("tournament")

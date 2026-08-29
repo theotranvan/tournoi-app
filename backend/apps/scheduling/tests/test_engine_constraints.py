@@ -28,7 +28,12 @@ class TestHardConstraintFinalPlacement:
 
     def test_final_on_required_field_after_time(self, organizer):
         tournament = make_tournament(
-            organizer, n_categories=1, teams_per_cat=4, n_fields=2, n_days=1, n_groups=2,
+            organizer,
+            n_categories=1,
+            teams_per_cat=4,
+            n_fields=2,
+            n_days=1,
+            n_groups=2,
         )
 
         field1 = Field.objects.filter(tournament=tournament, name="Terrain 1").first()
@@ -92,9 +97,7 @@ class TestCategoryDayConstraint:
         # Check all U10 matches
         u10_matches = Match.objects.filter(tournament=tournament, category=cat_u10)
         for m in u10_matches:
-            assert m.start_time.date().isoformat() == day1, (
-                f"U10 match on wrong day: {m.start_time.date()}"
-            )
+            assert m.start_time.date().isoformat() == day1, f"U10 match on wrong day: {m.start_time.date()}"
             end_time = m.start_time + timedelta(minutes=m.duration_minutes)
             assert end_time.hour <= 12 or (end_time.hour == 12 and end_time.minute == 0), (
                 f"U10 match ends after 12:00: {end_time.time()}"
@@ -126,10 +129,7 @@ class TestImpossibleConstraintConflict:
 
         # 6 teams → C(6,2) = 15 matches needed
         cat = CategoryFactory(tournament=tournament, name="U12")
-        teams = [
-            TeamFactory(tournament=tournament, category=cat, name=f"T{i}")
-            for i in range(6)
-        ]
+        teams = [TeamFactory(tournament=tournament, category=cat, name=f"T{i}") for i in range(6)]
         group = Group.objects.create(category=cat, name="A", display_order=0)
         group.teams.set(teams)
 
@@ -157,12 +157,8 @@ class TestDeterminism:
         assert report1.placed_count == report2.placed_count
         assert report1.score == report2.score
 
-        starts1 = sorted(
-            (p.field_id, p.start_time) for p in engine1._context.placements
-        )
-        starts2 = sorted(
-            (p.field_id, p.start_time) for p in engine2._context.placements
-        )
+        starts1 = sorted((p.field_id, p.start_time) for p in engine1._context.placements)
+        starts2 = sorted((p.field_id, p.start_time) for p in engine2._context.placements)
         assert starts1 == starts2
 
 
@@ -241,23 +237,20 @@ class TestPhaseSeparation:
         from apps.matches.models import Match
 
         group_matches = Match.objects.filter(
-            tournament=tournament, phase="group",
+            tournament=tournament,
+            phase="group",
         )
         knockout_matches = Match.objects.filter(
             tournament=tournament,
         ).exclude(phase="group")
 
         if group_matches.exists() and knockout_matches.exists():
-            last_group_end = max(
-                m.start_time + timedelta(minutes=m.duration_minutes)
-                for m in group_matches
-            )
+            last_group_end = max(m.start_time + timedelta(minutes=m.duration_minutes) for m in group_matches)
             first_knockout_start = min(m.start_time for m in knockout_matches)
             gap_minutes = (first_knockout_start - last_group_end).total_seconds() / 60
             # Gap should be at least 3x rest (60min) - allow 5min tolerance
             assert gap_minutes >= 55, (
-                f"Knockout starts only {gap_minutes:.0f}min after groups "
-                f"(expected >= 60min with multiplier 3)"
+                f"Knockout starts only {gap_minutes:.0f}min after groups (expected >= 60min with multiplier 3)"
             )
 
     def test_next_day_mode_forces_knockout_on_day_2(self, organizer):
@@ -289,8 +282,7 @@ class TestPhaseSeparation:
         last_day = tournament.end_date
         for m in knockout_matches:
             assert m.start_time.date() == last_day, (
-                f"Knockout match {m.phase} on {m.start_time.date()}, "
-                f"expected on {last_day}"
+                f"Knockout match {m.phase} on {m.start_time.date()}, expected on {last_day}"
             )
 
     def test_next_day_single_day_warning(self, organizer):

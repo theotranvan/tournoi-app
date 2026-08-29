@@ -1,26 +1,36 @@
+import hashlib
 import logging
 
 import requests
 from django.core.cache import cache
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
 
 FFF_API_URL = "https://api-dofa.fff.fr/api/clubs"
 CACHE_TTL = 60 * 60  # 1 hour
+MAX_QUERY_LEN = 60
+
+
+class FFFSearchThrottle(AnonRateThrottle):
+    scope = "fff_search"
+    rate = "20/minute"
 
 
 class ClubSearchFFFView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [FFFSearchThrottle]
 
     def get(self, request):
-        q = request.query_params.get("q", "").strip()
+        q = request.query_params.get("q", "").strip()[:MAX_QUERY_LEN]
         if len(q) < 2:
             return Response([])
 
-        cache_key = f"fff_club_{q.lower()}"
+        # Hash the (untrusted) query so it can't shape unbounded cache keys.
+        cache_key = f"fff_club_{hashlib.sha256(q.lower().encode()).hexdigest()}"
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached)

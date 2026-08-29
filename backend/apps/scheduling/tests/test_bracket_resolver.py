@@ -11,12 +11,11 @@ from apps.scheduling.bracket_resolver import (
     resolve_brackets,
     resolve_group_to_knockout,
 )
-from apps.teams.models import Group, Team
+from apps.teams.models import Group
 from tests.factories import (
     CategoryFactory,
     ClubFactory,
     FieldFactory,
-    MatchFactory,
     TeamFactory,
     TournamentFactory,
     UserFactory,
@@ -261,7 +260,8 @@ class TestAdvanceKnockoutWinner:
     def test_group_phase_match_returns_zero(self, tournament, category, two_groups):
         """advance_knockout_winner should do nothing for group phase matches."""
         group_match = Match.objects.filter(
-            category=category, phase=Match.Phase.GROUP,
+            category=category,
+            phase=Match.Phase.GROUP,
         ).first()
         updated = advance_knockout_winner(group_match)
         assert updated == 0

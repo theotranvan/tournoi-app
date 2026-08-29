@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from apps.clubs.models import Club
 from apps.core import BusinessRuleViolation, InvalidStateTransition
+from apps.core.mixins import TournamentScopedMixin
 from apps.core.permissions import IsOrganizer
 from apps.subscriptions.plans import (
     FREE_LIMITS,
@@ -65,9 +66,7 @@ class TournamentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        qs = Tournament.objects.filter(
-            db_models.Q(club__owner=user) | db_models.Q(club__members=user)
-        ).distinct()
+        qs = Tournament.objects.filter(db_models.Q(club__owner=user) | db_models.Q(club__members=user)).distinct()
         qs = _annotate_tournament_qs(qs).order_by("-start_date")
         # Filtres optionnels
         club = self.request.query_params.get("club")
@@ -101,16 +100,12 @@ class TournamentViewSet(viewsets.ModelViewSet):
             Tournament.Status.FINISHED,
             Tournament.Status.ARCHIVED,
         ):
-            raise InvalidStateTransition(
-                "Impossible de modifier un tournoi en cours, terminé ou archivé."
-            )
+            raise InvalidStateTransition("Impossible de modifier un tournoi en cours, terminé ou archivé.")
         serializer.save()
 
     def perform_destroy(self, instance):
         if instance.matches.filter(status="finished").exists():
-            raise BusinessRuleViolation(
-                "Impossible de supprimer un tournoi avec des matchs joués."
-            )
+            raise BusinessRuleViolation("Impossible de supprimer un tournoi avec des matchs joués.")
         instance.status = Tournament.Status.ARCHIVED
         instance.save(update_fields=["status", "updated_at"])
 
@@ -118,9 +113,7 @@ class TournamentViewSet(viewsets.ModelViewSet):
     def publish(self, request, id=None):
         tournament = self.get_object()
         if tournament.status != Tournament.Status.DRAFT:
-            raise InvalidStateTransition(
-                "Seul un tournoi en brouillon peut être publié."
-            )
+            raise InvalidStateTransition("Seul un tournoi en brouillon peut être publié.")
         errors = []
         if tournament.categories.count() == 0:
             errors.append("Au moins une catégorie est requise.")
@@ -139,9 +132,7 @@ class TournamentViewSet(viewsets.ModelViewSet):
     def start(self, request, id=None):
         tournament = self.get_object()
         if tournament.status != Tournament.Status.PUBLISHED:
-            raise InvalidStateTransition(
-                "Seul un tournoi publié peut être démarré."
-            )
+            raise InvalidStateTransition("Seul un tournoi publié peut être démarré.")
         tournament.status = Tournament.Status.LIVE
         tournament.save(update_fields=["status", "updated_at"])
         return Response(self._detail(tournament))
@@ -150,9 +141,7 @@ class TournamentViewSet(viewsets.ModelViewSet):
     def finish(self, request, id=None):
         tournament = self.get_object()
         if tournament.status != Tournament.Status.LIVE:
-            raise InvalidStateTransition(
-                "Seul un tournoi en cours peut être terminé."
-            )
+            raise InvalidStateTransition("Seul un tournoi en cours peut être terminé.")
         tournament.status = Tournament.Status.FINISHED
         tournament.save(update_fields=["status", "updated_at"])
         return Response(self._detail(tournament))
@@ -205,15 +194,10 @@ class TournamentViewSet(viewsets.ModelViewSet):
         return TournamentDetailSerializer(qs.first()).data
 
 
-class CategoryViewSet(viewsets.ModelViewSet):
+class CategoryViewSet(TournamentScopedMixin, viewsets.ModelViewSet):
     serializer_class = CategorySerializer
     permission_classes = [IsAuthenticated, IsOrganizer]
-
-    def get_queryset(self):
-        tournament_id = self.kwargs.get("tournament_id")
-        if tournament_id:
-            return Category.objects.filter(tournament_id=tournament_id)
-        return Category.objects.none()
+    queryset = Category.objects.all()
 
     def perform_create(self, serializer):
         tournament = _get_tournament_for_nested(self.kwargs, self.request.user)
@@ -226,19 +210,13 @@ class CategoryViewSet(viewsets.ModelViewSet):
         try:
             serializer.save(tournament=tournament)
         except IntegrityError:
-            raise ValidationError(
-                {"name": "Une catégorie avec ce nom existe déjà dans ce tournoi."}
-            )
+            raise ValidationError({"name": "Une catégorie avec ce nom existe déjà dans ce tournoi."})
 
     def perform_destroy(self, instance):
         if instance.teams.exists():
-            raise BusinessRuleViolation(
-                "Impossible de supprimer une catégorie qui contient des équipes."
-            )
+            raise BusinessRuleViolation("Impossible de supprimer une catégorie qui contient des équipes.")
         if instance.matches.exists():
-            raise BusinessRuleViolation(
-                "Impossible de supprimer une catégorie qui contient des matchs."
-            )
+            raise BusinessRuleViolation("Impossible de supprimer une catégorie qui contient des matchs.")
         instance.delete()
 
     @action(detail=False, methods=["post"], url_path="bulk-create")
@@ -258,7 +236,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
         for i, cat_data in enumerate(serializer.validated_data["categories"]):
             cat = Category.objects.create(
                 tournament=tournament,
-                name=cat_data.get("name", f"Cat {i+1}"),
+                name=cat_data.get("name", f"Cat {i + 1}"),
                 display_order=cat_data.get("display_order", i),
                 color=cat_data.get("color", "#3b82f6"),
                 players_per_team=cat_data.get("players_per_team", 7),
@@ -270,15 +248,10 @@ class CategoryViewSet(viewsets.ModelViewSet):
         )
 
 
-class FieldViewSet(viewsets.ModelViewSet):
+class FieldViewSet(TournamentScopedMixin, viewsets.ModelViewSet):
     serializer_class = FieldSerializer
     permission_classes = [IsAuthenticated, IsOrganizer]
-
-    def get_queryset(self):
-        tournament_id = self.kwargs.get("tournament_id")
-        if tournament_id:
-            return Field.objects.filter(tournament_id=tournament_id)
-        return Field.objects.none()
+    queryset = Field.objects.all()
 
     def perform_create(self, serializer):
         tournament = _get_tournament_for_nested(self.kwargs, self.request.user)
@@ -308,35 +281,23 @@ class FieldViewSet(viewsets.ModelViewSet):
                 except ValueError:
                     continue
                 if slot_date < tournament.start_date or slot_date > tournament.end_date:
-                    raise ValidationError(
-                        {"availability": f"La date {date_str} est hors de la période du tournoi."}
-                    )
+                    raise ValidationError({"availability": f"La date {date_str} est hors de la période du tournoi."})
 
 
-class SchedulingConstraintViewSet(viewsets.ModelViewSet):
+class SchedulingConstraintViewSet(TournamentScopedMixin, viewsets.ModelViewSet):
     serializer_class = SchedulingConstraintSerializer
     permission_classes = [IsAuthenticated, IsOrganizer]
-
-    def get_queryset(self):
-        tournament_id = self.kwargs.get("tournament_id")
-        if tournament_id:
-            return SchedulingConstraint.objects.filter(tournament_id=tournament_id)
-        return SchedulingConstraint.objects.none()
+    queryset = SchedulingConstraint.objects.all()
 
     def perform_create(self, serializer):
         tournament = _get_tournament_for_nested(self.kwargs, self.request.user)
         serializer.save(tournament=tournament)
 
 
-class DayViewSet(viewsets.ModelViewSet):
+class DayViewSet(TournamentScopedMixin, viewsets.ModelViewSet):
     serializer_class = DaySerializer
     permission_classes = [IsAuthenticated, IsOrganizer]
-
-    def get_queryset(self):
-        tournament_id = self.kwargs.get("tournament_id")
-        if tournament_id:
-            return Day.objects.filter(tournament_id=tournament_id).order_by("order", "date")
-        return Day.objects.none()
+    queryset = Day.objects.order_by("order", "date")
 
     def perform_create(self, serializer):
         tournament = _get_tournament_for_nested(self.kwargs, self.request.user)

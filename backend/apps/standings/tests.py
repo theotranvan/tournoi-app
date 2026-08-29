@@ -8,7 +8,6 @@ from apps.accounts.models import User
 from apps.clubs.models import Club
 from apps.matches.models import Match
 from apps.standings.services import (
-    CACHE_TTL,
     _cache_key,
     compute_group_standings,
     invalidate_category_standings,
@@ -169,14 +168,16 @@ class TestFormTracking:
     def test_form_shows_last_5_results(self, tournament, category, group_with_teams):
         grp, teams = group_with_teams
         # Play 6 matches for Alpha
-        for i, (opp, sh, sa) in enumerate([
-            (teams[1], 1, 0),  # W
-            (teams[2], 0, 0),  # D
-            (teams[3], 0, 1),  # L
-            (teams[1], 2, 0),  # W
-            (teams[2], 3, 0),  # W
-            (teams[3], 1, 1),  # D
-        ]):
+        for i, (opp, sh, sa) in enumerate(
+            [
+                (teams[1], 1, 0),  # W
+                (teams[2], 0, 0),  # D
+                (teams[3], 0, 1),  # L
+                (teams[1], 2, 0),  # W
+                (teams[2], 3, 0),  # W
+                (teams[3], 1, 1),  # D
+            ]
+        ):
             _make_finished_match(tournament, category, grp, teams[0], opp, sh, sa, hour=8 + i)
 
         standings = compute_group_standings(grp.id, bypass_cache=True)
@@ -304,12 +305,14 @@ class TestStandingsViewsAPI:
 
     def test_category_standings_view_requires_auth(self, category):
         from rest_framework.test import APIClient
+
         api = APIClient()
         resp = api.get(f"/api/v1/categories/{category.id}/standings/")
         assert resp.status_code == 401
 
     def test_category_standings_view_returns_groups(self, organizer, tournament, category, group_with_teams):
         from rest_framework.test import APIClient
+
         grp, teams = group_with_teams
         api = APIClient()
         api.force_authenticate(user=organizer)
@@ -321,6 +324,7 @@ class TestStandingsViewsAPI:
 
     def test_group_standings_view_returns_standings(self, organizer, tournament, category, group_with_teams):
         from rest_framework.test import APIClient
+
         grp, teams = group_with_teams
         _make_finished_match(tournament, category, grp, teams[0], teams[1], 2, 0)
         api = APIClient()
@@ -335,6 +339,7 @@ class TestStandingsViewsAPI:
 
     def test_standings_refresh_view_recalculates(self, organizer, tournament, category, group_with_teams):
         from rest_framework.test import APIClient
+
         grp, teams = group_with_teams
         _make_finished_match(tournament, category, grp, teams[0], teams[1], 1, 0)
         # Warm cache

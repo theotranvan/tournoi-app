@@ -29,6 +29,7 @@ def _no_password_validators(settings):
 def _clear_throttle_cache():
     """Reset DRF throttle cache between tests so rate limits don't leak."""
     from django.core.cache import cache
+
     cache.clear()
 
 
@@ -42,16 +43,20 @@ def _make_user(username, password="testpass123", **kwargs):
 
 # ── Register ─────────────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestRegister:
     def test_register_success(self, api):
-        resp = api.post(REGISTER_URL, {
-            "username": "alice",
-            "email": "alice@example.com",
-            "password": "testpass123",
-            "first_name": "Alice",
-            "last_name": "Dupont",
-        })
+        resp = api.post(
+            REGISTER_URL,
+            {
+                "username": "alice",
+                "email": "alice@example.com",
+                "password": "testpass123",
+                "first_name": "Alice",
+                "last_name": "Dupont",
+            },
+        )
         assert resp.status_code == status.HTTP_201_CREATED
         data = resp.json()
         assert "access" in data
@@ -61,57 +66,76 @@ class TestRegister:
 
     def test_register_duplicate_username(self, api):
         UserFactory(username="bob")
-        resp = api.post(REGISTER_URL, {
-            "username": "bob",
-            "password": "testpass123",
-        })
+        resp = api.post(
+            REGISTER_URL,
+            {
+                "username": "bob",
+                "password": "testpass123",
+            },
+        )
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_register_short_password(self, api):
-        resp = api.post(REGISTER_URL, {
-            "username": "charlie",
-            "password": "short",
-        })
+        resp = api.post(
+            REGISTER_URL,
+            {
+                "username": "charlie",
+                "password": "short",
+            },
+        )
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_register_duplicate_email_rejected(self, api):
         UserFactory(username="user1", email="dup@test.com")
-        resp = api.post(REGISTER_URL, {
-            "username": "user2",
-            "email": "dup@test.com",
-            "password": "testpass123",
-        })
+        resp = api.post(
+            REGISTER_URL,
+            {
+                "username": "user2",
+                "email": "dup@test.com",
+                "password": "testpass123",
+            },
+        )
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_register_duplicate_email_case_insensitive(self, api):
         UserFactory(username="user1", email="dup@test.com")
-        resp = api.post(REGISTER_URL, {
-            "username": "user2",
-            "email": "DUP@TEST.COM",
-            "password": "testpass123",
-        })
+        resp = api.post(
+            REGISTER_URL,
+            {
+                "username": "user2",
+                "email": "DUP@TEST.COM",
+                "password": "testpass123",
+            },
+        )
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_register_duplicate_username_case_insensitive(self, api):
         UserFactory(username="alice")
-        resp = api.post(REGISTER_URL, {
-            "username": "ALICE",
-            "email": "new@test.com",
-            "password": "testpass123",
-        })
+        resp = api.post(
+            REGISTER_URL,
+            {
+                "username": "ALICE",
+                "email": "new@test.com",
+                "password": "testpass123",
+            },
+        )
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
 
 # ── Login ────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestLogin:
     def test_login_success(self, api):
         _make_user("dave", "pass1234")
-        resp = api.post(LOGIN_URL, {
-            "username": "dave",
-            "password": "pass1234",
-        })
+        resp = api.post(
+            LOGIN_URL,
+            {
+                "username": "dave",
+                "password": "pass1234",
+            },
+        )
         assert resp.status_code == status.HTTP_200_OK
         data = resp.json()
         assert "access" in data
@@ -120,22 +144,29 @@ class TestLogin:
 
     def test_login_invalid_password(self, api):
         _make_user("eve", "correct_pass")
-        resp = api.post(LOGIN_URL, {
-            "username": "eve",
-            "password": "wrong_pass",
-        })
+        resp = api.post(
+            LOGIN_URL,
+            {
+                "username": "eve",
+                "password": "wrong_pass",
+            },
+        )
         assert resp.status_code == status.HTTP_401_UNAUTHORIZED
         assert resp.json()["error"] == "auth_required"
 
     def test_login_nonexistent_user(self, api):
-        resp = api.post(LOGIN_URL, {
-            "username": "ghost",
-            "password": "doesntmatter",
-        })
+        resp = api.post(
+            LOGIN_URL,
+            {
+                "username": "ghost",
+                "password": "doesntmatter",
+            },
+        )
         assert resp.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 # ── Token Refresh ────────────────────────────────────────────────────────
+
 
 @pytest.mark.django_db
 class TestRefresh:
@@ -155,6 +186,7 @@ class TestRefresh:
 
 # ── Me ───────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestMe:
     def test_me_authenticated(self, api):
@@ -170,6 +202,7 @@ class TestMe:
 
 
 # ── Team Access ──────────────────────────────────────────────────────────
+
 
 @pytest.mark.django_db
 class TestTeamAccess:
@@ -207,6 +240,7 @@ class TestTeamAccess:
 
 # ── Rate Limiting ────────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestRateLimiting:
     def test_login_rate_limited(self, api):
@@ -220,17 +254,20 @@ class TestRateLimiting:
 
 # ── Permissions (unit-level) ─────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestPermissions:
     def test_team_anonymous_user_properties(self):
         from apps.accounts.authentication import TeamAnonymousUser
 
-        user = TeamAnonymousUser({
-            "team_id": 42,
-            "tournament_id": "abc-123",
-            "category_id": 7,
-            "team_name": "FC Test",
-        })
+        user = TeamAnonymousUser(
+            {
+                "team_id": 42,
+                "tournament_id": "abc-123",
+                "category_id": 7,
+                "team_name": "FC Test",
+            }
+        )
         assert user.is_authenticated is True
         assert user.role == "team"
         assert user.team_id == 42
@@ -242,11 +279,13 @@ class TestPermissions:
         from apps.accounts.authentication import TeamAnonymousUser
         from apps.accounts.permissions import IsOrganizer
 
-        team_user = TeamAnonymousUser({
-            "team_id": 1,
-            "tournament_id": "t1",
-            "category_id": 1,
-        })
+        team_user = TeamAnonymousUser(
+            {
+                "team_id": 1,
+                "tournament_id": "t1",
+                "category_id": 1,
+            }
+        )
 
         class FakeRequest:
             user = team_user

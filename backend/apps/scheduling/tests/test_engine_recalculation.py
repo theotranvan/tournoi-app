@@ -19,7 +19,12 @@ class TestRecalculation:
 
     def test_locked_match_stays_after_recalculation(self, organizer):
         tournament = make_tournament(
-            organizer, n_categories=1, teams_per_cat=4, n_fields=2, n_days=1, n_groups=2,
+            organizer,
+            n_categories=1,
+            teams_per_cat=4,
+            n_fields=2,
+            n_days=1,
+            n_groups=2,
         )
 
         # Initial generation
@@ -49,7 +54,12 @@ class TestRecalculation:
 
     def test_non_locked_matches_get_rescheduled(self, organizer):
         tournament = make_tournament(
-            organizer, n_categories=1, teams_per_cat=4, n_fields=2, n_days=1, n_groups=2,
+            organizer,
+            n_categories=1,
+            teams_per_cat=4,
+            n_fields=2,
+            n_days=1,
+            n_groups=2,
         )
 
         engine = SchedulingEngine(tournament, strategy="balanced")
@@ -71,7 +81,12 @@ class TestRecalculation:
 
     def test_constraint_added_then_recalculate(self, organizer):
         tournament = make_tournament(
-            organizer, n_categories=1, teams_per_cat=4, n_fields=2, n_days=1, n_groups=2,
+            organizer,
+            n_categories=1,
+            teams_per_cat=4,
+            n_fields=2,
+            n_days=1,
+            n_groups=2,
         )
 
         # Initial generation
@@ -99,10 +114,7 @@ class TestRecalculation:
         )
 
         # Recalculate
-        all_ids = [
-            str(m.id)
-            for m in Match.objects.filter(tournament=tournament, is_locked=False)
-        ]
+        all_ids = [str(m.id) for m in Match.objects.filter(tournament=tournament, is_locked=False)]
         if all_ids:
             report = SchedulingEngine.reschedule(tournament, all_ids)
             assert report.placed_count > 0
@@ -122,7 +134,12 @@ class TestAtomicCommit:
     def test_commit_is_atomic_on_error(self, organizer):
         """If bulk_create fails after the DELETE, all original matches survive (rollback)."""
         tournament = make_tournament(
-            organizer, n_categories=1, teams_per_cat=4, n_fields=2, n_days=1, n_groups=1,
+            organizer,
+            n_categories=1,
+            teams_per_cat=4,
+            n_fields=2,
+            n_days=1,
+            n_groups=1,
         )
 
         engine = SchedulingEngine(tournament, strategy="balanced")
@@ -132,17 +149,13 @@ class TestAtomicCommit:
         original_count = Match.objects.filter(tournament=tournament).count()
         assert original_count > 0
 
-        original_ids = set(
-            Match.objects.filter(tournament=tournament).values_list("id", flat=True)
-        )
+        original_ids = set(Match.objects.filter(tournament=tournament).values_list("id", flat=True))
 
         # Re-generate so engine has placements to commit
         engine2 = SchedulingEngine(tournament, strategy="balanced")
         engine2.generate()
 
         # Patch bulk_create to raise IntegrityError after DELETE has happened
-        real_bulk_create = Match.objects.bulk_create.__func__  # type: ignore[attr-defined]
-
         def _boom(manager_self, objs, *args, **kwargs):
             raise IntegrityError("simulated DB error")
 
@@ -154,9 +167,7 @@ class TestAtomicCommit:
         surviving_count = Match.objects.filter(tournament=tournament).count()
         assert surviving_count == original_count
 
-        surviving_ids = set(
-            Match.objects.filter(tournament=tournament).values_list("id", flat=True)
-        )
+        surviving_ids = set(Match.objects.filter(tournament=tournament).values_list("id", flat=True))
         assert surviving_ids == original_ids
 
 
@@ -166,7 +177,12 @@ class TestConcurrentGeneration:
 
     def test_concurrent_generates_dont_corrupt(self, organizer):
         tournament = make_tournament(
-            organizer, n_categories=1, teams_per_cat=4, n_fields=2, n_days=1, n_groups=1,
+            organizer,
+            n_categories=1,
+            teams_per_cat=4,
+            n_fields=2,
+            n_days=1,
+            n_groups=1,
         )
 
         # First generation

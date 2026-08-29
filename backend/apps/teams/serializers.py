@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.teams.models import Group, Team
+from apps.tournaments.models import Category
 
 
 class TeamSerializer(serializers.ModelSerializer):
@@ -48,14 +49,19 @@ class TeamAdminSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("id", "tournament", "access_code", "created_at", "updated_at")
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # N1: only accept a category from the request's own tournament.
+        tournament = self.context.get("tournament")
+        if tournament is not None and "category" in self.fields:
+            self.fields["category"].queryset = Category.objects.filter(tournament=tournament)
+
     def get_qr_code_url(self, obj):
         request = self.context.get("request")
         if request is None:
             return None
         tournament_id = obj.tournament_id
-        return request.build_absolute_uri(
-            f"/api/v1/tournaments/{tournament_id}/teams/{obj.pk}/qr-code/"
-        )
+        return request.build_absolute_uri(f"/api/v1/tournaments/{tournament_id}/teams/{obj.pk}/qr-code/")
 
 
 class TeamBriefSerializer(serializers.ModelSerializer):
@@ -92,6 +98,13 @@ class GroupSerializer(serializers.ModelSerializer):
         fields = ("id", "category", "name", "display_order", "team_ids")
         read_only_fields = ("id", "category")
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # N1: only accept teams from the request's own tournament.
+        tournament = self.context.get("tournament")
+        if tournament is not None and "team_ids" in self.fields:
+            self.fields["team_ids"].child_relation.queryset = Team.objects.filter(tournament=tournament)
+
 
 class GroupDetailSerializer(serializers.ModelSerializer):
     teams = TeamBriefSerializer(many=True, read_only=True)
@@ -104,6 +117,4 @@ class GroupDetailSerializer(serializers.ModelSerializer):
 
 class GenerateGroupsSerializer(serializers.Serializer):
     num_groups = serializers.IntegerField(min_value=1, max_value=20)
-    strategy = serializers.ChoiceField(
-        choices=["balanced"], default="balanced"
-    )
+    strategy = serializers.ChoiceField(choices=["balanced"], default="balanced")

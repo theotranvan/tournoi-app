@@ -72,7 +72,7 @@ def make_tournament(
     for i in range(n_fields):
         FieldFactory(
             tournament=tournament,
-            name=f"Terrain {i+1}",
+            name=f"Terrain {i + 1}",
             availability=availability,
         )
 
@@ -119,7 +119,12 @@ def small_tournament_2_groups(organizer):
 def medium_tournament(organizer):
     """3 categories, 24 teams (8 per cat, 2 groups each), 3 fields, 1 day."""
     return make_tournament(
-        organizer, n_categories=3, teams_per_cat=8, n_fields=3, n_days=1, n_groups=2,
+        organizer,
+        n_categories=3,
+        teams_per_cat=8,
+        n_fields=3,
+        n_days=1,
+        n_groups=2,
     )
 
 
@@ -127,5 +132,10 @@ def medium_tournament(organizer):
 def large_tournament(organizer):
     """5 categories, 80 teams (16 per cat, 4 groups each), 6 fields, 2 days."""
     return make_tournament(
-        organizer, n_categories=5, teams_per_cat=16, n_fields=6, n_days=2, n_groups=4,
+        organizer,
+        n_categories=5,
+        teams_per_cat=16,
+        n_fields=6,
+        n_days=2,
+        n_groups=4,
     )

@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from apps.matches.models import Goal, Match
 from apps.teams.serializers import TeamBriefSerializer
+from apps.tournaments.models import Field
 
 
 class GoalSerializer(serializers.ModelSerializer):
@@ -100,6 +101,13 @@ class MatchUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Match
         fields = ("field", "start_time", "duration_minutes", "notes", "status")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # N1: a match may only be moved to a field of its own tournament.
+        tournament = self.context.get("tournament")
+        if tournament is not None and "field" in self.fields:
+            self.fields["field"].queryset = Field.objects.filter(tournament=tournament)
 
 
 class ScoreInputSerializer(serializers.Serializer):

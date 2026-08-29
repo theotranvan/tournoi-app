@@ -67,15 +67,17 @@ def gen_round_robin(team_ids: list, group, category, tournament) -> list[dict]:
             a = cur[n - 1 - i]
             if h is None or a is None:
                 continue  # BYE match
-            matches.append({
-                "category": category,
-                "group": group,
-                "phase": "group",
-                "team_home_id": h,
-                "team_away_id": a,
-                "duration": dur,
-                "round": r,
-            })
+            matches.append(
+                {
+                    "category": category,
+                    "group": group,
+                    "phase": "group",
+                    "team_home_id": h,
+                    "team_away_id": a,
+                    "duration": dur,
+                    "round": r,
+                }
+            )
         # Rotate: move last element to front
         last = rot[-1]
         rot = [last] + rot[:-1]
@@ -190,10 +192,10 @@ def auto_generate_pools(category) -> dict:
         for team in club_teams:
             # Find pool without a team from same club
             avail = [
-                (i, p) for i, p in enumerate(pools)
+                (i, p)
+                for i, p in enumerate(pools)
                 if not any(
-                    (t.name.rsplit(" ", 1)[0] if hasattr(t, "name") else "").strip().lower() == club_key
-                    for t in p
+                    (t.name.rsplit(" ", 1)[0] if hasattr(t, "name") else "").strip().lower() == club_key for t in p
                 )
             ]
             avail.sort(key=lambda x: len(x[1]))
@@ -347,8 +349,16 @@ def _schedule_across_days(
                     m = c["m"]
                     cat = m["category"]
 
-                    min_rest = cat.min_rest_matches if cat.min_rest_matches is not None else tournament.default_min_rest_matches
-                    max_consec = cat.max_consecutive_matches if cat.max_consecutive_matches is not None else tournament.max_consecutive_matches
+                    min_rest = (
+                        cat.min_rest_matches
+                        if cat.min_rest_matches is not None
+                        else tournament.default_min_rest_matches
+                    )
+                    max_consec = (
+                        cat.max_consecutive_matches
+                        if cat.max_consecutive_matches is not None
+                        else tournament.max_consecutive_matches
+                    )
 
                     h_id = m["team_home_id"]
                     a_id = m["team_away_id"]
@@ -430,18 +440,23 @@ def _schedule_across_days(
                     team_consec[tid] = 0
 
             # Advance time
-            max_dur = max(
-                (sm["duration"] for sm in slot_matches),
-                default=tournament.default_match_duration,
-            ) if slot_matches else tournament.default_match_duration
+            max_dur = (
+                max(
+                    (sm["duration"] for sm in slot_matches),
+                    default=tournament.default_match_duration,
+                )
+                if slot_matches
+                else tournament.default_match_duration
+            )
 
-            max_chg = max(
-                (
-                    sm["category"].effective_transition_time
-                    for sm in slot_matches
-                ),
-                default=tournament.default_transition_time,
-            ) if slot_matches else tournament.default_transition_time
+            max_chg = (
+                max(
+                    (sm["category"].effective_transition_time for sm in slot_matches),
+                    default=tournament.default_transition_time,
+                )
+                if slot_matches
+                else tournament.default_transition_time
+            )
 
             cur_time += _round_to_5(max_dur) + max_chg
             global_slot += 1
@@ -466,19 +481,30 @@ def calculate_feasibility(tournament) -> dict:
     # If no explicit Days, create virtual days from tournament date range
     if not days:
         from datetime import timedelta as td
+
         current = tournament.start_date
         virtual_days = []
         order = 0
         while current <= tournament.end_date:
-            virtual_days.append(type("VDay", (), {
-                "id": None, "date": current, "label": str(current),
-                "start_time": "08:00", "end_time": "19:00",
-                "lunch_start": "12:00", "lunch_end": "13:00",
-                "order": order,
-                "playable_minutes": lambda self=None, st="08:00", et="19:00", ls="12:00", le="13:00": (
-                    _parse_hhmm(et) - _parse_hhmm(st) - (_parse_hhmm(le) - _parse_hhmm(ls))
-                ),
-            })())
+            virtual_days.append(
+                type(
+                    "VDay",
+                    (),
+                    {
+                        "id": None,
+                        "date": current,
+                        "label": str(current),
+                        "start_time": "08:00",
+                        "end_time": "19:00",
+                        "lunch_start": "12:00",
+                        "lunch_end": "13:00",
+                        "order": order,
+                        "playable_minutes": lambda self=None, st="08:00", et="19:00", ls="12:00", le="13:00": (
+                            _parse_hhmm(et) - _parse_hhmm(st) - (_parse_hhmm(le) - _parse_hhmm(ls))
+                        ),
+                    },
+                )()
+            )
             current += td(days=1)
             order += 1
         days = virtual_days
@@ -510,7 +536,7 @@ def calculate_feasibility(tournament) -> dict:
         assigned = False
         if cat.day_id:
             for d in days:
-                if hasattr(d, 'id') and d.id == cat.day_id:
+                if hasattr(d, "id") and d.id == cat.day_id:
                     cats_by_day[id(d)].append(cat.id)
                     assigned = True
                     break
@@ -526,7 +552,11 @@ def calculate_feasibility(tournament) -> dict:
     total_slots = 0
 
     for day in days:
-        playable = day.playable_minutes() if hasattr(day, 'playable_minutes') and callable(day.playable_minutes) else _calc_playable(day)
+        playable = (
+            day.playable_minutes()
+            if hasattr(day, "playable_minutes") and callable(day.playable_minutes)
+            else _calc_playable(day)
+        )
         day_cat_ids = cats_by_day.get(id(day), [])
         dcd = [cd for cd in cat_details if cd["cat"].id in day_cat_ids]
 
@@ -542,14 +572,16 @@ def calculate_feasibility(tournament) -> dict:
         ps = spd * len(fields)
         total_slots += ps
 
-        day_details.append({
-            "day": getattr(day, "label", str(getattr(day, "date", ""))),
-            "playable_min": playable,
-            "slots_per_day": spd,
-            "parallel_slots": ps,
-            "day_match_count": day_mc,
-            "feasible": ps >= day_mc,
-        })
+        day_details.append(
+            {
+                "day": getattr(day, "label", str(getattr(day, "date", ""))),
+                "playable_min": playable,
+                "slots_per_day": spd,
+                "parallel_slots": ps,
+                "day_match_count": day_mc,
+                "feasible": ps >= day_mc,
+            }
+        )
 
     feasible = len(days) > 0 and len(fields) > 0 and all(d["feasible"] for d in day_details)
     utilization = round(total_matches / total_slots * 100) if total_slots > 0 else 0
@@ -572,10 +604,7 @@ def calculate_feasibility(tournament) -> dict:
         "feasible": feasible,
         "feasibility_score": feasibility_score,
         "utilization": utilization,
-        "cat_details": [
-            {"name": cd["cat"].name, "match_count": cd["match_count"]}
-            for cd in cat_details
-        ],
+        "cat_details": [{"name": cd["cat"].name, "match_count": cd["match_count"]} for cd in cat_details],
         "day_details": day_details,
         "fields_count": len(fields),
         "days_count": len(days),
@@ -618,23 +647,27 @@ def generate_schedule(tournament) -> dict:
         order = 0
         virtual_days = []
         while current <= tournament.end_date:
-            virtual_days.append(type("VDay", (), {
-                "id": None,
-                "pk": None,
-                "date": current,
-                "label": str(current),
-                "start_time": "08:00",
-                "end_time": "19:00",
-                "lunch_start": "12:00",
-                "lunch_end": "13:00",
-                "order": order,
-            })())
+            virtual_days.append(
+                type(
+                    "VDay",
+                    (),
+                    {
+                        "id": None,
+                        "pk": None,
+                        "date": current,
+                        "label": str(current),
+                        "start_time": "08:00",
+                        "end_time": "19:00",
+                        "lunch_start": "12:00",
+                        "lunch_end": "13:00",
+                        "order": order,
+                    },
+                )()
+            )
             current += timedelta(days=1)
             order += 1
         days = virtual_days
-        warnings.append(
-            "⚠️ Aucune journée configurée: génération sur les dates du tournoi (08:00–19:00)."
-        )
+        warnings.append("⚠️ Aucune journée configurée: génération sur les dates du tournoi (08:00–19:00).")
 
     groups = list(Group.objects.filter(category__tournament=tournament).prefetch_related("teams"))
     group_by_cat: dict[int, list] = defaultdict(list)
@@ -672,20 +705,22 @@ def generate_schedule(tournament) -> dict:
     # Create Match objects
     match_objects = []
     for sm in result["matches"]:
-        match_objects.append(Match(
-            tournament=tournament,
-            category=sm["category"],
-            group=sm["group"],
-            phase=sm["phase"],
-            team_home_id=sm["team_home_id"],
-            team_away_id=sm["team_away_id"],
-            field=sm["field"],
-            start_time=_build_datetime(sm["day"].date, sm["scheduled_time"]),
-            duration_minutes=sm["duration"],
-            status=Match.Status.SCHEDULED,
-            day=sm["day"] if hasattr(sm["day"], "pk") and sm["day"].pk else None,
-            slot_index=sm["slot_index"],
-        ))
+        match_objects.append(
+            Match(
+                tournament=tournament,
+                category=sm["category"],
+                group=sm["group"],
+                phase=sm["phase"],
+                team_home_id=sm["team_home_id"],
+                team_away_id=sm["team_away_id"],
+                field=sm["field"],
+                start_time=_build_datetime(sm["day"].date, sm["scheduled_time"]),
+                duration_minutes=sm["duration"],
+                status=Match.Status.SCHEDULED,
+                day=sm["day"] if hasattr(sm["day"], "pk") and sm["day"].pk else None,
+                slot_index=sm["slot_index"],
+            )
+        )
 
     if match_objects:
         Match.objects.bulk_create(match_objects)
@@ -717,14 +752,10 @@ def generate_finals(category) -> dict:
     Returns {"success": bool, "match_count": int} or {"success": False, "error": "..."}
     """
     from apps.standings.services import compute_group_standings
-    from apps.tournaments.models import Day, Field
+    from apps.tournaments.models import Field
 
     tournament = category.tournament
-    groups = list(
-        Group.objects.filter(category=category)
-        .order_by("display_order")
-        .prefetch_related("teams")
-    )
+    groups = list(Group.objects.filter(category=category).order_by("display_order").prefetch_related("teams"))
 
     if not groups:
         return {"success": False, "error": "Aucune poule"}
@@ -751,18 +782,20 @@ def generate_finals(category) -> dict:
         # Single pool: 1st vs 2nd
         r = rankings[0]
         if len(r) >= 2:
-            finals_matches.append({
-                "phase": Match.Phase.FINAL,
-                "team_home_id": r[0]["team_id"],
-                "team_away_id": r[1]["team_id"],
-                "placeholder_home": f"1er {groups[0].name}",
-                "placeholder_away": f"2e {groups[0].name}",
-                "round": 0,
-                "source_home": None,
-                "source_away": None,
-                "source_home_type": "",
-                "source_away_type": "",
-            })
+            finals_matches.append(
+                {
+                    "phase": Match.Phase.FINAL,
+                    "team_home_id": r[0]["team_id"],
+                    "team_away_id": r[1]["team_id"],
+                    "placeholder_home": f"1er {groups[0].name}",
+                    "placeholder_away": f"2e {groups[0].name}",
+                    "round": 0,
+                    "source_home": None,
+                    "source_away": None,
+                    "source_home_type": "",
+                    "source_away_type": "",
+                }
+            )
 
     elif len(groups) == 2:
         # 2 pools: semi-finals + third-place + final
@@ -786,47 +819,55 @@ def generate_finals(category) -> dict:
         finals_matches.append(s2_data)
 
         # Third place and final will reference semis (source_home/away set after creation)
-        finals_matches.append({
-            "phase": Match.Phase.THIRD_PLACE,
-            "team_home_id": None,
-            "team_away_id": None,
-            "placeholder_home": "Perdant D1",
-            "placeholder_away": "Perdant D2",
-            "round": 1,
-            "_source_home_idx": 0,  # index in finals_matches
-            "_source_away_idx": 1,
-            "_source_home_type": "loser",
-            "_source_away_type": "loser",
-        })
-        finals_matches.append({
-            "phase": Match.Phase.FINAL,
-            "team_home_id": None,
-            "team_away_id": None,
-            "placeholder_home": "Vainqueur D1",
-            "placeholder_away": "Vainqueur D2",
-            "round": 1,
-            "_source_home_idx": 0,
-            "_source_away_idx": 1,
-            "_source_home_type": "winner",
-            "_source_away_type": "winner",
-        })
+        finals_matches.append(
+            {
+                "phase": Match.Phase.THIRD_PLACE,
+                "team_home_id": None,
+                "team_away_id": None,
+                "placeholder_home": "Perdant D1",
+                "placeholder_away": "Perdant D2",
+                "round": 1,
+                "_source_home_idx": 0,  # index in finals_matches
+                "_source_away_idx": 1,
+                "_source_home_type": "loser",
+                "_source_away_type": "loser",
+            }
+        )
+        finals_matches.append(
+            {
+                "phase": Match.Phase.FINAL,
+                "team_home_id": None,
+                "team_away_id": None,
+                "placeholder_home": "Vainqueur D1",
+                "placeholder_away": "Vainqueur D2",
+                "round": 1,
+                "_source_home_idx": 0,
+                "_source_away_idx": 1,
+                "_source_home_type": "winner",
+                "_source_away_type": "winner",
+            }
+        )
 
     else:
         # 3+ pools: qualified teams
         qual = []
         for i, grp in enumerate(groups):
             if rankings[i]:
-                qual.append({
-                    "team": rankings[i][0],
-                    "pool_name": grp.name,
-                    "rank": 1,
-                })
+                qual.append(
+                    {
+                        "team": rankings[i][0],
+                        "pool_name": grp.name,
+                        "rank": 1,
+                    }
+                )
             if category.finals_format != "TOP1_FINAL" and len(rankings[i]) > 1:
-                qual.append({
-                    "team": rankings[i][1],
-                    "pool_name": grp.name,
-                    "rank": 2,
-                })
+                qual.append(
+                    {
+                        "team": rankings[i][1],
+                        "pool_name": grp.name,
+                        "rank": 2,
+                    }
+                )
 
         if len(qual) >= 4:
             s1_data = {
@@ -847,37 +888,37 @@ def generate_finals(category) -> dict:
             }
             finals_matches.append(s1_data)
             finals_matches.append(s2_data)
-            finals_matches.append({
-                "phase": Match.Phase.FINAL,
-                "team_home_id": None,
-                "team_away_id": None,
-                "placeholder_home": "V. D1",
-                "placeholder_away": "V. D2",
-                "round": 1,
-                "_source_home_idx": 0,
-                "_source_away_idx": 1,
-                "_source_home_type": "winner",
-                "_source_away_type": "winner",
-            })
+            finals_matches.append(
+                {
+                    "phase": Match.Phase.FINAL,
+                    "team_home_id": None,
+                    "team_away_id": None,
+                    "placeholder_home": "V. D1",
+                    "placeholder_away": "V. D2",
+                    "round": 1,
+                    "_source_home_idx": 0,
+                    "_source_away_idx": 1,
+                    "_source_home_type": "winner",
+                    "_source_away_type": "winner",
+                }
+            )
         elif len(qual) >= 2:
-            finals_matches.append({
-                "phase": Match.Phase.FINAL,
-                "team_home_id": qual[0]["team"]["team_id"],
-                "team_away_id": qual[1]["team"]["team_id"],
-                "placeholder_home": f"{qual[0]['pool_name']}",
-                "placeholder_away": f"{qual[1]['pool_name']}",
-                "round": 0,
-            })
+            finals_matches.append(
+                {
+                    "phase": Match.Phase.FINAL,
+                    "team_home_id": qual[0]["team"]["team_id"],
+                    "team_away_id": qual[1]["team"]["team_id"],
+                    "placeholder_home": f"{qual[0]['pool_name']}",
+                    "placeholder_away": f"{qual[1]['pool_name']}",
+                    "round": 0,
+                }
+            )
 
     if not finals_matches:
         return {"success": False, "error": "Pas assez d'équipes qualifiées"}
 
     # Determine scheduling for finals slots
-    last_pool = (
-        Match.objects.filter(category=category, phase=Match.Phase.GROUP)
-        .order_by("-slot_index")
-        .first()
-    )
+    last_pool = Match.objects.filter(category=category, phase=Match.Phase.GROUP).order_by("-slot_index").first()
     slot = (last_pool.slot_index or 0) + 2 if last_pool else 0
     last_time = last_pool.start_time if last_pool else None
 
@@ -891,7 +932,6 @@ def generate_finals(category) -> dict:
     date = last_pool.start_time.date() if last_pool and last_pool.start_time else tournament.start_date
 
     # Create Match objects in order, tracking created IDs for source references
-    created_matches = []
     by_round: dict[int, list] = defaultdict(list)
     for idx, fm in enumerate(finals_matches):
         by_round[fm.get("round", 0)].append((idx, fm))
@@ -975,10 +1015,12 @@ def propagate_winner(match: Match) -> int:
 
     updated = 0
     # Find matches referencing this match as source
-    next_matches = Match.objects.filter(
-        category=match.category,
-    ).exclude(phase=Match.Phase.GROUP).filter(
-        models_q_source_home_or_away(match.id)
+    next_matches = (
+        Match.objects.filter(
+            category=match.category,
+        )
+        .exclude(phase=Match.Phase.GROUP)
+        .filter(models_q_source_home_or_away(match.id))
     )
 
     for nm in next_matches:
@@ -1005,4 +1047,5 @@ def propagate_winner(match: Match) -> int:
 def models_q_source_home_or_away(match_id):
     """Build a Q filter for matches referencing this match as source."""
     from django.db.models import Q
+
     return Q(source_home_id=match_id) | Q(source_away_id=match_id)
