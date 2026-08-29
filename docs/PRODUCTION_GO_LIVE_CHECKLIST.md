@@ -53,7 +53,7 @@
 - [x] `IMAGE_TAG` propagé au container backend (visible via health endpoint)
 - [ ] **MANUAL STEP** : Vérifier que GHCR est accessible depuis le VPS :
   ```bash
-  docker pull ghcr.io/theotranvan/tournoi-app/backend:latest
+  docker pull ghcr.io/m-eddy-x/football/backend:latest
   ```
 
 ---

@@ -94,7 +94,14 @@ SERVER_EMAIL = DEFAULT_FROM_EMAIL
 USE_S3_MEDIA = config("USE_S3_MEDIA", default=False, cast=bool)
 if USE_S3_MEDIA:
     INSTALLED_APPS += ["storages"]  # noqa: F405
-    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    # DEFAULT_FILE_STORAGE was removed in Django 5.1 and is silently ignored
+    # when STORAGES is defined (base.py does define it), which meant media
+    # kept landing on the local disk despite USE_S3_MEDIA=True.
+    # Override the "default" backend and keep whitenoise for staticfiles.
+    STORAGES = {  # noqa: F405
+        **STORAGES,  # noqa: F405
+        "default": {"BACKEND": "storages.backends.s3boto3.S3Boto3Storage"},
+    }
     AWS_ACCESS_KEY_ID = config("AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY = config("AWS_SECRET_ACCESS_KEY")
     AWS_STORAGE_BUCKET_NAME = config("AWS_STORAGE_BUCKET_NAME")

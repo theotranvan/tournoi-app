@@ -92,7 +92,7 @@ Si le rollback auto échoue aussi, un rollback manuel est nécessaire.
 
 ```bash
 # Vérifier que l'image existe dans GHCR
-docker pull ghcr.io/theotranvan/tournoi-app/backend:<SHA>
+docker pull ghcr.io/m-eddy-x/football/backend:<SHA>
 
 # Si l'image n'existe pas, build localement
 git checkout <SHA>

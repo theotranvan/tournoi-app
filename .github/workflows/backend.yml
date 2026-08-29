@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install dependencies
-        run: pip install ".[dev]"
+        run: pip install ".[prod,dev]"
       - name: Ruff check
         run: ruff check .
       - name: Ruff format check
@@ -76,7 +76,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install dependencies
-        run: pip install ".[dev]"
+        run: pip install ".[prod,dev]"
       - name: Run migrations
         run: python manage.py migrate --noinput
       - name: Run tests

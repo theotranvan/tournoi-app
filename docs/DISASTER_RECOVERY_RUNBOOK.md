@@ -13,11 +13,11 @@
 
 | Élément | Localisation | Criticité |
 |---------|-------------|-----------|
-| Code source | GitHub `theotranvan/tournoi-app` | CRITIQUE |
+| Code source | GitHub `M-EDDY-X/Football` | CRITIQUE |
 | `.env.production` | Sauvegardé hors serveur (gestionnaire de mots de passe) | CRITIQUE |
 | Backup DB | S3 offsite (`s3://$S3_BUCKET/backups/`) | CRITIQUE |
 | Backup media | S3 offsite | IMPORTANT |
-| Images Docker | GHCR (`ghcr.io/theotranvan/tournoi-app/*`) | IMPORTANT |
+| Images Docker | GHCR (`ghcr.io/m-eddy-x/football/*`) | IMPORTANT |
 | Certificat SSL | Regénérable via Let's Encrypt | AUTOMATIQUE |
 | DNS | Registrar (modifier l'IP si nouveau serveur) | MANUEL |
 
@@ -39,7 +39,7 @@ sudo usermod -aG docker $USER
 ### Étape 2 — Cloner le repo
 
 ```bash
-git clone https://github.com/theotranvan/tournoi-app.git /opt/kickoff
+git clone https://github.com/M-EDDY-X/Football.git /opt/kickoff
 cd /opt/kickoff
 ```
 
@@ -174,7 +174,7 @@ $COMPOSE up -d postgres
 |---------|-----------|---------|
 | VPS | (provider dashboard URL) | (support URL) |
 | DNS/Domain | (registrar dashboard) | (registrar support) |
-| GHCR | github.com/theotranvan/tournoi-app/pkgs | GitHub Support |
+| GHCR | github.com/M-EDDY-X/Football/pkgs | GitHub Support |
 | Stripe | dashboard.stripe.com | stripe.com/support |
 | S3/Backups | (provider dashboard) | (provider support) |
 | Sentry | sentry.io | - |
