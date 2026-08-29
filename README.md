@@ -63,8 +63,14 @@ python manage.py runserver
 # Frontend (dans un autre terminal)
 cd frontend
 npm install
+# .env.local REQUIS, sinon le front tape sur le backend déployé (cf. src/lib/capacitor.ts) :
+printf 'NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1\nNEXT_PUBLIC_WS_URL=ws://localhost:8000/ws\n' > .env.local
 npm run dev
 ```
+
+> 💡 En dev, **ni Redis ni Celery ne sont nécessaires** : `settings/dev.py` utilise un
+> channel layer en mémoire et la génération de planning est synchrone. Compte de test
+> organisateur : `organisateur` / `Footix2026!`. Voir [CLAUDE.md](CLAUDE.md) pour les détails.
 
 ## Variables d'environnement
 
@@ -81,6 +87,9 @@ cd backend && mypy apps/ --ignore-missing-imports
 
 # Tests backend
 cd backend && pytest
+
+# Tests frontend e2e (⚠️ --workers=1 obligatoire : le parallélisme sature le dev server Turbopack)
+cd frontend && npx playwright test --workers=1
 
 # Build frontend
 cd frontend && npm run build
