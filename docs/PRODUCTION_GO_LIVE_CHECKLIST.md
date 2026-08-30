@@ -13,6 +13,7 @@
 - [x] Tests frontend bloquants (eslint + tsc + next build)
 - [x] E2E frontend bloquants (Playwright)
 - [x] Dependency scanning (pip-audit + npm audit)
+- [x] Dépendances backend : source unique = `backend/pyproject.toml` (extras `prod` / `dev`), installées à l'identique en CI (`pip install ".[prod,dev]"`) et dans l'image Docker (`.[prod]`). `requirements.txt` est **déprécié** — ne rien y ajouter (reconfigurer Dependabot sur `pyproject.toml` si besoin)
 - [x] Images taguées par SHA commit (immuables)
 - [x] Deploy ne se déclenche que si tous les checks passent
 - [ ] **MANUAL STEP** : Vérifier que les GitHub Secrets sont configurés :
@@ -64,6 +65,7 @@
 - [ ] **MANUAL STEP** : Générer `POSTGRES_PASSWORD` (fort)
 - [ ] **MANUAL STEP** : Générer `REDIS_PASSWORD` (fort)
 - [ ] **MANUAL STEP** : Configurer `.env.production` depuis `.env.production.example`
+- [ ] **MANUAL STEP** : Dans `.env.production`, mettre entre **guillemets** toute valeur contenant des espaces/caractères shell (ex. `DEFAULT_FROM_EMAIL="Footix <noreply@footix.app>"`) — sinon le sourcing par `deploy.sh` / `rollback.sh` échoue
 - [ ] **MANUAL STEP** : Sauvegarder `.env.production` dans un gestionnaire de secrets
 - [ ] **MANUAL STEP** : Vérifier que `.env.production` est dans `.gitignore` ✓
 
@@ -74,13 +76,20 @@
 - [x] Nginx config SSL stricte (TLS 1.2+, ciphers modernes)
 - [x] HTTP → HTTPS redirect
 - [x] HSTS 2 ans + preload
-- [ ] **MANUAL STEP** : Obtenir le certificat SSL :
+- [ ] **PRÉREQUIS** : DNS déjà résolu vers le VPS (section Domaine/DNS) **et** port 80 libre — `deploy.sh --ssl` utilise certbot `--standalone` qui lie le port 80
+- [ ] **MANUAL STEP** : Renseigner `CERTBOT_DOMAINS` (et `SSL_EMAIL`) dans `.env.production` (à défaut, `ALLOWED_HOSTS` est utilisé)
+- [ ] **MANUAL STEP** : Obtenir le certificat SSL (première émission uniquement) :
   ```bash
   ./deploy.sh --ssl
   ```
 - [ ] **MANUAL STEP** : Vérifier le certificat :
   ```bash
   curl -vI https://footix.app 2>&1 | grep "expire date"
+  ```
+- [ ] **MANUAL STEP** : Vérifier le **renouvellement automatique** (service `certbot` webroot + reload nginx toutes les 6 h — n'agit que ~J-30 avant expiration) :
+  ```bash
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+    run --rm --entrypoint certbot certbot certificates
   ```
 
 ---

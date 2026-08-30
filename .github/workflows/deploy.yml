@@ -11,7 +11,9 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ${{ github.repository }}
+  # Image paths on ghcr.io must be lowercase. ${{ github.repository }} preserves
+  # the owner/repo casing as-is, so each job lowercases it into $IMAGE_PREFIX
+  # before use (a no-op for an already-lowercase repo, safe if it ever changes).
 
 jobs:
   # ── Backend lint + type checks ─────────────────
@@ -24,7 +26,8 @@ jobs:
           python-version: "3.13"
       - name: Install dependencies
         working-directory: backend
-        run: pip install ".[dev]"
+        # [prod] included so CI installs the exact set the Docker image runs.
+        run: pip install ".[prod,dev]"
       - name: Ruff lint
         working-directory: backend
         run: ruff check .
@@ -75,7 +78,8 @@ jobs:
           python-version: "3.13"
       - name: Install dependencies
         working-directory: backend
-        run: pip install ".[dev]"
+        # [prod] included so CI installs the exact set the Docker image runs.
+        run: pip install ".[prod,dev]"
       - name: Run migrations
         working-directory: backend
         run: python manage.py migrate --noinput
@@ -153,6 +157,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Lowercase image prefix
+        run: echo "IMAGE_PREFIX=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
@@ -188,7 +195,8 @@ jobs:
             cd ${{ vars.DEPLOY_PATH || '/opt/kickoff' }}
             export IMAGE_TAG=${{ github.sha }}
             export REGISTRY=ghcr.io
-            export IMAGE_PREFIX=${{ github.repository }}
+            # Lowercased: ghcr.io rejects uppercase image paths.
+            export IMAGE_PREFIX=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
 
             # Save current image tag for rollback
             PREV_TAG=""

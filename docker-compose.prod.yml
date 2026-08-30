@@ -107,8 +107,43 @@ services:
     volumes:
       - ./nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
+      - certbot_www:/var/www/certbot:ro
       - backend_static:/app/backend/staticfiles:ro
       - backend_media:/app/backend/media:ro
+    # Reload every 6h so a certificate renewed by the `certbot` service is
+    # picked up without a manual restart. Renewal writes the same flat paths
+    # nginx already reads, so a reload is enough.
+    command: >
+      /bin/sh -c "while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g 'daemon off;'"
+
+  # ── TLS renewal (Let's Encrypt, webroot challenge) ────────
+  # Initial issuance is done once by `./deploy.sh --ssl` (standalone).
+  # This service keeps the certificate alive: certbot only renews within
+  # 30 days of expiry, so a 12h loop is cheap and never hits rate limits.
+  certbot:
+    image: certbot/certbot:latest
+    restart: always
+    volumes:
+      - ./nginx/ssl:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    depends_on:
+      - nginx
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        trap exit TERM
+        while :; do
+          certbot renew \
+            --webroot --webroot-path /var/www/certbot \
+            --quiet \
+            --deploy-hook 'cp -L /etc/letsencrypt/live/*/fullchain.pem /etc/letsencrypt/fullchain.pem && cp -L /etc/letsencrypt/live/*/privkey.pem /etc/letsencrypt/privkey.pem'
+          sleep 12h & wait $${!}
+        done
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   # ── Backup cron (daily at 3 AM) ────────────────
   backup:
@@ -197,3 +232,7 @@ services:
       resources:
         limits:
           memory: 128M
+
+# Merged with the volumes declared in docker-compose.yml.
+volumes:
+  certbot_www:

@@ -6,6 +6,8 @@ set -euo pipefail
 
 COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
 REGISTRY="${REGISTRY:-ghcr.io}"
+# Must match `${{ github.repository }}` used by .github/workflows/deploy.yml,
+# lowercased — ghcr.io rejects uppercase in image paths.
 IMAGE_PREFIX="${IMAGE_PREFIX:-theotranvan/tournoi-app}"
 
 # ── Parse args ───────────────────────────────────
@@ -36,7 +38,13 @@ if [ ! -f .env.production ]; then
 fi
 
 echo "✓ Loading .env.production"
-export $(grep -v '^#' .env.production | xargs)
+# `export $(grep ... | xargs)` breaks on any value containing spaces, quotes or
+# shell metacharacters (e.g. DEFAULT_FROM_EMAIL="Footix <noreply@footix.app>").
+# Sourcing with `set -a` exports every assignment verbatim.
+set -a
+# shellcheck disable=SC1091
+. ./.env.production
+set +a
 
 # ── Image tag resolution ─────────────────────────
 if [ -z "$IMAGE_TAG" ]; then
@@ -81,19 +89,51 @@ else
 fi
 
 # ── SSL setup (Let's Encrypt via certbot) ────────
+# Initial issuance only. Renewal is handled by the `certbot` service in
+# docker-compose.prod.yml (webroot challenge, every 12h) — do NOT rely on
+# re-running this flag to keep the certificate alive.
 if [ "$SSL" = true ]; then
-    echo "→ Setting up SSL certificates..."
+    echo "→ Setting up SSL certificates (initial issuance)..."
     mkdir -p nginx/ssl
-    docker run --rm -v "$(pwd)/nginx/ssl:/etc/letsencrypt" \
+
+    # certbot --standalone binds :80, so nginx must release it first.
+    echo "  Stopping nginx to free port 80..."
+    $COMPOSE --env-file .env.production stop nginx 2>/dev/null || true
+
+    # Request one certificate covering every domain served by this stack.
+    # `set -u` is active: keep both fallbacks defaulted so an unset variable
+    # doesn't abort the deploy before we can print a useful error.
+    CERT_DOMAINS="${CERTBOT_DOMAINS:-${ALLOWED_HOSTS:-}}"
+    if [ -z "$CERT_DOMAINS" ]; then
+        echo "ERROR: set CERTBOT_DOMAINS (or ALLOWED_HOSTS) in .env.production before using --ssl"
+        exit 1
+    fi
+    CERTBOT_ARGS=""
+    IFS=','
+    for domain in $CERT_DOMAINS; do
+        domain=$(echo "$domain" | tr -d '[:space:]')
+        [ -n "$domain" ] && CERTBOT_ARGS="$CERTBOT_ARGS -d $domain"
+    done
+    unset IFS
+
+    echo "  Requesting certificate for:$CERTBOT_ARGS"
+    # shellcheck disable=SC2086
+    docker run --rm \
+        -v "$(pwd)/nginx/ssl:/etc/letsencrypt" \
         -p 80:80 certbot/certbot certonly \
         --standalone \
         --agree-tos \
         --no-eff-email \
-        -d "${ALLOWED_HOSTS%%,*}" \
-        --email "${SSL_EMAIL:-admin@footix.app}"
-    cp nginx/ssl/live/*/fullchain.pem nginx/ssl/fullchain.pem
-    cp nginx/ssl/live/*/privkey.pem nginx/ssl/privkey.pem
-    echo "✓ SSL certificates obtained"
+        --keep-until-expiring \
+        --email "${SSL_EMAIL:-admin@footix.app}" \
+        $CERTBOT_ARGS
+
+    # nginx reads flat paths (/etc/nginx/ssl/{fullchain,privkey}.pem);
+    # certbot writes to live/<primary-domain>/. Mirror them.
+    PRIMARY_DOMAIN=$(echo "$CERT_DOMAINS" | cut -d, -f1 | tr -d '[:space:]')
+    cp "nginx/ssl/live/$PRIMARY_DOMAIN/fullchain.pem" nginx/ssl/fullchain.pem
+    cp "nginx/ssl/live/$PRIMARY_DOMAIN/privkey.pem" nginx/ssl/privkey.pem
+    echo "✓ SSL certificates obtained for $PRIMARY_DOMAIN"
 fi
 
 # ── Build ────────────────────────────────────────

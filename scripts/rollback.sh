@@ -20,6 +20,8 @@ set -euo pipefail
 
 COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
 REGISTRY="${REGISTRY:-ghcr.io}"
+# Must match `${{ github.repository }}` used by .github/workflows/deploy.yml,
+# lowercased — ghcr.io rejects uppercase in image paths.
 IMAGE_PREFIX="${IMAGE_PREFIX:-theotranvan/tournoi-app}"
 
 TARGET_SHA=""
@@ -33,8 +35,14 @@ for arg in "$@"; do
 done
 
 # ── Load env ─────────────────────────────────────
+# Same bug as deploy.sh had: `export $(grep ... | xargs)` breaks on values
+# containing spaces or shell metacharacters. This runs during an outage —
+# it must not be the thing that fails.
 if [ -f .env.production ]; then
-    export $(grep -v '^#' .env.production | xargs)
+    set -a
+    # shellcheck disable=SC1091
+    . ./.env.production
+    set +a
 fi
 
 # ── Resolve target SHA ───────────────────────────

@@ -74,6 +74,22 @@ chmod +x deploy.sh scripts/*.sh
 ./deploy.sh --build --migrate --ssl
 ```
 
+`--ssl` ne sert qu'à la **première émission** du certificat (certbot `--standalone`,
+nginx est arrêté le temps de libérer le port 80). Les domaines demandés viennent de
+`CERTBOT_DOMAINS` (ou `ALLOWED_HOSTS` à défaut).
+
+Le **renouvellement est ensuite automatique** : le service `certbot` de
+`docker-compose.prod.yml` tente un `certbot renew` en mode webroot toutes les 12 h
+(Let's Encrypt ne renouvelle que dans les 30 derniers jours), recopie les certificats
+vers les chemins lus par nginx, et nginx se recharge tout seul toutes les 6 h.
+
+Vérifier l'échéance à tout moment :
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  run --rm --entrypoint certbot certbot certificates
+```
+
 ## Étape 6 : Vérification
 
 ```bash

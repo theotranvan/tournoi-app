@@ -1,24 +1,13 @@
-django>=5.2,<6.0
-djangorestframework>=3.15,<4.0
-djangorestframework-simplejwt>=5.3,<6.0
-PyJWT>=2.8,<3.0
-drf-spectacular>=0.28,<1.0
-django-cors-headers>=4.3,<5.0
-django-filter>=24.0
-dj-database-url>=2.2,<3.0
-Pillow>=10.0
-qrcode[pil]>=8.0,<9.0
-psycopg2-binary>=2.9,<3.0
-python-decouple>=3.8
-channels>=4.1,<5.0
-channels-redis>=4.2,<5.0
-daphne>=4.1,<5.0
-celery>=5.4,<6.0
-redis>=5.0,<6.0
-sentry-sdk[django]>=2.0,<3.0
-django-structlog>=8.0,<9.0
-django-ratelimit>=4.1,<5.0
-pywebpush>=2.0,<3.0
-gunicorn>=22.0,<23.0
-whitenoise>=6.7,<7.0
-stripe>=11.0,<16.0
+# DEPRECATED — do not add dependencies here.
+#
+# Dependencies are declared in backend/pyproject.toml, which is the single
+# source of truth for both CI (`pip install ".[prod,dev]"`) and the production
+# image (`pip install ".[prod]"`, see backend/Dockerfile).
+#
+# This file previously drifted from pyproject.toml (it was missing
+# django-storages), which meant CI validated a different dependency set than
+# the one running in production.
+#
+# To get a pinned lockfile instead:
+#     pip install pip-tools
+#     pip-compile --extra prod backend/pyproject.toml -o backend/requirements.lock
