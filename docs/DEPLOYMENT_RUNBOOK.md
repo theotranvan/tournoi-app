@@ -63,7 +63,7 @@ cd /opt/kickoff
 
 ```bash
 # 1. Cloner le repo
-git clone https://github.com/M-EDDY-X/Football.git /opt/kickoff
+git clone https://github.com/theotranvan/tournoi-app.git /opt/kickoff
 cd /opt/kickoff
 
 # 2. Configurer l'environnement

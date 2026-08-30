@@ -25,7 +25,7 @@ push main → GitHub Actions:
 ssh root@your-vps-ip
 apt update && apt upgrade -y
 apt install -y docker.io docker-compose-plugin git
-git clone https://github.com/M-EDDY-X/Football.git /opt/kickoff
+git clone https://github.com/theotranvan/tournoi-app.git /opt/kickoff
 cd /opt/kickoff
 ```
 

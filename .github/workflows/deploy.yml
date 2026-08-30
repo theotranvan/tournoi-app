@@ -11,9 +11,9 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  # NOTE: do not use ${{ github.repository }} directly — it keeps the original
-  # casing (M-EDDY-X/Football) and ghcr.io rejects uppercase image paths.
-  # Each job lowercases it into $IMAGE_PREFIX before use.
+  # Image paths on ghcr.io must be lowercase. ${{ github.repository }} preserves
+  # the owner/repo casing as-is, so each job lowercases it into $IMAGE_PREFIX
+  # before use (a no-op for an already-lowercase repo, safe if it ever changes).
 
 jobs:
   # ── Backend lint + type checks ─────────────────

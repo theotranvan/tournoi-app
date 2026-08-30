@@ -8,7 +8,7 @@ COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
 REGISTRY="${REGISTRY:-ghcr.io}"
 # Must match `${{ github.repository }}` used by .github/workflows/deploy.yml,
 # lowercased — ghcr.io rejects uppercase in image paths.
-IMAGE_PREFIX="${IMAGE_PREFIX:-m-eddy-x/football}"
+IMAGE_PREFIX="${IMAGE_PREFIX:-theotranvan/tournoi-app}"
 
 # ── Parse args ───────────────────────────────────
 BUILD=false

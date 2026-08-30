@@ -22,7 +22,7 @@ COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
 REGISTRY="${REGISTRY:-ghcr.io}"
 # Must match `${{ github.repository }}` used by .github/workflows/deploy.yml,
 # lowercased — ghcr.io rejects uppercase in image paths.
-IMAGE_PREFIX="${IMAGE_PREFIX:-m-eddy-x/football}"
+IMAGE_PREFIX="${IMAGE_PREFIX:-theotranvan/tournoi-app}"
 
 TARGET_SHA=""
 RESTORE_DB=false
@@ -60,7 +60,7 @@ if [ -z "$TARGET_SHA" ]; then
     git log --oneline -10 2>/dev/null || true
     echo ""
     echo "Available images in GHCR:"
-    echo "  Check: https://github.com/M-EDDY-X/Football/pkgs/container/Football%2Fbackend"
+    echo "  Check: https://github.com/theotranvan/tournoi-app/pkgs/container/tournoi-app%2Fbackend"
     exit 1
 fi
 

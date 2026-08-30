@@ -186,7 +186,7 @@ aws s3 cp s3://$S3_BUCKET/backups/YYYYMMDD_HHMMSS/ ./backups/ --recursive --endp
 ### Procédure
 ```bash
 # 1. Cloner le repo
-git clone https://github.com/M-EDDY-X/Football.git /opt/kickoff
+git clone https://github.com/theotranvan/tournoi-app.git /opt/kickoff
 cd /opt/kickoff
 
 # 2. Restaurer la config

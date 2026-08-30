@@ -27,7 +27,7 @@ services:
       retries: 5
 
   backend:
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-m-eddy-x/football}/backend:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-theotranvan/tournoi-app}/backend:${IMAGE_TAG:-latest}
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
@@ -52,7 +52,7 @@ services:
       start_period: 30s
 
   celery-worker:
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-m-eddy-x/football}/backend:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-theotranvan/tournoi-app}/backend:${IMAGE_TAG:-latest}
     command: celery -A kickoff worker -l warning --concurrency=4 --max-tasks-per-child=1000
     volumes: []
     restart: always
@@ -70,7 +70,7 @@ services:
       start_period: 30s
 
   celery-beat:
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-m-eddy-x/football}/backend:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-theotranvan/tournoi-app}/backend:${IMAGE_TAG:-latest}
     command: celery -A kickoff beat -l warning --pidfile=/tmp/celerybeat.pid
     volumes: []
     restart: always
@@ -88,7 +88,7 @@ services:
       start_period: 30s
 
   frontend:
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-m-eddy-x/football}/frontend:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-theotranvan/tournoi-app}/frontend:${IMAGE_TAG:-latest}
     restart: always
     ports: []   # Only exposed via nginx
     environment:
